@@ -125,10 +125,13 @@ def save_salary_record():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Vérifier si la colonne hours_worked existe
+        # Vérifier si les colonnes hours_worked et is_synced existent
         cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
         hours_worked_exists = cursor.fetchone()
-        if hours_worked_exists:
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'is_synced'")
+        is_synced_exists = cursor.fetchone()
+
+        if hours_worked_exists and is_synced_exists:
             query = '''
                 INSERT INTO salaries 
                 (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
@@ -144,11 +147,27 @@ def save_salary_record():
                 record['period'],
                 record['date']
             ]
+        elif hours_worked_exists:
+            query = '''
+                INSERT INTO salaries 
+                (id, employee_id, employee_name, type, amount, hours_worked, period, date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            '''
+            values = [
+                record.get('id', str(int(record['date']))),
+                record['employeeId'],
+                record['employeeName'],
+                record['type'],
+                record['amount'],
+                record.get('hoursWorked'),
+                record['period'],
+                record['date']
+            ]
         else:
             query = '''
                 INSERT INTO salaries 
-                (id, employee_id, employee_name, type, amount, period, date, is_synced)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
+                (id, employee_id, employee_name, type, amount, period, date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             '''
             values = [
                 record.get('id', str(int(record['date']))),
