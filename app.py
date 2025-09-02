@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 # --- Configuration ---
-DB_TYPE = os.getenv("DB_TYPE", "postgresql")  # "sqlite" ou "postgresql"
+DB_TYPE = os.getenv("DB_TYPE", "sqlite")  # "sqlite" ou "postgresql"
 
 # --- Connexion DB ---
 def get_db():
@@ -31,6 +31,9 @@ def login():
     data = request.json
     username = data.get("username")
     password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"success": False, "message": "Nom d'utilisateur et mot de passe requis"}), 400
 
     conn = get_db()
     cur = conn.cursor()
@@ -69,17 +72,24 @@ def get_employees():
 # --- ROUTES SALAIRES ---
 @app.route('/api/salary', methods=['POST'])
 def save_salary_record():
-    record = request.json
+    record = request.json or {}
 
     # Champs obligatoires
     required = ['employeeId', 'employeeName', 'type', 'amount', 'date']
     for field in required:
-        if field not in record:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+        if field not in record or record[field] in (None, ''):
+            return jsonify({"error": f"Champ manquant ou vide: {field}"}), 400
 
     # Champs optionnels
     period = record.get('period', '') or ''
     hoursWorked = record.get('hoursWorked', 0.0) or 0.0
+
+    # Conversion en float si nécessaire
+    try:
+        amount = float(record['amount'])
+        hoursWorked = float(hoursWorked)
+    except ValueError:
+        return jsonify({"error": "Le champ 'amount' ou 'hoursWorked' doit être un nombre"}), 400
 
     # ID unique si non fourni
     salary_id = record.get('id', str(int(record['date'])))
@@ -98,7 +108,7 @@ def save_salary_record():
         record['employeeId'],
         record['employeeName'],
         record['type'],
-        record['amount'],
+        amount,
         hoursWorked,
         period,
         record['date']
