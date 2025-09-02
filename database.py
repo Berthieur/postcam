@@ -89,6 +89,13 @@ def init_db():
                 print("✅ Colonne type ajoutée à la table salaries")
                 cursor.execute("UPDATE salaries SET type = 'salaire' WHERE type = ''")
 
+            # Vérifier et ajouter hours_worked si nécessaire
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE salaries ADD COLUMN hours_worked REAL")
+                print("✅ Colonne hours_worked ajoutée à la table salaries")
+                cursor.execute("UPDATE salaries SET hours_worked = 0.0 WHERE hours_worked IS NULL")
+
             conn.commit()
             print("✅ Tables PostgreSQL créées ou mises à jour")
         except Exception as e:
@@ -141,6 +148,9 @@ def verify_schema():
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
             if not cursor.fetchone():
                 raise Exception("La colonne type n'existe pas dans la table salaries")
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
+            if not cursor.fetchone():
+                raise Exception("La colonne hours_worked n'existe pas dans la table salaries")
             print("✅ Schéma vérifié avec succès")
         else:
             cursor.execute("PRAGMA table_info(salaries)")
@@ -149,6 +159,8 @@ def verify_schema():
                 raise Exception("La colonne employee_name n'existe pas dans la table salaries (SQLite)")
             if 'type' not in columns:
                 raise Exception("La colonne type n'existe pas dans la table salaries (SQLite)")
+            if 'hours_worked' not in columns:
+                raise Exception("La colonne hours_worked n'existe pas dans la table salaries (SQLite)")
             print("✅ Schéma SQLite vérifié avec succès")
     except Exception as e:
         print(f"❌ Erreur vérification schéma: {e}")
