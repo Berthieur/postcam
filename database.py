@@ -6,19 +6,20 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db():
     if DATABASE_URL:
-        # PostgreSQL
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
-        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        try:
+            import psycopg2
+            from psycopg2.extras import RealDictCursor
+            return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+        except Exception as e:
+            print(f"❌ Échec connexion PostgreSQL: {e}")
+            raise
     else:
-        # SQLite local
         conn = sqlite3.connect('tracking.db')
         conn.row_factory = sqlite3.Row
         return conn
 
 def init_db():
     if DATABASE_URL:
-        # PostgreSQL
         conn = None
         try:
             import psycopg2
@@ -31,8 +32,7 @@ def init_db():
                     nom TEXT NOT NULL,
                     prenom TEXT NOT NULL,
                     type TEXT NOT NULL,
-                    is_active INTEGER DEFAULT 1,
-                    created_at BIGINT
+                    is_active INTEGER DEFAULT 1
                 )
             ''')
 
@@ -40,7 +40,10 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS salaries (
                     id TEXT PRIMARY KEY,
                     employee_id TEXT REFERENCES employees(id),
+                    employee_name TEXT NOT NULL,
+                    type TEXT NOT NULL,
                     amount REAL NOT NULL,
+                    hours_worked REAL,
                     period TEXT NOT NULL,
                     date BIGINT NOT NULL
                 )
@@ -49,12 +52,11 @@ def init_db():
             conn.commit()
             print("✅ Tables PostgreSQL créées")
         except Exception as e:
-            print(f"❌ Erreur PostgreSQL : {e}")
+            print(f"❌ Erreur init_db PostgreSQL: {e}")
         finally:
             if conn:
                 conn.close()
     else:
-        # SQLite
         with sqlite3.connect('tracking.db') as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -70,7 +72,10 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS salaries (
                     id TEXT PRIMARY KEY,
                     employee_id TEXT NOT NULL,
+                    employee_name TEXT NOT NULL,
+                    type TEXT NOT NULL,
                     amount REAL NOT NULL,
+                    hours_worked REAL,
                     period TEXT NOT NULL,
                     date INTEGER NOT NULL,
                     FOREIGN KEY(employee_id) REFERENCES employees(id)
