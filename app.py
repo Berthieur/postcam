@@ -6,7 +6,7 @@ from datetime import datetime
 
 # === Configuration de l'application ===
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981')  # Clé par défaut
+app.secret_key = os.getenv('SECRET_KEY', '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Logging ===
@@ -62,7 +62,6 @@ def logout():
 # 🔐 API Login
 @app.route('/api/login', methods=['POST'])
 def login():
-    # Vérifier le Content-Type pour gérer JSON ou données de formulaire
     content_type = request.headers.get('Content-Type', '')
     data = None
     if 'application/json' in content_type:
@@ -79,7 +78,6 @@ def login():
         logger.error(f"❌ Content-Type non supporté: {content_type}")
         return jsonify({"error": "Content-Type doit être application/json ou application/x-www-form-urlencoded"}), 415
 
-    # Vérifier les identifiants
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
@@ -177,14 +175,28 @@ def dashboard():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type,
-                   s.amount, s.period, s.date
-            FROM salaries s
-            INNER JOIN employees e ON e.id = s.employee_id
-            WHERE e.is_active = 1
-            ORDER BY s.date DESC
-        ''')
+        # Vérifier si la colonne type existe
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
+        type_exists = cursor.fetchone()
+        if type_exists:
+            query = '''
+                SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type,
+                       s.amount, s.period, s.date
+                FROM salaries s
+                INNER JOIN employees e ON e.id = s.employee_id
+                WHERE e.is_active = 1
+                ORDER BY s.date DESC
+            '''
+        else:
+            query = '''
+                SELECT e.nom, e.prenom, e.type, s.employee_name, 'salaire' AS payment_type,
+                       s.amount, s.period, s.date
+                FROM salaries s
+                INNER JOIN employees e ON e.id = s.employee_id
+                WHERE e.is_active = 1
+                ORDER BY s.date DESC
+            '''
+        cursor.execute(query)
         payments = [dict(row) for row in cursor.fetchall()]
         conn.close()
         logger.info("✅ Tableau de bord chargé")
