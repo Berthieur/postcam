@@ -110,6 +110,44 @@ def get_all_employees():
         logger.error(f"❌ get_all_employees: {e}")
         return jsonify({"error": str(e)}), 500
 
+# 👥 Ajouter un employé
+@app.route('/api/employees', methods=['POST'])
+def add_employee():
+    record = request.get_json()
+    logger.info(f"📥 Reçu pour /api/employees: {record}")
+
+    required = ['id', 'nom', 'prenom', 'type']
+    for field in required:
+        if field not in record:
+            logger.error(f"❌ Champ manquant: {field}")
+            return jsonify({"error": f"Champ manquant: {field}"}), 400
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', [
+            record['id'],
+            record['nom'],
+            record['prenom'],
+            record['type'],
+            record.get('is_active', 1),
+            record.get('created_at', int(datetime.now().timestamp() * 1000))
+        ])
+        conn.commit()
+        logger.info("✅ Employé ajouté")
+        return jsonify({"status": "success"}), 201
+    except Exception as e:
+        logger.error(f"❌ Échec add_employee: {e}")
+        return jsonify({"error": "Échec de l'enregistrement", "details": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+
 # 💰 Enregistrer un salaire
 @app.route('/api/salary', methods=['POST'])
 def save_salary_record():
@@ -125,6 +163,12 @@ def save_salary_record():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        # Vérifier si l'employeeId existe dans la table employees
+        cursor.execute("SELECT id FROM employees WHERE id = %s", (record['employeeId'],))
+        if not cursor.fetchone():
+            logger.error(f"❌ employeeId {record['employeeId']} n'existe pas dans la table employees")
+            return jsonify({"error": f"Employé avec ID {record['employeeId']} non trouvé"}), 400
+
         # Vérifier si les colonnes hours_worked et is_synced existent
         cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
         hours_worked_exists = cursor.fetchone()
