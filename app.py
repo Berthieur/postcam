@@ -62,7 +62,7 @@ def login():
     if not data:
         return jsonify({"error": "JSON manquant"}), 400
 
-    if data.get('username') == 'admin' and data.get('password') == '1234':
+    if data.get('username') == 'admin' and data.get('password') == 'admin123':
         session['logged_in'] = True
         return jsonify({
             "token": "fake-jwt-token-123",
