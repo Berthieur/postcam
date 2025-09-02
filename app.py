@@ -2,101 +2,19 @@
 import os
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from datetime import datetime
 
-# === Configuration de l'application ===
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'super-secret-key-change-in-production')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# === Connexion à PostgreSQL (Neon.tech) ===
-# 🔥 Ton URL complète depuis Neon
-DATABASE_URL = os.getenv('DATABASE_URL')
-
-def get_db():
-    """Retourne une connexion à la base PostgreSQL"""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-
-def init_db():
-    """Crée les tables si elles n'existent pas"""
-    try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-
-        # Table employees
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS employees (
-                id TEXT PRIMARY KEY,
-                nom TEXT NOT NULL,
-                prenom TEXT NOT NULL,
-                date_naissance TEXT,
-                lieu_naissance TEXT,
-                telephone TEXT,
-                email TEXT,
-                profession TEXT,
-                type TEXT NOT NULL,
-                taux_horaire REAL,
-                frais_ecolage REAL,
-                qr_code TEXT,
-                is_active INTEGER DEFAULT 1,
-                created_at BIGINT,
-                is_synced INTEGER DEFAULT 0
-            )
-        ''')
-
-        # Table salaries
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS salaries (
-                id TEXT PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
-                employee_name TEXT NOT NULL,
-                type TEXT NOT NULL,
-                amount REAL NOT NULL,
-                hours_worked REAL,
-                period TEXT NOT NULL,
-                date BIGINT NOT NULL,
-                is_synced INTEGER DEFAULT 0
-            )
-        ''')
-
-        # Table pointages
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS pointages (
-                id TEXT PRIMARY KEY,
-                employee_id TEXT REFERENCES employees(id),
-                employee_name TEXT NOT NULL,
-                type TEXT NOT NULL,&²²²&&
-                timestamp BIGINT NOT NULL,
-                date TEXT NOT NULL,
-                is_synced INTEGER DEFAULT 0
-            )
-        ''')
-
-        # Table alerts
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS alerts (
-                id SERIAL PRIMARY KEY,
-                employeeId TEXT REFERENCES employees(id),
-                employeeName TEXT NOT NULL,
-                zone_name TEXT NOT NULL,
-                timestamp BIGINT NOT NULL
-            )
-        ''')
-
-        conn.commit()
-        print("✅ Tables créées ou vérifiées avec succès.")
-    except Exception as e:
-        print(f"❌ Erreur lors de l'initialisation de la base : {e}")
-    finally:
-        if conn:
-            conn.close()
+# === Connexion à la base (PostgreSQL ou SQLite) ===
+from database import init_db, get_db
 
 # --- Initialisation ---
 init_db()
 
-# === Filtres Jinja2 pour les templates ===
+# === Filtres Jinja2 ===
 @app.template_filter('timestamp_to_datetime')
 def timestamp_to_datetime_filter(timestamp):
     try:
@@ -112,9 +30,7 @@ def timestamp_to_datetime_full_filter(timestamp):
     except:
         return '-'
 
-# === Routes API et Web ===
-
-# 🔐 Page de connexion
+# === Routes Web ===
 @app.route('/')
 @app.route('/login')
 def login_page():
@@ -125,7 +41,7 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('login_page'))
 
-# 🔐 API Login
+# 🔐 API Login - CORRIGÉ : méthode POST
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -219,7 +135,7 @@ def dashboard():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- Démarrage du serveur ---
+# --- Démarrage ---
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 10000))  # Render attend le port 10000
     app.run(host='0.0.0.0', port=port, debug=False)
