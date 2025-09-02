@@ -62,12 +62,31 @@ def logout():
 # 🔐 API Login
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    if not data:
-        logger.error("❌ Requête login sans JSON")
-        return jsonify({"error": "JSON manquant"}), 400
+    # Vérifier le Content-Type pour gérer JSON ou données de formulaire
+    content_type = request.headers.get('Content-Type', '')
+    data = None
+    if 'application/json' in content_type:
+        data = request.get_json()
+        if not data:
+            logger.error("❌ Requête JSON vide à /api/login")
+            return jsonify({"error": "JSON manquant"}), 400
+    elif 'application/x-www-form-urlencoded' in content_type:
+        data = request.form
+        if not data:
+            logger.error("❌ Requête form-data vide à /api/login")
+            return jsonify({"error": "Données de formulaire manquantes"}), 400
+    else:
+        logger.error(f"❌ Content-Type non supporté: {content_type}")
+        return jsonify({"error": "Content-Type doit être application/json ou application/x-www-form-urlencoded"}), 415
 
-    if data.get('username') == 'admin' and data.get('password') == '1234':
+    # Vérifier les identifiants
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        logger.error("❌ Nom d'utilisateur ou mot de passe manquant")
+        return jsonify({"error": "Nom d'utilisateur et mot de passe requis"}), 400
+
+    if username == 'admin' and password == '1234':
         session['logged_in'] = True
         logger.info("✅ Connexion réussie pour admin")
         return jsonify({
