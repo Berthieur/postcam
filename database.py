@@ -1,15 +1,16 @@
-# database.py
 import os
 import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db():
+    """Ouvre une connexion à la base de données (PostgreSQL ou SQLite)."""
     if DATABASE_URL:
         try:
-            import psycopg2
-            from psycopg2.extras import RealDictCursor
-            return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+            conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+            return conn
         except Exception as e:
             print(f"❌ Échec connexion PostgreSQL: {e}")
             raise
@@ -19,10 +20,10 @@ def get_db():
         return conn
 
 def init_db():
+    """Initialise les tables de la base de données."""
     if DATABASE_URL:
         conn = None
         try:
-            import psycopg2
             conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
 
@@ -38,7 +39,7 @@ def init_db():
                 )
             ''')
 
-            # Table salaries (avec employee_name)
+            # Table salaries
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS salaries (
                     id TEXT PRIMARY KEY,
@@ -66,37 +67,80 @@ def init_db():
                 )
             ''')
 
+            # Vérifier et ajouter employee_name si nécessaire
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'employee_name'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE salaries ADD COLUMN employee_name TEXT NOT NULL DEFAULT ''")
+                print("✅ Colonne employee_name ajoutée à la table salaries")
+                # Optionnel : remplir employee_name pour les données existantes
+                cursor.execute('''
+                    UPDATE salaries
+                    SET employee_name = (
+                        SELECT nom || ' ' || prenom
+                        FROM employees
+                        WHERE employees.id = salaries.employee_id
+                    )
+                    WHERE employee_name = ''
+                ''')
+
             conn.commit()
-            print("✅ Tables PostgreSQL créées")
+            print("✅ Tables PostgreSQL créées ou mises à jour")
         except Exception as e:
-            print(f"❌ Erreur init_db: {e}")
+            print(f"❌ Erreur init_db PostgreSQL: {e}")
+            raise
         finally:
             if conn:
                 conn.close()
     else:
-        with sqlite3.connect('tracking.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS employees (
-                    id TEXT PRIMARY KEY,
-                    nom TEXT NOT NULL,
-                    prenom TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    is_active INTEGER DEFAULT 1
-                )
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS salaries (
-                    id TEXT PRIMARY KEY,
-                    employee_id TEXT NOT NULL,
-                    employee_name TEXT NOT NULL,
-                    type TEXT NOT NULL,
-                    amount REAL NOT NULL,
-                    hours_worked REAL,
-                    period TEXT NOT NULL,
-                    date INTEGER NOT NULL,
-                    FOREIGN KEY(employee_id) REFERENCES employees(id)
-                )
-            ''')
-            conn.commit()
-        print("✅ Tables SQLite créées")
+        try:
+            with sqlite3.connect('tracking.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS employees (
+                        id TEXT PRIMARY KEY,
+                        nom TEXT NOT NULL,
+                        prenom TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        is_active INTEGER DEFAULT 1
+                    )
+                ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS salaries (
+                        id TEXT PRIMARY KEY,
+                        employee_id TEXT NOT NULL,
+                        employee_name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        hours_worked REAL,
+                        period TEXT NOT NULL,
+                        date INTEGER NOT NULL,
+                        FOREIGN KEY(employee_id) REFERENCES employees(id)
+                    )
+                ''')
+                conn.commit()
+                print("✅ Tables SQLite créées")
+        except Exception as e:
+            print(f"❌ Erreur init_db SQLite: {e}")
+            raise
+
+def verify_schema():
+    """Vérifie que le schéma de la base de données est correct."""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        if DATABASE_URL:
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'employee_name'")
+            if not cursor.fetchone():
+                raise Exception("La colonne employee_name n'existe pas dans la table salaries")
+            print("✅ Schéma vérifié avec succès")
+        else:
+            cursor.execute("PRAGMA table_info(salaries)")
+            columns = [col['name'] for col in cursor.fetchall()]
+            if 'employee_name' not in columns:
+                raise Exception("La colonne employee_name n'existe pas dans la table salaries (SQLite)")
+            print("✅ Schéma SQLite vérifié avec succès")
+    except Exception as e:
+        print(f"❌ Erreur vérification schéma: {e}")
+        raise
+    finally:
+        conn.close()
