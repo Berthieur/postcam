@@ -1,4 +1,3 @@
-# app.py
 import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
@@ -16,17 +15,20 @@ logger = logging.getLogger(__name__)
 
 # === Connexion à la base ===
 try:
-    from database import init_db, get_db
+    from database import init_db, get_db, verify_schema
     logger.info("✅ database.py importé")
 except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
+    raise
 
 # --- Initialisation ---
 try:
     init_db()
-    logger.info("✅ Base initialisée")
+    verify_schema()
+    logger.info("✅ Base initialisée et schéma vérifié")
 except Exception as e:
-    logger.error(f"❌ Échec init_db : {e}")
+    logger.error(f"❌ Échec init_db ou verify_schema : {e}")
+    raise
 
 # === Filtres Jinja2 ===
 @app.template_filter('timestamp_to_datetime')
@@ -48,27 +50,32 @@ def timestamp_to_datetime_full_filter(timestamp):
 @app.route('/')
 @app.route('/login')
 def login_page():
+    logger.info("📄 Affichage de la page de connexion")
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
+    logger.info("✅ Déconnexion réussie")
     return redirect(url_for('login_page'))
 
-# 🔐 API Login (route correcte)
+# 🔐 API Login
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
     if not data:
+        logger.error("❌ Requête login sans JSON")
         return jsonify({"error": "JSON manquant"}), 400
 
     if data.get('username') == 'admin' and data.get('password') == '1234':
         session['logged_in'] = True
+        logger.info("✅ Connexion réussie pour admin")
         return jsonify({
             "token": "fake-jwt-token-123",
             "role": "admin",
             "redirect_url": url_for('dashboard')
         })
+    logger.error("❌ Échec connexion: identifiants invalides")
     return jsonify({"error": "Identifiants invalides"}), 401
 
 # 👥 Liste des employés
@@ -80,6 +87,7 @@ def get_all_employees():
         cursor.execute("SELECT * FROM employees ORDER BY nom, prenom")
         employees = [dict(row) for row in cursor.fetchall()]
         conn.close()
+        logger.info("✅ Liste des employés récupérée")
         return jsonify(employees)
     except Exception as e:
         logger.error(f"❌ get_all_employees: {e}")
@@ -135,6 +143,7 @@ def get_salary_history():
         cursor.execute("SELECT * FROM salaries ORDER BY date DESC")
         records = [dict(row) for row in cursor.fetchall()]
         conn.close()
+        logger.info("✅ Historique des salaires récupéré")
         return jsonify(records)
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}")
@@ -144,6 +153,7 @@ def get_salary_history():
 @app.route('/dashboard')
 def dashboard():
     if not session.get('logged_in'):
+        logger.warning("❌ Accès dashboard non autorisé, redirection vers login")
         return redirect(url_for('login_page'))
     try:
         conn = get_db()
@@ -158,6 +168,7 @@ def dashboard():
         ''')
         payments = [dict(row) for row in cursor.fetchall()]
         conn.close()
+        logger.info("✅ Tableau de bord chargé")
         return render_template('dashboard.html', payments=payments)
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
