@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # === Connexion à la base ===
 try:
-    from database import init_db, get_db, verify_schema
+    from database import init_db, get_db, verify_schema, DATABASE_URL
     logger.info("✅ database.py importé")
 except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
@@ -62,27 +62,12 @@ def logout():
 # 🔐 API Login
 @app.route('/api/login', methods=['POST'])
 def login():
-    content_type = request.headers.get('Content-Type', '')
-    data = None
-    if 'application/json' in content_type:
-        data = request.get_json()
-        if not data:
-            logger.error("❌ Requête JSON vide à /api/login")
-            return jsonify({"error": "JSON manquant"}), 400
-    elif 'application/x-www-form-urlencoded' in content_type:
-        data = request.form
-        if not data:
-            logger.error("❌ Requête form-data vide à /api/login")
-            return jsonify({"error": "Données de formulaire manquantes"}), 400
-    else:
-        logger.error(f"❌ Content-Type non supporté: {content_type}")
-        return jsonify({"error": "Content-Type doit être application/json ou application/x-www-form-urlencoded"}), 415
+    data = request.get_json(silent=True) or request.form
+    if not data:
+        return jsonify({"error": "Données manquantes"}), 400
 
     username = data.get('username')
     password = data.get('password')
-    if not username or not password:
-        logger.error("❌ Nom d'utilisateur ou mot de passe manquant")
-        return jsonify({"error": "Nom d'utilisateur et mot de passe requis"}), 400
 
     if username == 'admin' and password == '1234':
         session['logged_in'] = True
@@ -92,7 +77,6 @@ def login():
             "role": "admin",
             "redirect_url": url_for('dashboard')
         })
-    logger.error("❌ Échec connexion: identifiants invalides")
     return jsonify({"error": "Identifiants invalides"}), 401
 
 # 👥 Liste des employés
@@ -103,12 +87,15 @@ def get_all_employees():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM employees ORDER BY nom, prenom")
         employees = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        logger.info("✅ Liste des employés récupérée")
         return jsonify(employees)
     except Exception as e:
         logger.error(f"❌ get_all_employees: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 # 👥 Ajouter un employé
 @app.route('/api/employees', methods=['POST'])
@@ -119,7 +106,6 @@ def add_employee():
     required = ['id', 'nom', 'prenom', 'type']
     for field in required:
         if field not in record:
-            logger.error(f"❌ Champ manquant: {field}")
             return jsonify({"error": f"Champ manquant: {field}"}), 400
 
     try:
@@ -140,8 +126,8 @@ def add_employee():
         logger.info("✅ Employé ajouté")
         return jsonify({"status": "success"}), 201
     except Exception as e:
-        logger.error(f"❌ Échec add_employee: {e}")
-        return jsonify({"error": "Échec de l'enregistrement", "details": str(e)}), 500
+        logger.error(f"❌ add_employee: {e}")
+        return jsonify({"error": str(e)}), 500
     finally:
         try:
             conn.close()
@@ -157,22 +143,29 @@ def save_salary_record():
     required = ['employeeId', 'employeeName', 'type', 'amount', 'period', 'date']
     for field in required:
         if field not in record:
-            logger.error(f"❌ Champ manquant: {field}")
             return jsonify({"error": f"Champ manquant: {field}"}), 400
 
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Vérification stricte de l'existence de l'employeeId
-        cursor.execute("SELECT id FROM employees WHERE id = %s", (record['employeeId'],))
+
+        # Vérifier existence employé
+        if DATABASE_URL:  # PostgreSQL
+            cursor.execute("SELECT id FROM employees WHERE id = %s", (record['employeeId'],))
+        else:  # SQLite
+            cursor.execute("SELECT id FROM employees WHERE id = ?", (record['employeeId'],))
         employee = cursor.fetchone()
         if not employee:
-            logger.error(f"❌ employeeId {record['employeeId']} n'existe pas dans la table employees")
-            return jsonify({"error": f"Employé avec ID {record['employeeId']} non trouvé"}), 400
+            return jsonify({"error": f"Employé {record['employeeId']} non trouvé"}), 400
 
-        # Vérifier la structure de la table salaries
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name IN ('hours_worked', 'is_synced')")
-        columns = [row[0] for row in cursor.fetchall()]
+        # Vérifier colonnes existantes
+        if DATABASE_URL:
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries'")
+            columns = [row[0] for row in cursor.fetchall()]
+        else:
+            cursor.execute("PRAGMA table_info(salaries)")
+            columns = [col['name'] for col in cursor.fetchall()]
+
         hours_worked_exists = 'hours_worked' in columns
         is_synced_exists = 'is_synced' in columns
 
@@ -180,21 +173,6 @@ def save_salary_record():
             query = '''
                 INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
-            '''
-            values = [
-                record.get('id', str(int(record['date']))),
-                record['employeeId'],
-                record['employeeName'],
-                record['type'],
-                record['amount'],
-                record.get('hoursWorked', 0.0),
-                record['period'],
-                record['date']
-            ]
-        elif hours_worked_exists:
-            query = '''
-                INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             '''
             values = [
                 record.get('id', str(int(record['date']))),
@@ -226,8 +204,8 @@ def save_salary_record():
         logger.info("✅ Salaire enregistré")
         return jsonify({"status": "success"}), 201
     except Exception as e:
-        logger.error(f"❌ Échec save_salary: {e}")
-        return jsonify({"error": "Échec de l'enregistrement", "details": str(e)}), 500
+        logger.error(f"❌ save_salary: {e}")
+        return jsonify({"error": str(e)}), 500
     finally:
         try:
             conn.close()
@@ -242,24 +220,34 @@ def get_salary_history():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM salaries ORDER BY date DESC")
         records = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        logger.info("✅ Historique des salaires récupéré")
         return jsonify(records)
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 # 📊 Tableau de bord
 @app.route('/dashboard')
 def dashboard():
     if not session.get('logged_in'):
-        logger.warning("❌ Accès dashboard non autorisé, redirection vers login")
         return redirect(url_for('login_page'))
+
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
-        type_exists = cursor.fetchone()
+
+        if DATABASE_URL:
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
+            type_exists = cursor.fetchone()
+        else:
+            cursor.execute("PRAGMA table_info(salaries)")
+            cols = [col['name'] for col in cursor.fetchall()]
+            type_exists = 'type' in cols
+
         if type_exists:
             query = '''
                 SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type,
@@ -278,14 +266,18 @@ def dashboard():
                 WHERE e.is_active = 1
                 ORDER BY s.date DESC
             '''
+
         cursor.execute(query)
         payments = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        logger.info("✅ Tableau de bord chargé")
         return render_template('dashboard.html', payments=payments)
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
 # --- Démarrage ---
 if __name__ == '__main__':
