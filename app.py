@@ -163,22 +163,22 @@ def save_salary_record():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Vérifier si l'employeeId existe dans la table employees
+        # Vérification stricte de l'existence de l'employeeId
         cursor.execute("SELECT id FROM employees WHERE id = %s", (record['employeeId'],))
-        if not cursor.fetchone():
+        employee = cursor.fetchone()
+        if not employee:
             logger.error(f"❌ employeeId {record['employeeId']} n'existe pas dans la table employees")
             return jsonify({"error": f"Employé avec ID {record['employeeId']} non trouvé"}), 400
 
-        # Vérifier si les colonnes hours_worked et is_synced existent
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
-        hours_worked_exists = cursor.fetchone()
-        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'is_synced'")
-        is_synced_exists = cursor.fetchone()
+        # Vérifier la structure de la table salaries
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name IN ('hours_worked', 'is_synced')")
+        columns = [row[0] for row in cursor.fetchall()]
+        hours_worked_exists = 'hours_worked' in columns
+        is_synced_exists = 'is_synced' in columns
 
         if hours_worked_exists and is_synced_exists:
             query = '''
-                INSERT INTO salaries 
-                (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
+                INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
             '''
             values = [
@@ -187,14 +187,13 @@ def save_salary_record():
                 record['employeeName'],
                 record['type'],
                 record['amount'],
-                record.get('hoursWorked'),
+                record.get('hoursWorked', 0.0),
                 record['period'],
                 record['date']
             ]
         elif hours_worked_exists:
             query = '''
-                INSERT INTO salaries 
-                (id, employee_id, employee_name, type, amount, hours_worked, period, date)
+                INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             '''
             values = [
@@ -203,14 +202,13 @@ def save_salary_record():
                 record['employeeName'],
                 record['type'],
                 record['amount'],
-                record.get('hoursWorked'),
+                record.get('hoursWorked', 0.0),
                 record['period'],
                 record['date']
             ]
         else:
             query = '''
-                INSERT INTO salaries 
-                (id, employee_id, employee_name, type, amount, period, date)
+                INSERT INTO salaries (id, employee_id, employee_name, type, amount, period, date)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             '''
             values = [
@@ -222,6 +220,7 @@ def save_salary_record():
                 record['period'],
                 record['date']
             ]
+
         cursor.execute(query, values)
         conn.commit()
         logger.info("✅ Salaire enregistré")
@@ -259,7 +258,6 @@ def dashboard():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Vérifier si la colonne type existe
         cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
         type_exists = cursor.fetchone()
         if type_exists:
