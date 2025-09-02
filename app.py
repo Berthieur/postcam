@@ -53,6 +53,12 @@ def login_page():
     logger.info("📄 Affichage de la page de connexion")
     return render_template('login.html')
 
+# Gestion temporaire pour POST /login (redirection vers /api/login)
+@app.route('/login', methods=['POST'])
+def login_redirect():
+    logger.warning("⚠️ Requête POST /login détectée, redirection vers /api/login")
+    return redirect(url_for('login'), code=307)  # Redirige vers /api/login en conservant la méthode POST
+
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
