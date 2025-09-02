@@ -72,7 +72,6 @@ def init_db():
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE salaries ADD COLUMN employee_name TEXT NOT NULL DEFAULT ''")
                 print("✅ Colonne employee_name ajoutée à la table salaries")
-                # Optionnel : remplir employee_name pour les données existantes
                 cursor.execute('''
                     UPDATE salaries
                     SET employee_name = (
@@ -82,6 +81,14 @@ def init_db():
                     )
                     WHERE employee_name = ''
                 ''')
+
+            # Vérifier et ajouter type si nécessaire
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE salaries ADD COLUMN type TEXT NOT NULL DEFAULT 'salaire'")
+                print("✅ Colonne type ajoutée à la table salaries")
+                # Optionnel : mettre à jour les enregistrements existants
+                cursor.execute("UPDATE salaries SET type = 'salaire' WHERE type = ''")
 
             conn.commit()
             print("✅ Tables PostgreSQL créées ou mises à jour")
@@ -132,12 +139,17 @@ def verify_schema():
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'employee_name'")
             if not cursor.fetchone():
                 raise Exception("La colonne employee_name n'existe pas dans la table salaries")
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
+            if not cursor.fetchone():
+                raise Exception("La colonne type n'existe pas dans la table salaries")
             print("✅ Schéma vérifié avec succès")
         else:
             cursor.execute("PRAGMA table_info(salaries)")
             columns = [col['name'] for col in cursor.fetchall()]
             if 'employee_name' not in columns:
                 raise Exception("La colonne employee_name n'existe pas dans la table salaries (SQLite)")
+            if 'type' not in columns:
+                raise Exception("La colonne type n'existe pas dans la table salaries (SQLite)")
             print("✅ Schéma SQLite vérifié avec succès")
     except Exception as e:
         print(f"❌ Erreur vérification schéma: {e}")
