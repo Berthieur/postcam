@@ -6,7 +6,7 @@ from datetime import datetime
 
 # === Configuration de l'application ===
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'super-secret-key-change-in-production')
+app.secret_key = os.getenv('SECRET_KEY', '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981')  # Clé par défaut
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Logging ===
