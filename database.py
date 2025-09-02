@@ -26,16 +26,19 @@ def init_db():
             conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
 
+            # Table employees
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS employees (
                     id TEXT PRIMARY KEY,
                     nom TEXT NOT NULL,
                     prenom TEXT NOT NULL,
                     type TEXT NOT NULL,
-                    is_active INTEGER DEFAULT 1
+                    is_active INTEGER DEFAULT 1,
+                    created_at BIGINT
                 )
             ''')
 
+            # Table salaries (avec employee_name)
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS salaries (
                     id TEXT PRIMARY KEY,
@@ -45,14 +48,28 @@ def init_db():
                     amount REAL NOT NULL,
                     hours_worked REAL,
                     period TEXT NOT NULL,
-                    date BIGINT NOT NULL
+                    date BIGINT NOT NULL,
+                    is_synced INTEGER DEFAULT 0
+                )
+            ''')
+
+            # Table pointages
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pointages (
+                    id TEXT PRIMARY KEY,
+                    employee_id TEXT REFERENCES employees(id),
+                    employee_name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    timestamp BIGINT NOT NULL,
+                    date TEXT NOT NULL,
+                    is_synced INTEGER DEFAULT 0
                 )
             ''')
 
             conn.commit()
             print("✅ Tables PostgreSQL créées")
         except Exception as e:
-            print(f"❌ Erreur init_db PostgreSQL: {e}")
+            print(f"❌ Erreur init_db: {e}")
         finally:
             if conn:
                 conn.close()
