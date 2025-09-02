@@ -1,79 +1,80 @@
 # database.py
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import sqlite3
 
-# Récupère l'URL depuis une variable d'environnement
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 def get_db():
-    """Retourne une connexion à la base PostgreSQL"""
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    if DATABASE_URL:
+        # PostgreSQL
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    else:
+        # SQLite local
+        conn = sqlite3.connect('tracking.db')
+        conn.row_factory = sqlite3.Row
+        return conn
 
 def init_db():
-    """Crée les tables si elles n'existent pas"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cursor = conn.cursor()
+    if DATABASE_URL:
+        # PostgreSQL
+        conn = None
+        try:
+            import psycopg2
+            conn = psycopg2.connect(DATABASE_URL)
+            cursor = conn.cursor()
 
-    # Table employees
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employees (
-            id TEXT PRIMARY KEY,
-            nom TEXT NOT NULL,
-            prenom TEXT NOT NULL,
-            date_naissance TEXT,
-            lieu_naissance TEXT,
-            telephone TEXT,
-            email TEXT,
-            profession TEXT,
-            type TEXT NOT NULL,
-            taux_horaire REAL,
-            frais_ecolage REAL,
-            qr_code TEXT,
-            is_active INTEGER DEFAULT 1,
-            created_at BIGINT,
-            is_synced INTEGER DEFAULT 0
-        )
-    ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS employees (
+                    id TEXT PRIMARY KEY,
+                    nom TEXT NOT NULL,
+                    prenom TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    created_at BIGINT
+                )
+            ''')
 
-    # Table salaries
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS salaries (
-            id TEXT PRIMARY KEY,
-            employee_id TEXT REFERENCES employees(id),
-            employee_name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            amount REAL NOT NULL,
-            hours_worked REAL,
-            period TEXT NOT NULL,
-            date BIGINT NOT NULL,
-            is_synced INTEGER DEFAULT 0
-        )
-    ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS salaries (
+                    id TEXT PRIMARY KEY,
+                    employee_id TEXT REFERENCES employees(id),
+                    amount REAL NOT NULL,
+                    period TEXT NOT NULL,
+                    date BIGINT NOT NULL
+                )
+            ''')
 
-    # Table pointages
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS pointages (
-            id TEXT PRIMARY KEY,
-            employee_id TEXT REFERENCES employees(id),
-            employee_name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            timestamp BIGINT NOT NULL,
-            date TEXT NOT NULL,
-            is_synced INTEGER DEFAULT 0
-        )
-    ''')
-
-    # Table alerts
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS alerts (
-            id SERIAL PRIMARY KEY,
-            employeeId TEXT REFERENCES employees(id),
-            employeeName TEXT NOT NULL,
-            zone_name TEXT NOT NULL,
-            timestamp BIGINT NOT NULL
-        )
-    ''')
-
-    conn.commit()
-    conn.close()
+            conn.commit()
+            print("✅ Tables PostgreSQL créées")
+        except Exception as e:
+            print(f"❌ Erreur PostgreSQL : {e}")
+        finally:
+            if conn:
+                conn.close()
+    else:
+        # SQLite
+        with sqlite3.connect('tracking.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS employees (
+                    id TEXT PRIMARY KEY,
+                    nom TEXT NOT NULL,
+                    prenom TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    is_active INTEGER DEFAULT 1
+                )
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS salaries (
+                    id TEXT PRIMARY KEY,
+                    employee_id TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    period TEXT NOT NULL,
+                    date INTEGER NOT NULL,
+                    FOREIGN KEY(employee_id) REFERENCES employees(id)
+                )
+            ''')
+            conn.commit()
+        print("✅ Tables SQLite créées")
