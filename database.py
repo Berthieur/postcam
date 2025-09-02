@@ -96,6 +96,13 @@ def init_db():
                 print("✅ Colonne hours_worked ajoutée à la table salaries")
                 cursor.execute("UPDATE salaries SET hours_worked = 0.0 WHERE hours_worked IS NULL")
 
+            # Vérifier et ajouter is_synced si nécessaire
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'is_synced'")
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE salaries ADD COLUMN is_synced INTEGER DEFAULT 0")
+                print("✅ Colonne is_synced ajoutée à la table salaries")
+                cursor.execute("UPDATE salaries SET is_synced = 0 WHERE is_synced IS NULL")
+
             conn.commit()
             print("✅ Tables PostgreSQL créées ou mises à jour")
         except Exception as e:
@@ -127,6 +134,7 @@ def init_db():
                         hours_worked REAL,
                         period TEXT NOT NULL,
                         date INTEGER NOT NULL,
+                        is_synced INTEGER DEFAULT 0,
                         FOREIGN KEY(employee_id) REFERENCES employees(id)
                     )
                 ''')
@@ -151,6 +159,9 @@ def verify_schema():
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
             if not cursor.fetchone():
                 raise Exception("La colonne hours_worked n'existe pas dans la table salaries")
+            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'is_synced'")
+            if not cursor.fetchone():
+                raise Exception("La colonne is_synced n'existe pas dans la table salaries")
             print("✅ Schéma vérifié avec succès")
         else:
             cursor.execute("PRAGMA table_info(salaries)")
@@ -161,6 +172,8 @@ def verify_schema():
                 raise Exception("La colonne type n'existe pas dans la table salaries (SQLite)")
             if 'hours_worked' not in columns:
                 raise Exception("La colonne hours_worked n'existe pas dans la table salaries (SQLite)")
+            if 'is_synced' not in columns:
+                raise Exception("La colonne is_synced n'existe pas dans la table salaries (SQLite)")
             print("✅ Schéma SQLite vérifié avec succès")
     except Exception as e:
         print(f"❌ Erreur vérification schéma: {e}")
