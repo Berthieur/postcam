@@ -67,36 +67,29 @@ def init_db():
                 )
             ''')
 
-            # Vérifier et ajouter employee_name si nécessaire
+            # Vérifier et ajouter les colonnes manquantes dans salaries
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'employee_name'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE salaries ADD COLUMN employee_name TEXT NOT NULL DEFAULT ''")
                 print("✅ Colonne employee_name ajoutée à la table salaries")
                 cursor.execute('''
                     UPDATE salaries
-                    SET employee_name = (
-                        SELECT nom || ' ' || prenom
-                        FROM employees
-                        WHERE employees.id = salaries.employee_id
-                    )
+                    SET employee_name = (SELECT nom || ' ' || prenom FROM employees WHERE employees.id = salaries.employee_id)
                     WHERE employee_name = ''
                 ''')
 
-            # Vérifier et ajouter type si nécessaire
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'type'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE salaries ADD COLUMN type TEXT NOT NULL DEFAULT 'salaire'")
                 print("✅ Colonne type ajoutée à la table salaries")
                 cursor.execute("UPDATE salaries SET type = 'salaire' WHERE type = ''")
 
-            # Vérifier et ajouter hours_worked si nécessaire
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE salaries ADD COLUMN hours_worked REAL")
                 print("✅ Colonne hours_worked ajoutée à la table salaries")
                 cursor.execute("UPDATE salaries SET hours_worked = 0.0 WHERE hours_worked IS NULL")
 
-            # Vérifier et ajouter is_synced si nécessaire
             cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'is_synced'")
             if not cursor.fetchone():
                 cursor.execute("ALTER TABLE salaries ADD COLUMN is_synced INTEGER DEFAULT 0")
@@ -121,7 +114,8 @@ def init_db():
                         nom TEXT NOT NULL,
                         prenom TEXT NOT NULL,
                         type TEXT NOT NULL,
-                        is_active INTEGER DEFAULT 1
+                        is_active INTEGER DEFAULT 1,
+                        created_at BIGINT
                     )
                 ''')
                 cursor.execute('''
@@ -133,7 +127,7 @@ def init_db():
                         amount REAL NOT NULL,
                         hours_worked REAL,
                         period TEXT NOT NULL,
-                        date INTEGER NOT NULL,
+                        date BIGINT NOT NULL,
                         is_synced INTEGER DEFAULT 0,
                         FOREIGN KEY(employee_id) REFERENCES employees(id)
                     )
@@ -166,14 +160,10 @@ def verify_schema():
         else:
             cursor.execute("PRAGMA table_info(salaries)")
             columns = [col['name'] for col in cursor.fetchall()]
-            if 'employee_name' not in columns:
-                raise Exception("La colonne employee_name n'existe pas dans la table salaries (SQLite)")
-            if 'type' not in columns:
-                raise Exception("La colonne type n'existe pas dans la table salaries (SQLite)")
-            if 'hours_worked' not in columns:
-                raise Exception("La colonne hours_worked n'existe pas dans la table salaries (SQLite)")
-            if 'is_synced' not in columns:
-                raise Exception("La colonne is_synced n'existe pas dans la table salaries (SQLite)")
+            required_columns = ['employee_name', 'type', 'hours_worked', 'is_synced']
+            for col in required_columns:
+                if col not in columns:
+                    raise Exception(f"La colonne {col} n'existe pas dans la table salaries (SQLite)")
             print("✅ Schéma SQLite vérifié avec succès")
     except Exception as e:
         print(f"❌ Erreur vérification schéma: {e}")
