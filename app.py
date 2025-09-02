@@ -125,20 +125,41 @@ def save_salary_record():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO salaries 
-            (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
-        ''', [
-            record.get('id', str(int(record['date']))),
-            record['employeeId'],
-            record['employeeName'],
-            record['type'],
-            record['amount'],
-            record.get('hoursWorked'),
-            record['period'],
-            record['date']
-        ])
+        # Vérifier si la colonne hours_worked existe
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries' AND column_name = 'hours_worked'")
+        hours_worked_exists = cursor.fetchone()
+        if hours_worked_exists:
+            query = '''
+                INSERT INTO salaries 
+                (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
+            '''
+            values = [
+                record.get('id', str(int(record['date']))),
+                record['employeeId'],
+                record['employeeName'],
+                record['type'],
+                record['amount'],
+                record.get('hoursWorked'),
+                record['period'],
+                record['date']
+            ]
+        else:
+            query = '''
+                INSERT INTO salaries 
+                (id, employee_id, employee_name, type, amount, period, date, is_synced)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
+            '''
+            values = [
+                record.get('id', str(int(record['date']))),
+                record['employeeId'],
+                record['employeeName'],
+                record['type'],
+                record['amount'],
+                record['period'],
+                record['date']
+            ]
+        cursor.execute(query, values)
         conn.commit()
         logger.info("✅ Salaire enregistré")
         return jsonify({"status": "success"}), 201
