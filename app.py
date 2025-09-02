@@ -5,19 +5,19 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from flask_cors import CORS
 from datetime import datetime
 
-# === Configuration de base ===
+# === Configuration de l'application ===
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'super-secret-key-change-in-production')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# === Logging pour déboguer ===
+# === Logging ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # === Connexion à la base ===
 try:
     from database import init_db, get_db
-    logger.info("✅ database.py importé avec succès")
+    logger.info("✅ database.py importé")
 except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
 
@@ -55,14 +55,14 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('login_page'))
 
-# 🔐 API Login - CORRIGÉ
+# 🔐 API Login (route correcte)
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
     if not data:
         return jsonify({"error": "JSON manquant"}), 400
 
-    if data.get('username') == 'admin' and data.get('password') == 'admin123':
+    if data.get('username') == 'admin' and data.get('password') == '1234':
         session['logged_in'] = True
         return jsonify({
             "token": "fake-jwt-token-123",
@@ -71,16 +71,30 @@ def login():
         })
     return jsonify({"error": "Identifiants invalides"}), 401
 
-# 💰 Enregistrer un salaire - VERSION SÉCURISÉE
+# 👥 Liste des employés
+@app.route('/api/employees', methods=['GET'])
+def get_all_employees():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM employees ORDER BY nom, prenom")
+        employees = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return jsonify(employees)
+    except Exception as e:
+        logger.error(f"❌ get_all_employees: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# 💰 Enregistrer un salaire
 @app.route('/api/salary', methods=['POST'])
 def save_salary_record():
     record = request.get_json()
-    logger.info(f"Reçu pour /api/salary: {record}")
+    logger.info(f"📥 Reçu pour /api/salary: {record}")
 
     required = ['employeeId', 'employeeName', 'type', 'amount', 'period', 'date']
     for field in required:
         if field not in record:
-            logger.error(f"Champ manquant: {field}")
+            logger.error(f"❌ Champ manquant: {field}")
             return jsonify({"error": f"Champ manquant: {field}"}), 400
 
     try:
@@ -123,10 +137,10 @@ def get_salary_history():
         conn.close()
         return jsonify(records)
     except Exception as e:
-        logger.error(f"❌ Échec get_salary_history: {e}")
+        logger.error(f"❌ get_salary_history: {e}")
         return jsonify({"error": str(e)}), 500
 
-# 📊 Dashboard
+# 📊 Tableau de bord
 @app.route('/dashboard')
 def dashboard():
     if not session.get('logged_in'):
@@ -146,7 +160,7 @@ def dashboard():
         conn.close()
         return render_template('dashboard.html', payments=payments)
     except Exception as e:
-        logger.error(f"❌ Erreur dashboard: {e}")
+        logger.error(f"❌ dashboard: {e}")
         return jsonify({"error": str(e)}), 500
 
 # --- Démarrage ---
