@@ -1,9 +1,15 @@
 import os
 import sqlite3
 import psycopg2
+import logging
 from psycopg2.extras import RealDictCursor
 
+# --- Logger ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 DATABASE_URL = os.getenv('DATABASE_URL')
+
 
 def get_db():
     """Ouvre une connexion à la base de données (PostgreSQL ou SQLite)."""
@@ -12,12 +18,13 @@ def get_db():
             conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
             return conn
         except Exception as e:
-            print(f"❌ Échec connexion PostgreSQL: {e}")
+            logger.error(f"❌ Échec connexion PostgreSQL: {e}")
             raise
     else:
         conn = sqlite3.connect('tracking.db')
         conn.row_factory = sqlite3.Row
         return conn
+
 
 def init_db():
     """Initialise les tables de la base de données."""
@@ -68,9 +75,9 @@ def init_db():
             ''')
 
             conn.commit()
-            print("✅ Tables PostgreSQL créées ou mises à jour")
+            logger.info("✅ Tables PostgreSQL créées ou mises à jour")
         except Exception as e:
-            print(f"❌ Erreur init_db PostgreSQL: {e}")
+            logger.error(f"❌ Erreur init_db PostgreSQL: {e}")
             raise
         finally:
             if conn:
@@ -107,12 +114,15 @@ def init_db():
                 ''')
 
                 conn.commit()
-                print("✅ Tables SQLite créées")
+                logger.info("✅ Tables SQLite créées")
         except Exception as e:
-            print(f"❌ Erreur init_db SQLite: {e}")
+            logger.error(f"❌ Erreur init_db SQLite: {e}")
             raise
 
+
 def verify_schema():
+    """Vérifie que la table users possède les colonnes attendues."""
+    conn = None
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -123,7 +133,17 @@ def verify_schema():
             FROM information_schema.columns 
             WHERE table_name = 'users';
         """)
-        columns = [row[0] if isinstance(row, tuple) else row["column_name"] for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+
+        # rows peut être soit une liste de dicts (Postgres RealDictCursor), soit de tuples (SQLite)
+        columns = []
+        for row in rows:
+            if isinstance(row, dict):
+                columns.append(row.get("column_name"))
+            elif isinstance(row, tuple):
+                columns.append(row[0])
+
+        logger.info(f"📋 Colonnes trouvées dans users: {columns}")
 
         expected = ["id", "name", "email", "salary"]
         missing = [col for col in expected if col not in columns]
@@ -134,9 +154,9 @@ def verify_schema():
             logger.info("✅ Schéma users vérifié")
 
         cursor.close()
-        conn.close()
     except Exception as e:
         logger.error(f"❌ Erreur vérification schéma: {e}")
         raise
     finally:
-        conn.close()
+        if conn:
+            conn.close()
