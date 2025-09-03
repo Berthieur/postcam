@@ -4,15 +4,14 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from flask_cors import CORS
 from datetime import datetime
 
-
 # === Configuration de l'application ===
-app = Flask(__name__)
+app = Flask(_name_)
 app.secret_key = os.getenv('SECRET_KEY', '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Logging ===
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_name_)
 
 # === Connexion à la base ===
 try:
@@ -148,49 +147,14 @@ def add_salary():
     if not data:
         return jsonify({"error": "Requête vide ou mal formée"}), 400
 
-    required = ["employee_id", "employee_name", "type", "amount", "period", "date"]
-    missing = [f for f in required if f not in data]
-    if missing:
-        return jsonify({"error": f"Champs manquants: {missing}"}), 400
-
-    # ✅ Enregistrement en base
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            data.get("id"),
-            data["employee_id"],
-            data["employee_name"],
-            data["type"],
-            data["amount"],
-            data.get("hours_worked"),
-            data["period"],
-            data["date"],
-        ))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return jsonify({"success": True}), 201
-    except Exception as e:
-        print("❌ Erreur DB:", e)
-        return jsonify({"error": "Erreur base de données"}), 500
-# 📅 Historique des salaires
-@app.route("/api/salary", methods=["POST"])
-def add_salary():
-    data = request.json
-    print("📥 Données reçues:", data)
-
-    try:
-        # 1. Conversion du timestamp
+        # 1. Conversion du timestamp → date SQL
         if isinstance(data.get("date"), (int, float)):
             salary_date = datetime.fromtimestamp(data["date"] / 1000).strftime("%Y-%m-%d")
         else:
             salary_date = data.get("date")
 
-        # 2. Vérifier la période
+        # 2. Vérifier la période (défaut = mois courant)
         period = data.get("period") or datetime.now().strftime("%Y-%m")
 
         conn = get_db()
@@ -202,12 +166,16 @@ def add_salary():
             data.get("employeeId"),
             data.get("employeeName"),
             data.get("amount"),
-            data.get("hoursWorked"),
+            data.get("hoursWorked", 0),
             data.get("type"),
             period,
             salary_date
         ))
         conn.commit()
+        cur.close()
+        conn.close()
+
+        logger.info(f"✅ Salaire enregistré pour {data.get('employeeName')}")
         return jsonify({"status": "success"}), 201
 
     except Exception as e:
@@ -238,6 +206,6 @@ def dashboard():
         return jsonify({"error": str(e)}), 500
 
 # --- Démarrage ---
-if __name__ == '__main__':
+if _name_ == '_main_':
     port = int(os.getenv('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
