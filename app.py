@@ -147,7 +147,7 @@ def add_employee():
         logger.error(f"❌ Échec add_employee: {e}")
         return jsonify({"error": str(e)}), 500
 
-import uuid
+
 
 # 💰 Enregistrer un salaire (auto-crée l'employé si introuvable)
 @app.route("/api/salary", methods=["POST"])
