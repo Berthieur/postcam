@@ -139,46 +139,43 @@ def add_employee():
         return jsonify({"error": str(e)}), 500
 
 # 💰 Enregistrer un salaire
-@app.route('/api/salary', methods=['POST'])
-def save_salary_record():
-    record = request.get_json()
-    required = ['employeeId', 'employeeName', 'type', 'amount', 'period', 'date']
-    for field in required:
-        if field not in record:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+@app.route("/api/salary", methods=["POST"])
+def add_salary():
+    data = request.get_json(silent=True)
+    print("📥 Données reçues:", data)
 
+    if not data:
+        return jsonify({"error": "Requête vide ou mal formée"}), 400
+
+    required = ["employee_id", "employee_name", "type", "amount", "period", "date"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return jsonify({"error": f"Champs manquants: {missing}"}), 400
+
+    # ✅ Enregistrement en base
     try:
         conn = get_db()
         cursor = conn.cursor()
-
-        cursor.execute("SELECT id FROM employees WHERE id = %s", (record['employeeId'],))
-        employee = cursor.fetchone()
-        if not employee:
-            return jsonify({"error": f"Employé {record['employeeId']} introuvable"}), 400
-
-        query = '''
-            INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0)
-        '''
-        values = [
-            record.get('id', str(int(record['date']))),
-            record['employeeId'],
-            record['employeeName'],
-            record['type'],
-            record['amount'],
-            record.get('hoursWorked', 0.0),
-            record['period'],
-            record['date']
-        ]
-        cursor.execute(query, values)
+        cursor.execute("""
+            INSERT INTO salaries (id, employee_id, employee_name, type, amount, hours_worked, period, date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            data.get("id"),
+            data["employee_id"],
+            data["employee_name"],
+            data["type"],
+            data["amount"],
+            data.get("hours_worked"),
+            data["period"],
+            data["date"],
+        ))
         conn.commit()
+        cursor.close()
         conn.close()
-        logger.info("✅ Salaire enregistré")
-        return jsonify({"status": "success"}), 201
+        return jsonify({"success": True}), 201
     except Exception as e:
-        logger.error(f"❌ save_salary_record: {e}")
-        return jsonify({"error": str(e)}), 500
-
+        print("❌ Erreur DB:", e)
+        return jsonify({"error": "Erreur base de données"}), 500
 # 📅 Historique des salaires
 @app.route('/api/salary/history', methods=['GET'])
 def get_salary_history():
