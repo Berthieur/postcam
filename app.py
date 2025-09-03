@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from flask_cors import CORS
 from datetime import datetime
 
+
 # === Configuration de l'application ===
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981')
@@ -177,19 +178,41 @@ def add_salary():
         print("❌ Erreur DB:", e)
         return jsonify({"error": "Erreur base de données"}), 500
 # 📅 Historique des salaires
-@app.route('/api/salary/history', methods=['GET'])
-def get_salary_history():
+@app.route("/api/salary", methods=["POST"])
+def add_salary():
+    data = request.json
+    print("📥 Données reçues:", data)
+
     try:
+        # 1. Conversion du timestamp
+        if isinstance(data.get("date"), (int, float)):
+            salary_date = datetime.fromtimestamp(data["date"] / 1000).strftime("%Y-%m-%d")
+        else:
+            salary_date = data.get("date")
+
+        # 2. Vérifier la période
+        period = data.get("period") or datetime.now().strftime("%Y-%m")
+
         conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM salaries ORDER BY date DESC")
-        records = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        logger.info("✅ Historique des salaires récupéré")
-        return jsonify(records)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO salaries (employee_id, employee_name, amount, hours_worked, type, period, date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            data.get("employeeId"),
+            data.get("employeeName"),
+            data.get("amount"),
+            data.get("hoursWorked"),
+            data.get("type"),
+            period,
+            salary_date
+        ))
+        conn.commit()
+        return jsonify({"status": "success"}), 201
+
     except Exception as e:
-        logger.error(f"❌ get_salary_history: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"❌ Erreur insertion salaire: {e}")
+        return jsonify({"error": str(e)}), 400
 
 # 📊 Tableau de bord
 @app.route('/dashboard')
