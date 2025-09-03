@@ -206,6 +206,6 @@ def dashboard():
         return jsonify({"error": str(e)}), 500
 
 # --- Démarrage ---
-if _name_ == '_main_':
+if __name__ == '_main_':
     port = int(os.getenv('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
