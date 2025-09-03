@@ -111,7 +111,7 @@ def get_all_employees():
 @app.route('/api/employees', methods=['POST'])
 def add_employee():
     record = request.get_json()
-    required = ['id', 'nom', 'prenom', 'type']
+    required = ['nom', 'prenom', 'type']
     for field in required:
         if field not in record:
             return jsonify({"error": f"Champ manquant: {field}"}), 400
@@ -119,11 +119,13 @@ def add_employee():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        new_id = record.get('id') or str(int(datetime.now().timestamp() * 1000))
+
         cursor.execute('''
             INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
             VALUES (%s, %s, %s, %s, %s, %s)
         ''', [
-            record['id'],
+            new_id,
             record['nom'],
             record['prenom'],
             record['type'],
@@ -132,8 +134,8 @@ def add_employee():
         ])
         conn.commit()
         conn.close()
-        logger.info("✅ Employé ajouté")
-        return jsonify({"status": "success"}), 201
+        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']}")
+        return jsonify({"status": "success", "id": new_id}), 201
     except Exception as e:
         logger.error(f"❌ Échec add_employee: {e}")
         return jsonify({"error": str(e)}), 500
