@@ -3,6 +3,7 @@ import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
 from datetime import datetime
+import uuid
 
 # === Configuration de l'application ===
 app = Flask(__name__)
@@ -107,6 +108,7 @@ def get_all_employees():
         logger.error(f"❌ get_all_employees: {e}")
         return jsonify({"error": str(e)}), 500
 
+
 # 👥 Ajouter un employé
 @app.route('/api/employees', methods=['POST'])
 def add_employee():
@@ -119,7 +121,9 @@ def add_employee():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        new_id = record.get('id') or str(int(datetime.now().timestamp() * 1000))
+
+        # Générer un ID unique (UUID ou timestamp)
+        new_id = str(uuid.uuid4())  # plus sûr qu'un timestamp
 
         cursor.execute('''
             INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
@@ -130,11 +134,11 @@ def add_employee():
             record['prenom'],
             record['type'],
             record.get('is_active', 1),
-            record.get('created_at', int(datetime.now().timestamp() * 1000))
+            int(datetime.now().timestamp() * 1000)
         ])
         conn.commit()
         conn.close()
-        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']}")
+        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
         return jsonify({"status": "success", "id": new_id}), 201
     except Exception as e:
         logger.error(f"❌ Échec add_employee: {e}")
