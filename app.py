@@ -109,6 +109,7 @@ def get_all_employees():
         return jsonify({"error": str(e)}), 500
 
 
+
 # 👥 Ajouter un employé
 @app.route('/api/employees', methods=['POST'])
 def add_employee():
@@ -122,8 +123,8 @@ def add_employee():
         conn = get_db()
         cursor = conn.cursor()
 
-        # Générer un ID unique (UUID ou timestamp)
-        new_id = str(uuid.uuid4())  # plus sûr qu'un timestamp
+        # Générer un ID unique automatiquement si non fourni
+        new_id = record.get('id') or str(uuid.uuid4())
 
         cursor.execute('''
             INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
@@ -138,13 +139,13 @@ def add_employee():
         ])
         conn.commit()
         conn.close()
+
         logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
         return jsonify({"status": "success", "id": new_id}), 201
+
     except Exception as e:
         logger.error(f"❌ Échec add_employee: {e}")
         return jsonify({"error": str(e)}), 500
-
-
 
 # 💰 Enregistrer un salaire
 @app.route("/api/salary", methods=["POST"])
@@ -159,7 +160,7 @@ def add_salary():
         conn = get_db()
         cur = conn.cursor()
 
-        # 1. Vérifier si l'employé existe
+        # Vérifier si l'employé existe
         cur.execute("SELECT id FROM employees WHERE id = %s", (data.get("employeeId"),))
         employee = cur.fetchone()
         if not employee:
@@ -168,21 +169,21 @@ def add_salary():
             logger.error(f"❌ Employé introuvable: {data.get('employeeId')}")
             return jsonify({"error": f"Employé {data.get('employeeName')} introuvable"}), 400
 
-        # 2. Conversion du champ "date" → timestamp BIGINT (ms)
+        # Conversion du champ "date" → timestamp BIGINT (ms)
         if isinstance(data.get("date"), (int, float)):
-            salary_date = int(data["date"])  # déjà un timestamp
+            salary_date = int(data["date"])
         else:
             salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
 
-        # 3. Vérifier la période (défaut = mois courant)
+        # Vérifier la période (défaut = mois courant)
         period = data.get("period") or datetime.now().strftime("%Y-%m")
 
-        # 4. Insertion du salaire
+        # Insertion du salaire
         cur.execute("""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            str(int(datetime.now().timestamp() * 1000)),  # id unique basé sur le timestamp
+            str(uuid.uuid4()),  # id unique
             data.get("employeeId"),
             data.get("employeeName"),
             data.get("amount"),
