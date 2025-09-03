@@ -113,25 +113,30 @@ def init_db():
             raise
 
 def verify_schema():
-    """Vérifie que le schéma de la base de données est correct."""
-    conn = get_db()
-    cursor = conn.cursor()
     try:
-        if DATABASE_URL:
-            cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'salaries'")
-            columns = [row[0] for row in cursor.fetchall()]
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Vérifie les colonnes de la table users
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users';
+        """)
+        columns = [row[0] if isinstance(row, tuple) else row["column_name"] for row in cursor.fetchall()]
+
+        expected = ["id", "name", "email", "salary"]
+        missing = [col for col in expected if col not in columns]
+
+        if missing:
+            logger.error(f"❌ Colonnes manquantes dans users: {missing}")
         else:
-            cursor.execute("PRAGMA table_info(salaries)")
-            columns = [col['name'] for col in cursor.fetchall()]
+            logger.info("✅ Schéma users vérifié")
 
-        required_columns = ['employee_name', 'type', 'hours_worked', 'is_synced']
-        for col in required_columns:
-            if col not in columns:
-                raise Exception(f"❌ Colonne {col} manquante dans salaries")
-
-        print("✅ Schéma vérifié avec succès")
+        cursor.close()
+        conn.close()
     except Exception as e:
-        print(f"❌ Erreur vérification schéma: {e}")
+        logger.error(f"❌ Erreur vérification schéma: {e}")
         raise
     finally:
         conn.close()
