@@ -8,34 +8,37 @@ from psycopg2.extras import RealDictCursor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv('DATABASE_URL')
+# URL fournie automatiquement par Render pour Postgres
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Driver courant : "postgres" si DATABASE_URL défini, sinon "sqlite"
+DB_DRIVER = "postgres" if DATABASE_URL else "sqlite"
 
 
 def get_db():
-    """Ouvre une connexion à la base de données (PostgreSQL ou SQLite)."""
-    if DATABASE_URL:
+    """Retourne une connexion DB (Postgres si DATABASE_URL, sinon SQLite)."""
+    if DB_DRIVER == "postgres":
         try:
             conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
             return conn
         except Exception as e:
-            logger.error(f"❌ Échec connexion PostgreSQL: {e}")
+            logger.error(f"❌ Connexion PostgreSQL échouée : {e}")
             raise
     else:
-        conn = sqlite3.connect('tracking.db')
+        conn = sqlite3.connect("tracking.db")
         conn.row_factory = sqlite3.Row
         return conn
 
 
 def init_db():
-    """Initialise les tables de la base de données."""
-    if DATABASE_URL:
+    """Crée les tables nécessaires si elles n'existent pas."""
+    if DB_DRIVER == "postgres":
         conn = None
         try:
-            conn = psycopg2.connect(DATABASE_URL)
+            conn = get_db()
             cursor = conn.cursor()
 
-            # Table employees
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS employees (
                     id TEXT PRIMARY KEY,
                     nom TEXT NOT NULL,
@@ -44,10 +47,9 @@ def init_db():
                     is_active INTEGER DEFAULT 1,
                     created_at BIGINT
                 )
-            ''')
+            """)
 
-            # Table salaries
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS salaries (
                     id TEXT PRIMARY KEY,
                     employee_id TEXT REFERENCES employees(id),
@@ -59,10 +61,9 @@ def init_db():
                     date BIGINT NOT NULL,
                     is_synced INTEGER DEFAULT 0
                 )
-            ''')
+            """)
 
-            # Table pointages
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS pointages (
                     id TEXT PRIMARY KEY,
                     employee_id TEXT REFERENCES employees(id),
@@ -72,22 +73,22 @@ def init_db():
                     date TEXT NOT NULL,
                     is_synced INTEGER DEFAULT 0
                 )
-            ''')
+            """)
 
             conn.commit()
-            logger.info("✅ Tables PostgreSQL créées ou mises à jour")
+            logger.info("✅ Tables PostgreSQL initialisées")
         except Exception as e:
-            logger.error(f"❌ Erreur init_db PostgreSQL: {e}")
+            logger.error(f"❌ init_db PostgreSQL : {e}")
             raise
         finally:
             if conn:
                 conn.close()
     else:
         try:
-            with sqlite3.connect('tracking.db') as conn:
+            with sqlite3.connect("tracking.db") as conn:
                 cursor = conn.cursor()
 
-                cursor.execute('''
+                cursor.execute("""
                     CREATE TABLE IF NOT EXISTS employees (
                         id TEXT PRIMARY KEY,
                         nom TEXT NOT NULL,
@@ -96,9 +97,9 @@ def init_db():
                         is_active INTEGER DEFAULT 1,
                         created_at BIGINT
                     )
-                ''')
+                """)
 
-                cursor.execute('''
+                cursor.execute("""
                     CREATE TABLE IF NOT EXISTS salaries (
                         id TEXT PRIMARY KEY,
                         employee_id TEXT NOT NULL,
@@ -111,51 +112,61 @@ def init_db():
                         is_synced INTEGER DEFAULT 0,
                         FOREIGN KEY(employee_id) REFERENCES employees(id)
                     )
-                ''')
+                """)
+
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS pointages (
+                        id TEXT PRIMARY KEY,
+                        employee_id TEXT NOT NULL,
+                        employee_name TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        timestamp BIGINT NOT NULL,
+                        date TEXT NOT NULL,
+                        is_synced INTEGER DEFAULT 0,
+                        FOREIGN KEY(employee_id) REFERENCES employees(id)
+                    )
+                """)
 
                 conn.commit()
-                logger.info("✅ Tables SQLite créées")
+                logger.info("✅ Tables SQLite initialisées")
         except Exception as e:
-            logger.error(f"❌ Erreur init_db SQLite: {e}")
+            logger.error(f"❌ init_db SQLite : {e}")
             raise
 
 
 def verify_schema():
-    """Vérifie que la table users possède les colonnes attendues."""
+    """Vérifie la structure de la table employees."""
     conn = None
     try:
         conn = get_db()
         cursor = conn.cursor()
 
-        # Vérifie les colonnes de la table users
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users';
-        """)
-        rows = cursor.fetchall()
+        if DB_DRIVER == "postgres":
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'employees';
+            """)
+            rows = cursor.fetchall()
+            columns = [row["column_name"] for row in rows]
+        else:
+            cursor.execute("PRAGMA table_info(employees);")
+            rows = cursor.fetchall()
+            columns = [row[1] for row in rows]
 
-        # rows peut être soit une liste de dicts (Postgres RealDictCursor), soit de tuples (SQLite)
-        columns = []
-        for row in rows:
-            if isinstance(row, dict):
-                columns.append(row.get("column_name"))
-            elif isinstance(row, tuple):
-                columns.append(row[0])
+        logger.info(f"📋 Colonnes trouvées dans employees : {columns}")
 
-        logger.info(f"📋 Colonnes trouvées dans users: {columns}")
-
-        expected = ["id", "name", "email", "salary"]
+        expected = ["id", "nom", "prenom", "type", "is_active", "created_at"]
         missing = [col for col in expected if col not in columns]
 
         if missing:
-            logger.error(f"❌ Colonnes manquantes dans users: {missing}")
+            logger.error(f"❌ Colonnes manquantes : {missing}")
         else:
-            logger.info("✅ Schéma users vérifié")
+            logger.info("✅ Schéma employees correct")
 
         cursor.close()
     except Exception as e:
-        logger.error(f"❌ Erreur vérification schéma: {e}")
+        logger.error(f"❌ Erreur verify_schema : {e}")
         raise
     finally:
         if conn:
