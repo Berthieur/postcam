@@ -138,6 +138,7 @@ def add_employee():
         logger.error(f"❌ Échec add_employee: {e}")
         return jsonify({"error": str(e)}), 500
 
+
 # 💰 Enregistrer un salaire
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
@@ -148,11 +149,12 @@ def add_salary():
         return jsonify({"error": "Requête vide ou mal formée"}), 400
 
     try:
-        # 1. Conversion du timestamp → date SQL
+        # 1. Conversion du champ "date" → timestamp BIGINT (ms)
         if isinstance(data.get("date"), (int, float)):
-            salary_date = datetime.fromtimestamp(data["date"] / 1000).strftime("%Y-%m-%d")
+            salary_date = int(data["date"])  # garder tel quel (ms)
         else:
-            salary_date = data.get("date")
+            # si string, on parse puis on convertit en ms
+            salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
 
         # 2. Vérifier la période (défaut = mois courant)
         period = data.get("period") or datetime.now().strftime("%Y-%m")
@@ -160,9 +162,10 @@ def add_salary():
         conn = get_db()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO salaries (employee_id, employee_name, amount, hours_worked, type, period, date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
+            str(datetime.now().timestamp() * 1000),  # id unique basé sur timestamp
             data.get("employeeId"),
             data.get("employeeName"),
             data.get("amount"),
@@ -181,6 +184,7 @@ def add_salary():
     except Exception as e:
         logger.error(f"❌ Erreur insertion salaire: {e}")
         return jsonify({"error": str(e)}), 400
+
 
 # 📊 Tableau de bord
 @app.route('/dashboard')
