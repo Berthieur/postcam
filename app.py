@@ -139,33 +139,44 @@ def add_employee():
         return jsonify({"error": str(e)}), 500
 
 
+
 # 💰 Enregistrer un salaire
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
     data = request.get_json(silent=True)
-    print("📥 Données reçues:", data)
+    logger.info(f"📥 Données reçues: {data}")
 
     if not data:
         return jsonify({"error": "Requête vide ou mal formée"}), 400
 
     try:
-        # 1. Conversion du champ "date" → timestamp BIGINT (ms)
-        if isinstance(data.get("date"), (int, float)):
-            salary_date = int(data["date"])  # garder tel quel (ms)
-        else:
-            # si string, on parse puis on convertit en ms
-            salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
-
-        # 2. Vérifier la période (défaut = mois courant)
-        period = data.get("period") or datetime.now().strftime("%Y-%m")
-
         conn = get_db()
         cur = conn.cursor()
+
+        # 1. Vérifier si l'employé existe
+        cur.execute("SELECT id FROM employees WHERE id = %s", (data.get("employeeId"),))
+        employee = cur.fetchone()
+        if not employee:
+            cur.close()
+            conn.close()
+            logger.error(f"❌ Employé introuvable: {data.get('employeeId')}")
+            return jsonify({"error": f"Employé {data.get('employeeName')} introuvable"}), 400
+
+        # 2. Conversion du champ "date" → timestamp BIGINT (ms)
+        if isinstance(data.get("date"), (int, float)):
+            salary_date = int(data["date"])  # déjà un timestamp
+        else:
+            salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
+
+        # 3. Vérifier la période (défaut = mois courant)
+        period = data.get("period") or datetime.now().strftime("%Y-%m")
+
+        # 4. Insertion du salaire
         cur.execute("""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            str(datetime.now().timestamp() * 1000),  # id unique basé sur timestamp
+            str(int(datetime.now().timestamp() * 1000)),  # id unique basé sur le timestamp
             data.get("employeeId"),
             data.get("employeeName"),
             data.get("amount"),
@@ -174,6 +185,7 @@ def add_salary():
             period,
             salary_date
         ))
+
         conn.commit()
         cur.close()
         conn.close()
@@ -184,6 +196,7 @@ def add_salary():
     except Exception as e:
         logger.error(f"❌ Erreur insertion salaire: {e}")
         return jsonify({"error": str(e)}), 400
+
 
 
 # 📊 Tableau de bord
