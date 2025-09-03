@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # === Connexion à la base ===
 try:
-    from database import init_db, get_db, verify_schema
+    from database import init_db, get_db, verify_schema, DB_DRIVER
     logger.info("✅ database.py importé")
 except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
@@ -31,67 +31,44 @@ except Exception as e:
     logger.error(f"❌ Échec init_db ou verify_schema : {e}")
     raise
 
-# === Filtres Jinja2 ===
-@app.template_filter('timestamp_to_datetime')
-def timestamp_to_datetime_filter(timestamp):
-    try:
-        return datetime.fromtimestamp(int(timestamp) / 1000).strftime('%d/%m/%Y')
-    except:
-        return '-'
-
-@app.template_filter('timestamp_to_datetime_full')
-def timestamp_to_datetime_full_filter(timestamp):
-    try:
-        dt = datetime.fromtimestamp(int(timestamp) / 1000)
-        return dt.strftime('%d/%m/%Y à %H:%M')
-    except:
-        return '-'
+# === Détection driver SQL ===
+# sqlite → "?"
+# psycopg2 (Postgres) → "%s"
+PLACEHOLDER = "?" if DB_DRIVER == "sqlite" else "%s"
 
 # === Routes Web ===
 @app.route('/')
 @app.route('/login')
 def login_page():
-    logger.info("📄 Affichage de la page de connexion")
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     session.pop('logged_in', None)
-    logger.info("✅ Déconnexion réussie")
     return redirect(url_for('login_page'))
 
 # 🔐 API Login
 @app.route('/api/login', methods=['POST'])
 def login():
-    content_type = request.headers.get('Content-Type', '')
-    data = None
-
-    if 'application/json' in content_type:
-        data = request.get_json()
-    elif 'application/x-www-form-urlencoded' in content_type:
-        data = request.form
+    data = request.get_json(silent=True) or request.form
 
     if not data:
-        logger.error("❌ Données manquantes à /api/login")
-        return jsonify({"error": "Données manquantes"}), 400
+        return jsonify({"status": "error", "message": "Données manquantes"}), 400
 
     username = data.get('username')
     password = data.get('password')
 
-    if not username or not password:
-        return jsonify({"error": "Nom d'utilisateur et mot de passe requis"}), 400
-
     if username == 'admin' and password == '1234':
         session['logged_in'] = True
-        logger.info("✅ Connexion réussie pour admin")
         return jsonify({
+            "status": "success",
+            "message": "Connexion réussie",
             "token": "fake-jwt-token-123",
             "role": "admin",
             "redirect_url": url_for('dashboard')
         })
 
-    logger.error("❌ Identifiants invalides")
-    return jsonify({"error": "Identifiants invalides"}), 401
+    return jsonify({"status": "error", "message": "Identifiants invalides"}), 401
 
 # 👥 Liste des employés
 @app.route('/api/employees', methods=['GET'])
@@ -99,64 +76,59 @@ def get_all_employees():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM employees ORDER BY nom, prenom")
+        cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
         employees = [dict(row) for row in cursor.fetchall()]
         conn.close()
-        logger.info("✅ Liste des employés récupérée")
-        return jsonify(employees)
+        return jsonify({"status": "success", "employees": employees, "message": "Liste récupérée"})
     except Exception as e:
-        logger.error(f"❌ get_all_employees: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
+        logger.exception("❌ get_all_employees")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # 👥 Ajouter un employé
 @app.route('/api/employees', methods=['POST'])
 def add_employee():
-    record = request.get_json()
+    record = request.get_json(silent=True)
     required = ['nom', 'prenom', 'type']
     for field in required:
-        if field not in record:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+        if not record.get(field):
+            return jsonify({"status": "error", "message": f"Champ manquant: {field}"}), 400
 
     try:
         conn = get_db()
         cursor = conn.cursor()
 
-        # Générer un ID unique automatiquement si non fourni
         new_id = record.get('id') or str(uuid.uuid4())
 
-        cursor.execute('''
+        cursor.execute(f'''
             INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', [
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        ''', (
             new_id,
             record['nom'],
             record['prenom'],
             record['type'],
             record.get('is_active', 1),
             int(datetime.now().timestamp() * 1000)
-        ])
+        ))
         conn.commit()
         conn.close()
 
-        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
-        return jsonify({"status": "success", "id": new_id}), 201
+        return jsonify({
+            "status": "success",
+            "message": f"Employé {record['prenom']} {record['nom']} ajouté",
+            "id": new_id
+        }), 201
 
     except Exception as e:
-        logger.error(f"❌ Échec add_employee: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception("❌ add_employee")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-
-import uuid
-
+# 💰 Ajouter un salaire
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
     data = request.get_json(silent=True)
-    logger.info(f"📥 Données reçues: {data}")
-
     if not data:
-        return jsonify({"error": "Requête vide ou mal formée"}), 400
+        return jsonify({"status": "error", "message": "Requête vide"}), 400
 
     try:
         conn = get_db()
@@ -165,49 +137,42 @@ def add_salary():
         emp_id = data.get("employeeId")
         emp_name = (data.get("employeeName") or "").strip().split(" ")
 
-        # Vérifier si l'employé existe déjà
-        cur.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
+        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
 
         if not employee:
-            # ✅ Créer automatiquement l'employé
             new_id = emp_id or str(uuid.uuid4())
-
             prenom = emp_name[0] if len(emp_name) > 0 else ""
             nom = " ".join(emp_name[1:]) if len(emp_name) > 1 else prenom
-
             type_emp = data.get("type", "inconnu")
 
-            cur.execute('''
+            cur.execute(f'''
                 INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            ''', [
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            ''', (
                 new_id,
                 nom,
                 prenom,
                 type_emp,
                 1,
                 int(datetime.now().timestamp() * 1000)
-            ])
-            logger.info(f"✅ Employé auto-créé: {prenom} {nom} (id={new_id})")
-
+            ))
             emp_id = new_id
 
-        # Conversion du champ "date" → BIGINT
-        if isinstance(data.get("date"), (int, float)):
-            salary_date = int(data["date"])
-        else:
-            salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
+        salary_date = int(datetime.now().timestamp() * 1000)
+        if data.get("date"):
+            if isinstance(data["date"], (int, float)):
+                salary_date = int(data["date"])
+            else:
+                salary_date = int(datetime.strptime(data["date"], "%Y-%m-%d").timestamp() * 1000)
 
-        # Période (défaut = mois courant)
         period = data.get("period") or datetime.now().strftime("%Y-%m")
 
-        # ✅ Insertion du salaire
-        cur.execute("""
+        cur.execute(f"""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, (
-            str(uuid.uuid4()),  # id unique
+            str(uuid.uuid4()),
             emp_id,
             data.get("employeeName"),
             data.get("amount"),
@@ -221,16 +186,16 @@ def add_salary():
         cur.close()
         conn.close()
 
-        logger.info(f"✅ Salaire enregistré pour {data.get('employeeName')}")
-        return jsonify({"status": "success"}), 201
+        return jsonify({
+            "status": "success",
+            "message": f"Salaire enregistré pour {data.get('employeeName')}"
+        }), 201
 
     except Exception as e:
-        logger.error(f"❌ Erreur insertion salaire: {e}")
-        return jsonify({"error": str(e)}), 400
+        logger.exception("❌ add_salary")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-
-
-# 📊 Tableau de bord
+# 📊 Dashboard
 @app.route('/dashboard')
 def dashboard():
     if not session.get('logged_in'):
@@ -239,7 +204,7 @@ def dashboard():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('''
+        cursor.execute(f'''
             SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type, s.amount, s.period, s.date
             FROM salaries s
             INNER JOIN employees e ON e.id = s.employee_id
@@ -250,10 +215,10 @@ def dashboard():
         conn.close()
         return render_template('dashboard.html', payments=payments)
     except Exception as e:
-        logger.error(f"❌ dashboard: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.exception("❌ dashboard")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- Démarrage ---
-if __name__ == '_main_':
+# --- Lancement ---
+if __name__ == '__main__':
     port = int(os.getenv('PORT', 10000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=True)
