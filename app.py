@@ -148,8 +148,8 @@ def add_employee():
         return jsonify({"error": str(e)}), 500
 
 
+import uuid
 
-# 💰 Enregistrer un salaire (auto-crée l'employé si introuvable)
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
     data = request.get_json(silent=True)
@@ -163,17 +163,19 @@ def add_salary():
         cur = conn.cursor()
 
         emp_id = data.get("employeeId")
-        emp_name = data.get("employeeName", "").split(" ")
+        emp_name = (data.get("employeeName") or "").strip().split(" ")
 
-        # Vérifier si l'employé existe
+        # Vérifier si l'employé existe déjà
         cur.execute("SELECT id FROM employees WHERE id = %s", (emp_id,))
         employee = cur.fetchone()
 
         if not employee:
             # ✅ Créer automatiquement l'employé
             new_id = emp_id or str(uuid.uuid4())
-            nom = emp_name[-1] if len(emp_name) > 1 else emp_name[0]
-            prenom = emp_name[0] if len(emp_name) > 1 else ""
+
+            prenom = emp_name[0] if len(emp_name) > 0 else ""
+            nom = " ".join(emp_name[1:]) if len(emp_name) > 1 else prenom
+
             type_emp = data.get("type", "inconnu")
 
             cur.execute('''
