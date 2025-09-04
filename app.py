@@ -118,7 +118,8 @@ def add_employee():
         conn = get_db()
         cursor = conn.cursor()
 
-        new_id = record.get("id") or str(uuid.uuid4())
+        # ⚡ Génère toujours un UUID côté serveur
+        new_id = str(uuid.uuid4())
         created_at = int(datetime.now().timestamp() * 1000)
 
         cursor.execute(f"""
@@ -128,12 +129,20 @@ def add_employee():
 
         conn.commit()
         conn.close()
+
         logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
-        return jsonify({"success": True, "message": "Employé ajouté avec succès", "id": new_id}), 201
+
+        # ⚡ Retourne l’ID généré
+        return jsonify({
+            "success": True,
+            "message": "Employé ajouté avec succès",
+            "id": new_id
+        }), 201
 
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
