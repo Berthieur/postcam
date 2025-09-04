@@ -183,6 +183,54 @@ def add_salary():
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
         return jsonify({"success": False, "message": str(e)}), 400
+        # === PUT modifier employé ===
+@app.route("/api/employees/<id>", methods=["PUT"])
+def update_employee(id):
+    record = request.get_json(silent=True)
+    if not record:
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute(f"""
+            UPDATE employees
+            SET nom = {PLACEHOLDER}, prenom = {PLACEHOLDER}, type = {PLACEHOLDER}, is_active = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [record.get("nom"), record.get("prenom"), record.get("type"),
+              record.get("is_active", 1), id])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Employé modifié"}), 200
+    except Exception as e:
+        logger.error(f"❌ update_employee: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+# === DELETE supprimer employé ===
+@app.route("/api/employees/<id>", methods=["DELETE"])
+def delete_employee(id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Supprimer d'abord les salaires liés (clé étrangère)
+        cur.execute(f"DELETE FROM salaries WHERE employee_id = {PLACEHOLDER}", [id])
+
+        # Supprimer l’employé
+        cur.execute(f"DELETE FROM employees WHERE id = {PLACEHOLDER}", [id])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Employé supprimé"}), 200
+    except Exception as e:
+        logger.error(f"❌ delete_employee: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # === Dashboard ===
 @app.route("/dashboard")
