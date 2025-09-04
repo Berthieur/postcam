@@ -93,8 +93,12 @@ def get_all_employees():
         cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
         rows = cursor.fetchall()
 
-        employees = [dict(row) for row in rows] if DB_DRIVER == "postgres" else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        employees = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
 
+        logger.info(f"📋 Employés envoyés: {employees}")
         conn.close()
         return jsonify(employees)
     except Exception as e:
@@ -122,27 +126,14 @@ def add_employee():
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [new_id, record["nom"], record["prenom"], record["type"], record.get("is_active", 1), created_at])
 
-        conn.com@app.route("/api/employees", methods=["GET"])
-def get_all_employees():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
-        rows = cursor.fetchall()
-
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
-        logger.info(f"📋 Employés envoyés: {employees}")  # <--- AJOUTER ÇA
-
+        conn.commit()
         conn.close()
-        return jsonify(employees)
-    except Exception as e:
-        logger.error(f"❌ get_all_employees: {e}")
-        return jsonify({"error": str(e)}), 500
+        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
+        return jsonify({"status": "success", "id": new_id}), 201
 
+    except Exception as e:
+        logger.error(f"❌ add_employee: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
@@ -166,8 +157,8 @@ def add_salary():
 
         if not employee:
             new_id = emp_id or str(uuid.uuid4())
-            prenom = emp_name[0] if len(emp_name) > 0 else ""
-            nom = " ".join(emp_name[1:]) if len(emp_name) > 1 else prenom
+            prenom = emp_name[0] if len(emp_name) > 0 else "Inconnu"
+            nom = " ".join(emp_name[1:]) if len(emp_name) > 1 else "Inconnu"
 
             cur.execute(f"""
                 INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
@@ -211,7 +202,10 @@ def dashboard():
         """)
         rows = cursor.fetchall()
 
-        payments = [dict(row) for row in rows] if DB_DRIVER == "postgres" else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        payments = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
 
         conn.close()
         return render_template("dashboard.html", payments=payments)
