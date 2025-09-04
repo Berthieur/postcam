@@ -69,7 +69,7 @@ def login():
     data = request.get_json(silent=True) or request.form
 
     if not data:
-        return jsonify({"error": "Données manquantes"}), 400
+        return jsonify({"success": False, "message": "Données manquantes"}), 400
 
     username = data.get("username")
     password = data.get("password")
@@ -77,12 +77,13 @@ def login():
     if username == "admin" and password == "1234":
         session["logged_in"] = True
         return jsonify({
+            "success": True,
             "token": "fake-jwt-token-123",
             "role": "admin",
             "redirect_url": url_for("dashboard")
         })
 
-    return jsonify({"error": "Identifiants invalides"}), 401
+    return jsonify({"success": False, "message": "Identifiants invalides"}), 401
 
 # === GET employés ===
 @app.route("/api/employees", methods=["GET"])
@@ -98,21 +99,20 @@ def get_all_employees():
             else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
         )
 
-        logger.info(f"📋 Employés envoyés: {employees}")
         conn.close()
-        return jsonify(employees)
+        return jsonify({"success": True, "employees": employees})
     except Exception as e:
         logger.error(f"❌ get_all_employees: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST ajouter employé ===
 @app.route("/api/employees", methods=["POST"])
 def add_employee():
-    record = request.get_json()
+    record = request.get_json(silent=True)
     required = ["nom", "prenom", "type"]
     for field in required:
-        if field not in record:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+        if not record or field not in record:
+            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
 
     try:
         conn = get_db()
@@ -129,11 +129,11 @@ def add_employee():
         conn.commit()
         conn.close()
         logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
-        return jsonify({"status": "success", "id": new_id}), 201
+        return jsonify({"success": True, "message": "Employé ajouté avec succès", "id": new_id}), 201
 
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
@@ -142,7 +142,7 @@ def add_salary():
     logger.info(f"📥 Données reçues: {data}")
 
     if not data:
-        return jsonify({"error": "Requête vide"}), 400
+        return jsonify({"success": False, "message": "Requête vide"}), 400
 
     try:
         conn = get_db()
@@ -157,8 +157,8 @@ def add_salary():
 
         if not employee:
             new_id = emp_id or str(uuid.uuid4())
-            prenom = emp_name[0] if len(emp_name) > 0 else "Inconnu"
-            nom = " ".join(emp_name[1:]) if len(emp_name) > 1 else "Inconnu"
+            nom = emp_name[-1] if len(emp_name) > 1 else emp_name[0] if emp_name else "Inconnu"
+            prenom = emp_name[0] if len(emp_name) > 1 else "Inconnu"
 
             cur.execute(f"""
                 INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
@@ -179,10 +179,10 @@ def add_salary():
         cur.close()
         conn.close()
 
-        return jsonify({"status": "success"}), 201
+        return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": emp_id}), 201
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 400
 
 # === Dashboard ===
 @app.route("/dashboard")
@@ -211,7 +211,7 @@ def dashboard():
         return render_template("dashboard.html", payments=payments)
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Démarrage ---
 if __name__ == "__main__":
