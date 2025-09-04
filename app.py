@@ -122,13 +122,27 @@ def add_employee():
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [new_id, record["nom"], record["prenom"], record["type"], record.get("is_active", 1), created_at])
 
-        conn.commit()
-        conn.close()
+        conn.com@app.route("/api/employees", methods=["GET"])
+def get_all_employees():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
+        rows = cursor.fetchall()
 
-        return jsonify({"status": "success", "id": new_id}), 201
+        employees = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
+
+        logger.info(f"📋 Employés envoyés: {employees}")  # <--- AJOUTER ÇA
+
+        conn.close()
+        return jsonify(employees)
     except Exception as e:
-        logger.error(f"❌ add_employee: {e}")
+        logger.error(f"❌ get_all_employees: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
