@@ -118,21 +118,31 @@ def add_employee():
         conn = get_db()
         cursor = conn.cursor()
 
-        # ⚡ Génère toujours un UUID côté serveur
         new_id = str(uuid.uuid4())
         created_at = int(datetime.now().timestamp() * 1000)
 
         cursor.execute(f"""
-            INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [new_id, record["nom"], record["prenom"], record["type"], record.get("is_active", 1), created_at])
+            INSERT INTO employees (
+                id, nom, prenom, type, is_active, created_at,
+                email, telephone, taux_horaire, frais_ecolage,
+                profession, date_naissance, lieu_naissance
+            )
+            VALUES (
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}
+            )
+        """, [
+            new_id, record["nom"], record["prenom"], record["type"],
+            record.get("is_active", 1), created_at,
+            record.get("email"), record.get("telephone"), record.get("taux_horaire"),
+            record.get("frais_ecolage"), record.get("profession"),
+            record.get("date_naissance"), record.get("lieu_naissance")
+        ])
 
         conn.commit()
         conn.close()
 
-        logger.info(f"✅ Employé ajouté: {record['prenom']} {record['nom']} (id={new_id})")
-
-        # ⚡ Retourne l’ID généré
         return jsonify({
             "success": True,
             "message": "Employé ajouté avec succès",
@@ -142,6 +152,7 @@ def add_employee():
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 
 # === POST ajouter salaire ===
@@ -192,7 +203,6 @@ def add_salary():
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
         return jsonify({"success": False, "message": str(e)}), 400
-        # === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
 def update_employee(id):
     record = request.get_json(silent=True)
@@ -205,10 +215,18 @@ def update_employee(id):
 
         cur.execute(f"""
             UPDATE employees
-            SET nom = {PLACEHOLDER}, prenom = {PLACEHOLDER}, type = {PLACEHOLDER}, is_active = {PLACEHOLDER}
+            SET nom = {PLACEHOLDER}, prenom = {PLACEHOLDER}, type = {PLACEHOLDER}, is_active = {PLACEHOLDER},
+                email = {PLACEHOLDER}, telephone = {PLACEHOLDER},
+                taux_horaire = {PLACEHOLDER}, frais_ecolage = {PLACEHOLDER},
+                profession = {PLACEHOLDER}, date_naissance = {PLACEHOLDER}, lieu_naissance = {PLACEHOLDER}
             WHERE id = {PLACEHOLDER}
-        """, [record.get("nom"), record.get("prenom"), record.get("type"),
-              record.get("is_active", 1), id])
+        """, [
+            record.get("nom"), record.get("prenom"), record.get("type"), record.get("is_active", 1),
+            record.get("email"), record.get("telephone"),
+            record.get("taux_horaire"), record.get("frais_ecolage"),
+            record.get("profession"), record.get("date_naissance"), record.get("lieu_naissance"),
+            id
+        ])
 
         conn.commit()
         cur.close()
@@ -217,7 +235,6 @@ def update_employee(id):
     except Exception as e:
         logger.error(f"❌ update_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 # === DELETE supprimer employé ===
 @app.route("/api/employees/<id>", methods=["DELETE"])
