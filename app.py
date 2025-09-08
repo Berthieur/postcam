@@ -292,37 +292,32 @@ def dashboard():
     if not session.get("logged_in"):
         return redirect(url_for("login_page"))
 
-    conn = get_db()
-    cur = conn.cursor()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type AS payment_type, s.period, s.date,
+                   e.nom, e.prenom, e.type, 
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM salaries s
+            LEFT JOIN employees e ON e.id = s.employee_id
+            ORDER BY s.date DESC
+        """)
+        rows = cursor.fetchall()
 
-    # employés
-    cur.execute("SELECT * FROM employees ORDER BY nom, prenom")
-    rows_emp = cur.fetchall()
-    employees = [dict(zip([c[0] for c in cur.description], r)) for r in rows_emp]
+        payments = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
 
-    # paiements
-    cur.execute("""
-        SELECT e.nom, e.prenom, s.type AS payment_type, s.amount, s.hours_worked, s.period, s.date
-        FROM salaries s
-        INNER JOIN employees e ON e.id = s.employee_id
-        ORDER BY s.date DESC
-    """)
-    rows_sal = cur.fetchall()
-    payments = [dict(zip([c[0] for c in cur.description], r)) for r in rows_sal]
+        conn.close()
+        return render_template("dashboard.html", payments=payments)
+    except Exception as e:
+        logger.error(f"❌ dashboard: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
-    conn.close()
-
-    # Statistiques
-    total_incoming = sum(p["amount"] for p in payments if p["payment_type"] == "ecolage")
-    total_outgoing = sum(p["amount"] for p in payments if p["payment_type"] == "salaire")
-    net_benefit = total_incoming - total_outgoing
-
-    return render_template("dashboard.html",
-                           employees=employees,
-                           payments=payments,
-                           total_incoming=total_incoming,
-                           total_outgoing=total_outgoing,
-                           net_benefit=net_benefit)
 
 # --- Démarrage ---
 if __name__ == "__main__":
