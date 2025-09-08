@@ -2,207 +2,118 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Tableau de bord - Gestion</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau de bord - Paiements et Employés</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            background: #f4f4f9;
+            margin: 20px;
+            background-color: #f4f4f9;
+            animation: fadeIn 1s ease-in;
         }
-        header {
-            background: #4CAF50;
-            color: white;
-            padding: 20px;
+        h1 {
             text-align: center;
-        }
-        h1 { margin: 0; }
-        main { padding: 20px; }
-
-        section {
-            margin-bottom: 40px;
-        }
-
-        .stats {
-            display: flex;
-            justify-content: space-around;
-            margin: 20px 0;
-        }
-        .stat-card {
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            text-align: center;
-            flex: 1;
-            margin: 0 10px;
-        }
-        .stat-card h2 {
-            margin: 0;
-            font-size: 22px;
-            color: #4CAF50;
-        }
-        .stat-card p {
-            font-size: 16px;
             color: #333;
+            animation: slideDown 0.5s ease-out;
         }
-
         table {
             width: 100%;
             border-collapse: collapse;
-            background: #fff;
+            margin-top: 20px;
+            background-color: #fff;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            animation: fadeIn 1s ease-in;
         }
         th, td {
             border: 1px solid #ddd;
             padding: 10px;
-            font-size: 14px;
             text-align: left;
+            font-size: 14px;
+            transition: background-color 0.3s;
         }
         th {
-            background: #4CAF50;
+            background-color: #4CAF50;
             color: white;
         }
-        tr:nth-child(even) { background: #f9f9f9; }
-        tr:hover { background: #e0e0e0; }
-
-        .actions button {
-            margin: 2px;
-            padding: 5px 10px;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
         }
-        .edit { background: #2196F3; color: white; }
-        .delete { background: #f44336; color: white; }
-        .add-btn {
-            background: #4CAF50;
-            color: white;
-            padding: 8px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-bottom: 10px;
+        tr:hover {
+            background-color: #e0e0e0;
+            animation: pulse 0.5s;
         }
-
-        footer {
-            background: #333;
-            color: #ddd;
+        .no-data {
             text-align: center;
-            padding: 10px;
-            margin-top: 30px;
+            padding: 20px;
+            color: #888;
+        }
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
-<header>
-    <h1>📊 Tableau de bord - Gestion</h1>
-</header>
+    <h1>📊 Tableau de bord - Paiements et Employés</h1>
+    <p><b>Débogage :</b> Nombre de paiements = {{ payments | length }}</p>
 
-<main>
-    <!-- Statistiques -->
-    <section>
-        <h2>Statistiques globales</h2>
-        <div class="stats">
-            <div class="stat-card">
-                <h2>{{ total_incoming | round(2) }} €</h2>
-                <p>Entrées (Écolages)</p>
-            </div>
-            <div class="stat-card">
-                <h2>{{ total_outgoing | round(2) }} €</h2>
-                <p>Dépenses (Salaires)</p>
-            </div>
-            <div class="stat-card">
-                <h2>{{ net_benefit | round(2) }} €</h2>
-                <p>Bénéfice Net</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- Gestion des employés -->
-    <section>
-        <h2>Employés / Étudiants</h2>
-        <button class="add-btn">➕ Ajouter</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th>Prénom</th>
-                    <th>Email</th>
-                    <th>Téléphone</th>
-                    <th>Type</th>
-                    <th>Profession</th>
-                    <th>Taux horaire</th>
-                    <th>Frais écolage</th>
-                    <th>Date Naissance</th>
-                    <th>Lieu Naissance</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% if employees %}
-                {% for emp in employees %}
-                <tr>
-                    <td>{{ emp.nom or '-' }}</td>
-                    <td>{{ emp.prenom or '-' }}</td>
-                    <td>{{ emp.email or '-' }}</td>
-                    <td>{{ emp.telephone or '-' }}</td>
-                    <td>{{ emp.type or '-' }}</td>
-                    <td>{{ emp.profession or '-' }}</td>
-                    <td>{{ emp.taux_horaire or '-' }}</td>
-                    <td>{{ emp.frais_ecolage or '-' }}</td>
-                    <td>{{ emp.date_naissance or '-' }}</td>
-                    <td>{{ emp.lieu_naissance or '-' }}</td>
-                    <td class="actions">
-                        <button class="edit">Modifier</button>
-                        <button class="delete">Supprimer</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            {% else %}
-                <tr><td colspan="11" style="text-align:center;">Aucun employé/étudiant</td></tr>
-            {% endif %}
-            </tbody>
-        </table>
-    </section>
-
-    <!-- Historique des paiements -->
-    <section>
-        <h2>Historique des paiements</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Nom</th>
-                    <th>Prénom</th>
-                    <th>Type Paiement</th>
-                    <th>Montant (€)</th>
-                    <th>Heures</th>
-                    <th>Période</th>
-                    <th>Date</th>
-                </tr>
-            </thead>
-            <tbody>
+    <table>
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th>Email</th>
+                <th>Téléphone</th>
+                <th>Type</th>
+                <th>Nom complet (Paiement)</th>
+                <th>Type de paiement</th>
+                <th>Montant (€)</th>
+                <th>Heures</th>
+                <th>Taux horaire</th>
+                <th>Frais écolage</th>
+                <th>Période</th>
+                <th>Date</th>
+                <th>Date naissance</th>
+                <th>Lieu naissance</th>
+            </tr>
+        </thead>
+        <tbody>
             {% if payments %}
-                {% for p in payments %}
+                {% for payment in payments %}
                 <tr>
-                    <td>{{ p.nom or '-' }}</td>
-                    <td>{{ p.prenom or '-' }}</td>
-                    <td>{{ p.payment_type or '-' }}</td>
-                    <td>{{ p.amount | round(2) if p.amount else '-' }}</td>
-                    <td>{{ p.hours_worked or '-' }}</td>
-                    <td>{{ p.period or '-' }}</td>
-                    <td>{{ p.date | timestamp_to_datetime_full if p.date else '-' }}</td>
+                    <td>{{ payment.nom or '-' }}</td>
+                    <td>{{ payment.prenom or '-' }}</td>
+                    <td>{{ payment.email or '-' }}</td>
+                    <td>{{ payment.telephone or '-' }}</td>
+                    <td>{{ payment.type or '-' }}</td>
+                    <td>{{ payment.employee_name or '-' }}</td>
+                    <td>{{ payment.payment_type or '-' }}</td>
+                    <td>{{ payment.amount | round(2) if payment.amount else '-' }}</td>
+                    <td>{{ payment.hours_worked or '-' }}</td>
+                    <td>{{ payment.taux_horaire or '-' }}</td>
+                    <td>{{ payment.frais_ecolage or '-' }}</td>
+                    <td>{{ payment.period or '-' }}</td>
+                    <td>{{ payment.date | timestamp_to_datetime_full if payment.date else '-' }}</td>
+                    <td>{{ payment.date_naissance or '-' }}</td>
+                    <td>{{ payment.lieu_naissance or '-' }}</td>
                 </tr>
                 {% endfor %}
             {% else %}
-                <tr><td colspan="7" style="text-align:center;">Aucun paiement</td></tr>
+                <tr>
+                    <td colspan="15" class="no-data">Aucune donnée disponible</td>
+                </tr>
             {% endif %}
-            </tbody>
-        </table>
-    </section>
-</main>
-
-<footer>
-    <p>© 2025 - Gestion des Paiements & Employés</p>
-</footer>
+        </tbody>
+    </table>
 </body>
 </html>
