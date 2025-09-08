@@ -256,6 +256,38 @@ def delete_employee(id):
     except Exception as e:
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+        # === GET historique des salaires ===
+@app.route("/api/salary/history", methods=["GET"])
+def get_salary_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Jointure pour récupérer aussi les infos employé
+        cur.execute(f"""
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type, s.period, s.date,
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM salaries s
+            LEFT JOIN employees e ON e.id = s.employee_id
+            ORDER BY s.date DESC
+        """)
+        rows = cur.fetchall()
+
+        history = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "history": history}), 200
+
+    except Exception as e:
+        logger.error(f"❌ get_salary_history: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 
 # === Dashboard ===
