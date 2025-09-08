@@ -288,7 +288,6 @@ def get_salary_history():
 
 
 
-# === Dashboard ===
 @app.route("/dashboard")
 def dashboard():
     if not session.get("logged_in"):
@@ -298,10 +297,13 @@ def dashboard():
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute(f"""
-            SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type, s.amount, s.period, s.date
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type AS payment_type, s.period, s.date,
+                   e.nom, e.prenom, e.type, 
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
             FROM salaries s
-            INNER JOIN employees e ON e.id = s.employee_id
-            WHERE e.is_active = 1
+            LEFT JOIN employees e ON e.id = s.employee_id
             ORDER BY s.date DESC
         """)
         rows = cursor.fetchall()
