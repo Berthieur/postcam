@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>👨‍💼 Gestion des employés</h2>
+
+<a href="{{ url_for('add_employee_page') }}" class="btn">+ Ajouter Employé</a>
+
+<table>
+  <thead>
+    <tr>
+      <th>Nom</th><th>Prénom</th><th>Type</th><th>Email</th><th>Téléphone</th><th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for emp in employees %}
+    <tr>
+      <td>{{ emp.nom }}</td>
+      <td>{{ emp.prenom }}</td>
+      <td>{{ emp.type }}</td>
+      <td>{{ emp.email }}</td>
+      <td>{{ emp.telephone }}</td>
+      <td>
+        <a href="{{ url_for('edit_employee_page', id=emp.id) }}">✏ Modifier</a>
+        <a href="{{ url_for('delete_employee', id=emp.id) }}" onclick="return confirm('Supprimer ?')">🗑 Supprimer</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
