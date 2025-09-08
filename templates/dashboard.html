@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tableau de bord - Paiements et Remboursements</title>
+    <title>Tableau de bord - Paiements et Employés</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -26,8 +26,9 @@
         }
         th, td {
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: 10px;
             text-align: left;
+            font-size: 14px;
             transition: background-color 0.3s;
         }
         th {
@@ -45,9 +46,8 @@
             text-align: center;
             padding: 20px;
             color: #888;
-            animation: fadeIn 1s ease-in;
         }
-        /* Animations CSS */
+        /* Animations */
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -64,19 +64,27 @@
     </style>
 </head>
 <body>
-    <h1>Tableau de bord - Paiements et Remboursements</h1>
-    <p>Débogage : Nombre de paiements = {{ payments | length }}</p>
+    <h1>📊 Tableau de bord - Paiements et Employés</h1>
+    <p><b>Débogage :</b> Nombre de paiements = {{ payments | length }}</p>
+
     <table>
         <thead>
             <tr>
                 <th>Nom</th>
                 <th>Prénom</th>
+                <th>Email</th>
+                <th>Téléphone</th>
                 <th>Type</th>
                 <th>Nom complet (Paiement)</th>
                 <th>Type de paiement</th>
                 <th>Montant (€)</th>
+                <th>Heures</th>
+                <th>Taux horaire</th>
+                <th>Frais écolage</th>
                 <th>Période</th>
                 <th>Date</th>
+                <th>Date naissance</th>
+                <th>Lieu naissance</th>
             </tr>
         </thead>
         <tbody>
@@ -85,17 +93,24 @@
                 <tr>
                     <td>{{ payment.nom or '-' }}</td>
                     <td>{{ payment.prenom or '-' }}</td>
+                    <td>{{ payment.email or '-' }}</td>
+                    <td>{{ payment.telephone or '-' }}</td>
                     <td>{{ payment.type or '-' }}</td>
                     <td>{{ payment.employee_name or '-' }}</td>
                     <td>{{ payment.payment_type or '-' }}</td>
                     <td>{{ payment.amount | round(2) if payment.amount else '-' }}</td>
+                    <td>{{ payment.hours_worked or '-' }}</td>
+                    <td>{{ payment.taux_horaire or '-' }}</td>
+                    <td>{{ payment.frais_ecolage or '-' }}</td>
                     <td>{{ payment.period or '-' }}</td>
                     <td>{{ payment.date | timestamp_to_datetime_full if payment.date else '-' }}</td>
+                    <td>{{ payment.date_naissance or '-' }}</td>
+                    <td>{{ payment.lieu_naissance or '-' }}</td>
                 </tr>
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="8" class="no-data">Aucune donnée disponible</td>
+                    <td colspan="15" class="no-data">Aucune donnée disponible</td>
                 </tr>
             {% endif %}
         </tbody>
