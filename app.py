@@ -152,9 +152,7 @@ def add_employee():
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-
+        
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
