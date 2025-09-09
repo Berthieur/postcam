@@ -255,6 +255,7 @@ def delete_employee(id):
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
         # === GET historique des salaires ===
+
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
     try:
@@ -317,7 +318,6 @@ def dashboard():
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -335,7 +335,6 @@ def add_pointage():
         conn = get_db()
         cur = conn.cursor()
 
-        # Vérifier si l'employé existe
         emp_id = data.get("employeeId")
         cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
@@ -368,8 +367,7 @@ def add_pointage():
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
-
+@app.route("/api/pointages/history", methods=["GET"])
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
