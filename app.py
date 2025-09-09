@@ -318,7 +318,85 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+@app.route("/api/pointages", methods=["POST"])
+def add_pointage():
+    data = request.get_json(silent=True)
+    logger.info(f"📥 Données pointage reçues: {data}")
 
+    if not data:
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
+    for field in required:
+        if field not in data or not data[field]:
+            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Vérifier si l'employé existe
+        emp_id = data.get("employeeId")
+        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+
+        if not employee:
+            return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
+
+        pointage_id = str(uuid.uuid4())
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            pointage_id,
+            data.get("employeeId"),
+            data.get("employeeName"),
+            data.get("type"),
+            int(data.get("timestamp")),
+            data.get("date")
+        ])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": "Pointage enregistré",
+            "pointageId": pointage_id
+        }), 201
+    except Exception as e:
+        logger.error(f"❌ add_pointage: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/pointages/history", methods=["GET"])
+def get_pointage_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute(f"""
+            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date,
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM pointages p
+            LEFT JOIN employees e ON e.id = p.employee_id
+            ORDER BY p.timestamp DESC
+        """)
+        rows = cur.fetchall()
+
+        history = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "history": history}), 200
+    except Exception as e:
+        logger.error(f"❌ get_pointage_history: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
