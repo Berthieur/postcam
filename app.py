@@ -261,8 +261,6 @@ def get_salary_history():
     try:
         conn = get_db()
         cur = conn.cursor()
-
-        # Jointure + filtre pour éviter les enregistrements vides ou à 0
         cur.execute(f"""
             SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
                    s.type, s.period, s.date,
@@ -270,24 +268,23 @@ def get_salary_history():
                    e.date_naissance, e.lieu_naissance
             FROM salaries s
             LEFT JOIN employees e ON e.id = s.employee_id
-            WHERE s.amount > 0 AND s.employee_id IS NOT NULL
             ORDER BY s.date DESC
         """)
         rows = cur.fetchall()
 
-        history = (
+        salaries = (
             [dict(row) for row in rows] if DB_DRIVER == "postgres"
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
         cur.close()
         conn.close()
-        return jsonify({"success": True, "history": history}), 200
+        # ✅ Android attend "salaries" pas "history"
+        return jsonify({"success": True, "salaries": salaries}), 200
 
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 @app.route("/dashboard")
 def dashboard():
