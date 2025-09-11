@@ -262,7 +262,7 @@ def get_salary_history():
         conn = get_db()
         cur = conn.cursor()
 
-        # Jointure pour récupérer aussi les infos employé
+        # Jointure + filtre pour éviter les enregistrements vides ou à 0
         cur.execute(f"""
             SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
                    s.type, s.period, s.date,
@@ -270,6 +270,7 @@ def get_salary_history():
                    e.date_naissance, e.lieu_naissance
             FROM salaries s
             LEFT JOIN employees e ON e.id = s.employee_id
+            WHERE s.amount > 0 AND s.employee_id IS NOT NULL
             ORDER BY s.date DESC
         """)
         rows = cur.fetchall()
