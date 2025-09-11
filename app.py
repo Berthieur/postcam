@@ -152,31 +152,51 @@ def add_employee():
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-        
-# === POST ajouter salaire ===
+
+# === POST ajouter salaire (CORRIGÉ) ===
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
     data = request.get_json(silent=True)
     logger.info(f"📥 Données reçues: {data}")
 
     if not data:
+        logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    # Validation des champs requis
+    required_fields = ["employeeId", "employeeName", "amount", "type"]
+    for field in required_fields:
+        if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
+            logger.error(f"❌ Champ manquant ou vide: {field}")
+            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+
+    # Validation spécifique pour amount
+    try:
+        amount = float(data["amount"])
+        if amount <= 0:
+            logger.error(f"❌ Montant invalide: {amount}")
+            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
+    except (ValueError, TypeError):
+        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
+        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
 
     try:
         conn = get_db()
         cur = conn.cursor()
 
-        emp_id = data.get("employeeId")
-        emp_name = (data.get("employeeName") or "").strip().split(" ")
+        emp_id = data["employeeId"]
+        emp_name = data["employeeName"].strip()
 
         # Vérifier si l’employé existe
-        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
 
         if not employee:
+            logger.warning(f"⚠️ Employé {emp_id} non trouvé, création automatique")
+            emp_name_parts = emp_name.split(" ")
+            nom = emp_name_parts[-1] if len(emp_name_parts) > 1 else emp_name
+            prenom = emp_name_parts[0] if len(emp_name_parts) > 1 else "Inconnu"
             new_id = emp_id or str(uuid.uuid4())
-            nom = emp_name[-1] if len(emp_name) > 1 else emp_name[0] if emp_name else "Inconnu"
-            prenom = emp_name[0] if len(emp_name) > 1 else "Inconnu"
 
             cur.execute(f"""
                 INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
@@ -184,23 +204,31 @@ def add_salary():
             """, [new_id, nom, prenom, data.get("type", "inconnu"), 1, int(datetime.now().timestamp() * 1000)])
 
             emp_id = new_id
+        else:
+            logger.info(f"✅ Employé trouvé: {employee['nom']} {employee['prenom']}")
 
-        salary_date = int(data.get("date")) if isinstance(data.get("date"), (int, float)) else int(datetime.now().timestamp() * 1000)
+        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
         period = data.get("period") or datetime.now().strftime("%Y-%m")
 
         cur.execute(f"""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [str(uuid.uuid4()), emp_id, data.get("employeeName"), data.get("amount"), data.get("hoursWorked", 0), data.get("type"), period, salary_date])
+        """, [
+            str(uuid.uuid4()), emp_id, emp_name, amount, data.get("hoursWorked", 0.0),
+            data["type"], period, salary_date
+        ])
 
         conn.commit()
+        logger.info(f"✅ Salaire enregistré: employee_id={emp_id}, amount={amount}, type={data['type']}")
+
         cur.close()
         conn.close()
-
         return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": emp_id}), 201
+
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
-        return jsonify({"success": False, "message": str(e)}), 400
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route("/api/employees/<id>", methods=["PUT"])
 def update_employee(id):
     record = request.get_json(silent=True)
@@ -254,8 +282,8 @@ def delete_employee(id):
     except Exception as e:
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-        # === GET historique des salaires ===
 
+# === GET historique des salaires (CORRIGÉ avec logs) ===
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
     try:
@@ -277,8 +305,19 @@ def get_salary_history():
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
+        # Log des enregistrements problématiques
+        invalid_records = [
+            record for record in salaries
+            if record["employee_id"] is None or not record["employee_name"] or record["amount"] <= 0
+        ]
+        if invalid_records:
+            logger.warning(f"⚠️ {len(invalid_records)} enregistrements invalides trouvés :")
+            for record in invalid_records:
+                logger.warning(f"  - ID={record['id']}, employee_id={record['employee_id']}, employee_name={record['employee_name']}, amount={record['amount']}")
+
         cur.close()
         conn.close()
+        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
         # ✅ Android attend "salaries" pas "history"
         return jsonify({"success": True, "salaries": salaries}), 200
 
@@ -316,6 +355,7 @@ def dashboard():
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -365,6 +405,7 @@ def add_pointage():
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
