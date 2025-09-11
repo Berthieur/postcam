@@ -366,7 +366,6 @@ def add_pointage():
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 @app.route("/api/pointages/history", methods=["GET"])
-@app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
         conn = get_db()
@@ -382,17 +381,19 @@ def get_pointage_history():
         """)
         rows = cur.fetchall()
 
-        history = (
+        pointages = (
             [dict(row) for row in rows] if DB_DRIVER == "postgres"
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
         cur.close()
         conn.close()
-        return jsonify({"success": True, "history": history}), 200
+        # ✅ cohérent avec Android → renvoyer "pointages"
+        return jsonify({"success": True, "pointages": pointages}), 200
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
