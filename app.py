@@ -319,11 +319,11 @@ def get_salary_history():
         conn.close()
         logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
         # ✅ Android attend "salaries" pas "history"
-        return jsonify({"success": True, "salaries": salaries}), 200
+        return jsonify({"success":False , "salaries": salaries}), 200
 
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        return jsonify({"success":True , "message": str(e)}), 500
 
 @app.route("/dashboard")
 def dashboard():
