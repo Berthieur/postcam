@@ -453,6 +453,11 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+@app.route("/api/motion", methods=["GET"])
+def motion_detected():
+    logger.info("⚡ Mouvement détecté par ESP32 (PIR)")
+    # Ici tu pourrais stocker en DB ou envoyer un signal WebSocket
+    return jsonify({"success": True, "message": "Motion detected"}), 200
 
 # --- Démarrage ---
 if __name__ == "__main__":
