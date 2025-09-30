@@ -4,11 +4,13 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from flask_cors import CORS
 from datetime import datetime
 import uuid
-
+from flask_socketio import SocketIO, emit
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+# === Ajoute après app = Flask(...)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
@@ -453,13 +455,15 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+# === Route PIR ===
 @app.route("/api/motion", methods=["GET"])
 def motion_detected():
     logger.info("⚡ Mouvement détecté par ESP32 (PIR)")
-    # Ici tu pourrais stocker en DB ou envoyer un signal WebSocket
+    socketio.emit("motionDetected", {"motion": True})  # ⚡ envoie aux clients connectés
     return jsonify({"success": True, "message": "Motion detected"}), 200
 
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
    # app.run(host="0.0.0.0", port=port, debug=False)
+    socketio.run(app, host="0.0.0.0", port=port)
