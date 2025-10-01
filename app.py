@@ -265,7 +265,6 @@ def update_employee(id):
     record = request.get_json(silent=True)
     if not record:
         return jsonify({"success": False, "message": "Requête vide"}), 400
-
     try:
         conn = get_db()
         cur = conn.cursor()
