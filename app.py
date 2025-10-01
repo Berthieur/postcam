@@ -10,17 +10,16 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 # === Ajoute après app = Flask(...)
-
-# === SocketIO avec async_mode='eventlet' pour production ===
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*",
-    async_mode='eventlet',  # ✅ Important pour Render
+    async_mode='threading',  # ✅ toujours dispo
     logger=True,
     engineio_logger=True,
     ping_timeout=60,
     ping_interval=25
 )
+
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
