@@ -10,8 +10,17 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 # === Ajoute après app = Flask(...)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
+# === SocketIO avec async_mode='eventlet' pour production ===
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    async_mode='eventlet',  # ✅ Important pour Render
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
+)
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,6 +44,15 @@ try:
 except Exception as e:
     logger.error(f"❌ Échec init_db/verify_schema : {e}")
     raise
+# === WebSocket Events ===
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"✅ Client connecté: {request.sid}")
+    emit('connection_response', {'status': 'connected', 'sid': request.sid})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"❌ Client déconnecté: {request.sid}")
 
 # === Filtres Jinja2 ===
 @app.template_filter("timestamp_to_datetime")
@@ -459,11 +477,38 @@ def get_pointage_history():
 @app.route("/api/motion", methods=["GET"])
 def motion_detected():
     logger.info("⚡ Mouvement détecté par ESP32 (PIR)")
-    socketio.emit("motionDetected", {"motion": True})  # ⚡ envoie aux clients connectés
-    return jsonify({"success": True, "message": "Motion detected"}), 200
+    try:
+        # Émettre l'événement à tous les clients connectés
+        socketio.emit("motionDetected", {"motion": True, "timestamp": int(datetime.now().timestamp() * 1000)})
+        logger.info("📡 Événement motionDetected émis")
+        return jsonify({"success": True, "message": "Motion detected"}), 200
+    except Exception as e:
+        logger.error(f"❌ Erreur motion_detected: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+# === Route manquante pour /api/employees/active ===
+@app.route("/api/employees/active", methods=["GET"])
+def get_active_employees():
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM employees WHERE is_active = 1 ORDER BY nom, prenom")
+        rows = cursor.fetchall()
 
+        employees = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
+
+        conn.close()
+        logger.info(f"📤 {len(employees)} employés actifs renvoyés")
+        return jsonify({"success": True, "employees": employees})
+    except Exception as e:
+        logger.error(f"❌ get_active_employees: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# --- Démarrage ---
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-   # app.run(host="0.0.0.0", port=port, debug=False)
-    socketio.run(app, host="0.0.0.0", port=port)
+    # ✅ Utiliser socketio.run au lieu de app.run
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)
