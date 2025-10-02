@@ -312,12 +312,13 @@ def delete_employee(id):
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === GET historique des salaires (CORRIGÉ avec employee_id) ===
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
     try:
         conn = get_db()
         cur = conn.cursor()
+        
+        # Requête avec logs détaillés
         cur.execute(f"""
             SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
                    s.type, s.period, s.date,
@@ -338,7 +339,10 @@ def get_salary_history():
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
-        # Log pour debug
+        # Logs détaillés pour chaque enregistrement
+        logger.info(f"=== RÉCUPÉRATION HISTORIQUE SALAIRES ===")
+        logger.info(f"Nombre total de records: {len(salaries)}")
+        
         valid_count = 0
         invalid_count = 0
         
@@ -348,19 +352,25 @@ def get_salary_history():
                 record.get("employee_name").strip() and
                 record.get("amount", 0) > 0):
                 valid_count += 1
-                logger.info(f"✅ Record valide: ID={record['id']}, employee_id={record['employee_id']}, employee_name={record['employee_name']}, amount={record['amount']}")
+                logger.info(f"✅ Record valide: ID={record['id']}, " +
+                           f"employee_id={record['employee_id']}, " +
+                           f"employee_name={record['employee_name']}, " +
+                           f"type={record['type']}, " +
+                           f"amount={record['amount']}")
             else:
                 invalid_count += 1
-                logger.warning(f"⚠️ Record invalide: {record}")
+                logger.warning(f"⚠️ Record invalide ignoré: {record}")
 
+        logger.info(f"Résumé: {valid_count} valides, {invalid_count} invalides")
+        
         cur.close()
         conn.close()
-        logger.info(f"📤 Historique salaires: {valid_count} valides, {invalid_count} invalides")
         
+        # Retourner TOUS les records (même ceux marqués "invalides" dans les logs)
         return jsonify({"success": True, "salaries": salaries}), 200
 
     except Exception as e:
-        logger.error(f"❌ get_salary_history: {e}")
+        logger.error(f"❌ get_salary_history: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 @app.route("/dashboard")
 def dashboard():
