@@ -283,7 +283,6 @@ def delete_employee(id):
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === GET historique des salaires (CORRIGÉ avec logs) ===
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
     try:
@@ -296,6 +295,10 @@ def get_salary_history():
                    e.date_naissance, e.lieu_naissance
             FROM salaries s
             LEFT JOIN employees e ON e.id = s.employee_id
+            WHERE s.employee_id IS NOT NULL 
+              AND s.employee_name IS NOT NULL 
+              AND s.employee_name != ''
+              AND s.amount > 0
             ORDER BY s.date DESC
         """)
         rows = cur.fetchall()
@@ -305,25 +308,21 @@ def get_salary_history():
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
-        # Log des enregistrements problématiques
-        invalid_records = [
-            record for record in salaries
-            if record["employee_id"] is None or not record["employee_name"] or record["amount"] <= 0
-        ]
-        if invalid_records:
-            logger.warning(f"⚠️ {len(invalid_records)} enregistrements invalides trouvés :")
-            for record in invalid_records:
-                logger.warning(f"  - ID={record['id']}, employee_id={record['employee_id']}, employee_name={record['employee_name']}, amount={record['amount']}")
+        # Assurer que les valeurs nulles sont converties correctement
+        for record in salaries:
+            if record.get("hours_worked") is None:
+                record["hours_worked"] = 0.0
+            if record.get("period") is None:
+                record["period"] = ""
 
         cur.close()
         conn.close()
-        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
-        # ✅ Android attend "salaries" pas "history"
-        return jsonify({"success":True, "salaries": salaries}), 200
+        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements valides")
+        return jsonify({"success": True, "salaries": salaries}), 200
 
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}")
-        return jsonify({"success":False  , "message": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route("/dashboard")
 def dashboard():
