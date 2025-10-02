@@ -5,6 +5,7 @@ from flask_cors import CORS
 from datetime import datetime
 import uuid
 from flask_socketio import SocketIO, emit
+import psycopg2  # For explicit Neon PostgreSQL error handling
 
 # === Configuration Flask ===
 app = Flask(__name__)
@@ -16,8 +17,8 @@ socketio = SocketIO(
     async_mode='threading',
     logger=True,
     engineio_logger=True,
-    ping_timeout=120,  # Augmenté pour éviter les déconnexions prématurées
-    ping_interval=30   # Intervalle raisonnable pour maintenir la connexion
+    ping_timeout=120,
+    ping_interval=30
 )
 
 # === Logger ===
@@ -32,8 +33,8 @@ except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
     raise
 
-# === Placeholder SQL (Postgres = %s, SQLite = ?) ===
-PLACEHOLDER = "?" if DB_DRIVER == "sqlite" else "%s"
+# === Placeholder SQL (Postgres = %s) ===
+PLACEHOLDER = "%s"  # Neon uses PostgreSQL, so always %s
 
 # --- Initialisation DB ---
 try:
@@ -58,32 +59,36 @@ def handle_disconnect():
 def handle_pointage_update(data):
     logger.info(f"📥 Événement pointageUpdate reçu: {data}")
     try:
-        # Valider les données reçues
         required_fields = ["id", "employeeId", "employeeName", "type", "timestamp", "date"]
         for field in required_fields:
             if field not in data or not data[field]:
                 logger.error(f"❌ Champ manquant ou vide dans pointageUpdate: {field}")
                 return
 
-        # Sauvegarder dans la base de données
         conn = get_db()
         cur = conn.cursor()
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            data["id"],
-            data["employeeId"],
-            data["employeeName"],
-            data["type"],
-            int(data["timestamp"]),
-            data["date"]
-        ])
-        conn.commit()
-        cur.close()
-        conn.close()
+        try:
+            cur.execute(f"""
+                INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                data["id"],
+                data["employeeId"],
+                data["employeeName"],
+                data["type"],
+                int(data["timestamp"]),
+                data["date"]
+            ])
+            conn.commit()
+            logger.info(f"✅ Pointage inséré: ID={data['id']}")
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"❌ Erreur insertion pointage: {e}")
+            raise
+        finally:
+            cur.close()
+            conn.close()
 
-        # Diffuser l'événement à tous les clients
         socketio.emit('pointageUpdate', data, broadcast=True)
         logger.info(f"📡 Événement pointageUpdate émis: {data}")
     except Exception as e:
@@ -93,39 +98,43 @@ def handle_pointage_update(data):
 def handle_salary_update(data):
     logger.info(f"📥 Événement salaryUpdate reçu: {data}")
     try:
-        # Valider les données reçues
         if "salaries" not in data or not isinstance(data["salaries"], list):
             logger.error("❌ Données salaryUpdate invalides: 'salaries' doit être une liste")
             return
 
         conn = get_db()
         cur = conn.cursor()
-        for salary in data["salaries"]:
-            required_fields = ["id", "employee_id", "employee_name", "amount", "type", "period", "date"]
-            for field in required_fields:
-                if field not in salary or salary[field] is None:
-                    logger.error(f"❌ Champ manquant ou vide dans salaryUpdate: {field}")
-                    continue
+        try:
+            for salary in data["salaries"]:
+                required_fields = ["id", "employee_id", "employee_name", "amount", "type", "period", "date"]
+                for field in required_fields:
+                    if field not in salary or salary[field] is None:
+                        logger.error(f"❌ Champ manquant ou vide dans salaryUpdate: {field}")
+                        continue
 
-            cur.execute(f"""
-                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                salary["id"],
-                salary["employee_id"],
-                salary["employee_name"],
-                float(salary["amount"]),
-                salary.get("hours_worked", 0.0),
-                salary["type"],
-                salary["period"],
-                int(salary["date"])
-            ])
+                cur.execute(f"""
+                    INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+                """, [
+                    salary["id"],
+                    salary["employee_id"],
+                    salary["employee_name"],
+                    float(salary["amount"]),
+                    salary.get("hours_worked", 0.0),
+                    salary["type"],
+                    salary["period"],
+                    int(salary["date"])
+                ])
+            conn.commit()
+            logger.info(f"✅ {len(data['salaries'])} salaires insérés")
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"❌ Erreur insertion salaire: {e}")
+            raise
+        finally:
+            cur.close()
+            conn.close()
 
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        # Diffuser l'événement à tous les clients
         socketio.emit('salaryUpdate', data, broadcast=True)
         logger.info(f"📡 Événement salaryUpdate émis: {data}")
     except Exception as e:
@@ -189,12 +198,9 @@ def get_all_employees():
         cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
         rows = cursor.fetchall()
 
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
+        employees = [dict(row) for row in rows]  # Simplified for PostgreSQL
         conn.close()
+        logger.info(f"📤 {len(employees)} employés renvoyés")
         return jsonify({"success": True, "employees": employees})
     except Exception as e:
         logger.error(f"❌ get_all_employees: {e}")
@@ -237,7 +243,7 @@ def add_employee():
 
         conn.commit()
         conn.close()
-
+        logger.info(f"✅ Employé ajouté: ID={new_id}")
         return jsonify({
             "success": True,
             "message": "Employé ajouté avec succès",
@@ -293,7 +299,7 @@ def add_salary():
                 INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
             """, [new_id, nom, prenom, data.get("type", "inconnu"), 1, int(datetime.now().timestamp() * 1000)])
-
+            conn.commit()
             final_emp_id = new_id
             logger.info(f"✅ Employé créé avec ID: {final_emp_id}")
         else:
@@ -319,8 +325,8 @@ def add_salary():
         ])
 
         conn.commit()
+        logger.info(f"✅ Salaire inséré: ID={salary_id}, employee_id={final_emp_id}, amount={amount}")
 
-        # Émettre un événement WebSocket
         salary_data = {
             "salaries": [{
                 "id": salary_id,
@@ -341,6 +347,9 @@ def add_salary():
         return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": final_emp_id}), 201
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === PUT modifier employé ===
@@ -371,6 +380,7 @@ def update_employee(id):
         conn.commit()
         cur.close()
         conn.close()
+        logger.info(f"✅ Employé modifié: ID={id}")
         return jsonify({"success": True, "message": "Employé modifié"}), 200
     except Exception as e:
         logger.error(f"❌ update_employee: {e}")
@@ -389,6 +399,7 @@ def delete_employee(id):
         conn.commit()
         cur.close()
         conn.close()
+        logger.info(f"✅ Employé supprimé: ID={id}")
         return jsonify({"success": True, "message": "Employé supprimé"}), 200
     except Exception as e:
         logger.error(f"❌ delete_employee: {e}")
@@ -401,6 +412,7 @@ def get_salary_history():
         conn = get_db()
         cur = conn.cursor()
 
+        # Relaxed filtering for debugging
         cur.execute(f"""
             SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
                    s.type, s.period, s.date,
@@ -408,19 +420,11 @@ def get_salary_history():
                    e.date_naissance, e.lieu_naissance
             FROM salaries s
             LEFT JOIN employees e ON e.id = s.employee_id
-            WHERE s.employee_id IS NOT NULL 
-              AND s.employee_name IS NOT NULL 
-              AND s.employee_name != ''
-              AND s.amount > 0
             ORDER BY s.date DESC
         """)
         rows = cur.fetchall()
 
-        salaries = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
+        salaries = [dict(row) for row in rows]  # Simplified for PostgreSQL
         logger.info(f"=== RÉCUPÉRATION HISTORIQUE SALAIRES ===")
         logger.info(f"Nombre total de records: {len(salaries)}")
 
@@ -440,13 +444,12 @@ def get_salary_history():
                            f"amount={record['amount']}")
             else:
                 invalid_count += 1
-                logger.warning(f"⚠️ Record invalide ignoré: {record}")
+                logger.warning(f"⚠️ Record invalide: {record}")
 
         logger.info(f"Résumé: {valid_count} valides, {invalid_count} invalides")
 
         cur.close()
         conn.close()
-
         return jsonify({"success": True, "salaries": salaries}), 200
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}", exc_info=True)
@@ -473,11 +476,8 @@ def dashboard():
         """)
         rows = cursor.fetchall()
 
-        payments = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
+        payments = [dict(row) for row in rows]  # Simplified for PostgreSQL
+        logger.info(f"📤 {len(payments)} paiements renvoyés au dashboard")
         conn.close()
         return render_template("dashboard.html", payments=payments)
     except Exception as e:
@@ -523,8 +523,8 @@ def add_pointage():
         ])
 
         conn.commit()
+        logger.info(f"✅ Pointage inséré: ID={pointage_id}")
 
-        # Émettre un événement WebSocket
         pointage_data = {
             "id": pointage_id,
             "employeeId": data.get("employeeId"),
@@ -538,7 +538,6 @@ def add_pointage():
 
         cur.close()
         conn.close()
-
         return jsonify({
             "success": True,
             "message": "Pointage enregistré",
@@ -546,6 +545,9 @@ def add_pointage():
         }), 201
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === GET historique des pointages ===
@@ -565,11 +567,8 @@ def get_pointage_history():
         """)
         rows = cur.fetchall()
 
-        pointages = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
+        pointages = [dict(row) for row in rows]  # Simplified for PostgreSQL
+        logger.info(f"📤 {len(pointages)} pointages renvoyés")
         cur.close()
         conn.close()
         return jsonify({"success": True, "pointages": pointages}), 200
@@ -598,13 +597,9 @@ def get_active_employees():
         cursor.execute(f"SELECT * FROM employees WHERE is_active = 1 ORDER BY nom, prenom")
         rows = cursor.fetchall()
 
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
-        conn.close()
+        employees = [dict(row) for row in rows]  # Simplified for PostgreSQL
         logger.info(f"📤 {len(employees)} employés actifs renvoyés")
+        conn.close()
         return jsonify({"success": True, "employees": employees})
     except Exception as e:
         logger.error(f"❌ get_active_employees: {e}")
