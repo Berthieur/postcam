@@ -1,436 +1,441 @@
+import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
-import sqlite3
-import os
-import time
-from datetime import datetime, timedelta
-from database import init_db, get_db
+from datetime import datetime
+import uuid
 
-# Configuration des logs
-logging.basicConfig(level=logging.DEBUG)
+# === Configuration Flask ===
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# === Logger ===
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-app.secret_key = '3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981'  # Nouvelle clé unique
-CORS(app, resources={r"/api/*": {"origins": "*"}})  # Autoriser toutes les origines pour les tests
+# === DB imports ===
+try:
+    from database import init_db, get_db, verify_schema, DB_DRIVER
+    logger.info("✅ database.py importé")
+except Exception as e:
+    logger.error(f"❌ Échec import database.py : {e}")
+    raise
 
-# --- Initialisation ---
-init_db()
+# === Placeholder SQL (Postgres = %s, SQLite = ?) ===
+PLACEHOLDER = "?" if DB_DRIVER == "sqlite" else "%s"
 
-# --- Filtres Jinja2 pour le template ---
-def timestamp_to_datetime_full(timestamp):
+# --- Initialisation DB ---
+try:
+    init_db()
+    verify_schema()
+    logger.info("✅ Base initialisée et schéma vérifié")
+except Exception as e:
+    logger.error(f"❌ Échec init_db/verify_schema : {e}")
+    raise
+
+# === Filtres Jinja2 ===
+@app.template_filter("timestamp_to_datetime")
+def timestamp_to_datetime_filter(timestamp):
     try:
-        # Ajuster pour EAT (UTC+3)
-        dt = datetime.fromtimestamp(timestamp / 1000, tz=datetime.utcnow().astimezone().tzinfo)
-        dt_eat = dt + timedelta(hours=3)  # Forcer EAT
-        return dt_eat.strftime('%d/%m/%Y %H:%M:%S')
-    except (TypeError, ValueError):
-        return '-'
-app.jinja_env.filters['timestamp_to_datetime_full'] = timestamp_to_datetime_full
+        return datetime.fromtimestamp(int(timestamp) / 1000).strftime("%d/%m/%Y")
+    except:
+        return "-"
 
-# Middleware pour vérifier la session
-@app.before_request
-def check_session():
-    if request.path.startswith('/api/') and request.method in ['POST', 'GET'] and not session.get('logged_in'):
-        logger.error(f"Session check failed for {request.path}, session={session}, logged_in={session.get('logged_in')}")
-        return jsonify({"error": "Non autorisé"}), 403
-    logger.debug(f"Session check passed for {request.path}, session={session}, logged_in={session.get('logged_in')}")
+@app.template_filter("timestamp_to_datetime_full")
+def timestamp_to_datetime_full_filter(timestamp):
+    try:
+        dt = datetime.fromtimestamp(int(timestamp) / 1000)
+        return dt.strftime("%d/%m/%Y à %H:%M")
+    except:
+        return "-"
 
-# --- Routes API ---
+# === Routes Web ===
+@app.route("/")
+@app.route("/login")
+def login_page():
+    logger.info("📄 Page de connexion")
+    return render_template("login.html")
 
-# 1. 🔐 Login (mise à jour pour session)
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    logger.debug(f"Login attempt: {data}")
-    if data.get('username') == 'admin' and data.get('password') == '1234':
-        session['logged_in'] = True
-        session['role'] = 'admin'
-        session['userId'] = 'ADMIN001'
-        logger.info("Login successful, session updated")
-        return jsonify({"status": "success", "message": "Connexion réussie"})
-    logger.warning("Login failed")
-    return jsonify({"error": "Identifiants invalides"}), 401
-
-# 2. 🔓 Déconnexion
-@app.route('/api/logout', methods=['POST'])
+@app.route("/logout")
 def logout():
-    session.pop('logged_in', None)
-    session.pop('role', None)
-    session.pop('userId', None)
-    logger.info("Logout successful")
-    return jsonify({"status": "success", "message": "Déconnexion réussie"})
+    session.pop("logged_in", None)
+    logger.info("✅ Déconnexion")
+    return redirect(url_for("login_page"))
 
-# 3. 👥 Enregistrement employé
-@app.route('/api/employees', methods=['POST'])
-def register_employee():
-    emp = request.get_json()
-    required = ['id', 'nom', 'prenom', 'type']
-    for field in required:
-        if field not in emp:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+# === API Login ===
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.get_json(silent=True) or request.form
 
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT OR REPLACE INTO employees 
-            (id, nom, prenom, date_naissance, lieu_naissance, telephone, email, profession,
-             type, taux_horaire, frais_ecolage, qr_code, is_active, created_at, is_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-        ''', [
-            emp['id'],
-            emp['nom'],
-            emp['prenom'],
-            emp.get('dateNaissance'),
-            emp.get('lieuNaissance'),
-            emp.get('telephone'),
-            emp.get('email'),
-            emp.get('profession'),
-            emp['type'],
-            emp.get('tauxHoraire'),
-            emp.get('fraisEcolage'),
-            emp.get('qrCode'),
-            emp.get('isActive', True),
-            emp.get('createdAt', int(time.time() * 1000))
-        ])
-        conn.commit()
-        logger.info(f"Employee registered: {emp['id']}")
-        return jsonify({"status": "success", "message": "Employé enregistré"}), 201
-    except Exception as e:
-        logger.error(f"Error registering employee: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    if not data:
+        return jsonify({"success": False, "message": "Données manquantes"}), 400
 
-# 4. 📋 Liste de tous les employés
-@app.route('/api/employees', methods=['GET'])
+    username = data.get("username")
+    password = data.get("password")
+
+    if username == "admin" and password == "1234":
+        session["logged_in"] = True
+        return jsonify({
+            "success": True,
+            "token": "fake-jwt-token-123",
+            "role": "admin",
+            "redirect_url": url_for("dashboard")
+        })
+
+    return jsonify({"success": False, "message": "Identifiants invalides"}), 401
+
+# === GET employés ===
+@app.route("/api/employees", methods=["GET"])
 def get_all_employees():
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
     try:
-        cursor.execute("SELECT * FROM employees ORDER BY nom, prenom")
-        employees = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(employees)} employees")
-        return jsonify(employees)
-    except Exception as e:
-        logger.error(f"Error retrieving employees: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
+        rows = cursor.fetchall()
 
-# 5. 👷 Employés actifs
-@app.route('/api/employees/active', methods=['GET'])
-def get_active_employees():
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM employees WHERE is_active = 1 ORDER BY nom")
-        employees = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(employees)} active employees")
-        return jsonify(employees)
-    except Exception as e:
-        logger.error(f"Error retrieving active employees: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        employees = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
 
-# 6. 📍 Position (dernier pointage)
-@app.route('/api/employees/<employeeId>/position', methods=['GET'])
-def get_employee_position(employeeId):
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT employee_id, employee_name, type, timestamp, date
-            FROM pointages
-            WHERE employee_id = ?
-            ORDER BY timestamp DESC
-            LIMIT 1
-        ''', [employeeId])
-        row = cursor.fetchone()
-        if row:
-            logger.debug(f"Retrieved position for employee {employeeId}")
-            return jsonify(dict(row))
-        logger.warning(f"No position found for employee {employeeId}")
-        return jsonify({"error": "Aucun pointage trouvé"}), 404
+        conn.close()
+        return jsonify({"success": True, "employees": employees})
     except Exception as e:
-        logger.error(f"Error retrieving position for {employeeId}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"❌ get_all_employees: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
-# 7. 💰 Enregistrer un salaire
-@app.route('/api/salary', methods=['POST'])
-def save_salary_record():
-    record = request.get_json()
-    required = ['employeeId', 'employeeName', 'type', 'amount', 'period', 'date']
+# === POST ajouter employé ===
+@app.route("/api/employees", methods=["POST"])
+def add_employee():
+    record = request.get_json(silent=True)
+    required = ["nom", "prenom", "type"]
     for field in required:
-        if field not in record:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
+        if not record or field not in record:
+            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
 
-    conn = get_db()
-    cursor = conn.cursor()
     try:
-        cursor.execute('''
-            INSERT INTO salaries 
-            (id, employee_id, employee_name, type, amount, hours_worked, period, date, is_synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
-        ''', [
-            record.get('id', str(int(record['date']))),
-            record['employeeId'],
-            record['employeeName'],
-            record['type'],
-            record['amount'],
-            record.get('hoursWorked'),
-            record['period'],
-            record['date']
-        ])
-        conn.commit()
-        logger.info(f"Salary recorded: {record['id']}")
-        return jsonify({"status": "success", "id": cursor.lastrowid}), 201
-    except Exception as e:
-        logger.error(f"Error recording salary: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        conn = get_db()
+        cursor = conn.cursor()
 
-# 8. 📅 Historique des salaires
-@app.route('/api/salary/history', methods=['GET'])
+        new_id = str(uuid.uuid4())
+        created_at = int(datetime.now().timestamp() * 1000)
+
+        cursor.execute(f"""
+            INSERT INTO employees (
+                id, nom, prenom, type, is_active, created_at,
+                email, telephone, taux_horaire, frais_ecolage,
+                profession, date_naissance, lieu_naissance
+            )
+            VALUES (
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
+                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}
+            )
+        """, [
+            new_id, record["nom"], record["prenom"], record["type"],
+            record.get("is_active", 1), created_at,
+            record.get("email"), record.get("telephone"), record.get("taux_horaire"),
+            record.get("frais_ecolage"), record.get("profession"),
+            record.get("date_naissance"), record.get("lieu_naissance")
+        ])
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": "Employé ajouté avec succès",
+            "id": new_id
+        }), 201
+
+    except Exception as e:
+        logger.error(f"❌ add_employee: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# === POST ajouter salaire (CORRIGÉ) ===
+@app.route("/api/salary", methods=["POST"])
+def add_salary():
+    data = request.get_json(silent=True)
+    logger.info(f"📥 Données reçues: {data}")
+
+    if not data:
+        logger.error("❌ Requête vide")
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    # Validation des champs requis
+    required_fields = ["employeeId", "employeeName", "amount", "type"]
+    for field in required_fields:
+        if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
+            logger.error(f"❌ Champ manquant ou vide: {field}")
+            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+
+    # Validation spécifique pour amount
+    try:
+        amount = float(data["amount"])
+        if amount <= 0:
+            logger.error(f"❌ Montant invalide: {amount}")
+            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
+    except (ValueError, TypeError):
+        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
+        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        emp_id = data["employeeId"]
+        emp_name = data["employeeName"].strip()
+
+        # Vérifier si l’employé existe
+        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+
+        if not employee:
+            logger.warning(f"⚠️ Employé {emp_id} non trouvé, création automatique")
+            emp_name_parts = emp_name.split(" ")
+            nom = emp_name_parts[-1] if len(emp_name_parts) > 1 else emp_name
+            prenom = emp_name_parts[0] if len(emp_name_parts) > 1 else "Inconnu"
+            new_id = emp_id or str(uuid.uuid4())
+
+            cur.execute(f"""
+                INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [new_id, nom, prenom, data.get("type", "inconnu"), 1, int(datetime.now().timestamp() * 1000)])
+
+            emp_id = new_id
+        else:
+            logger.info(f"✅ Employé trouvé: {employee['nom']} {employee['prenom']}")
+
+        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
+        period = data.get("period") or datetime.now().strftime("%Y-%m")
+
+        cur.execute(f"""
+            INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            str(uuid.uuid4()), emp_id, emp_name, amount, data.get("hoursWorked", 0.0),
+            data["type"], period, salary_date
+        ])
+
+        conn.commit()
+        logger.info(f"✅ Salaire enregistré: employee_id={emp_id}, amount={amount}, type={data['type']}")
+
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": emp_id}), 201
+
+    except Exception as e:
+        logger.error(f"❌ add_salary: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/employees/<id>", methods=["PUT"])
+def update_employee(id):
+    record = request.get_json(silent=True)
+    if not record:
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute(f"""
+            UPDATE employees
+            SET nom = {PLACEHOLDER}, prenom = {PLACEHOLDER}, type = {PLACEHOLDER}, is_active = {PLACEHOLDER},
+                email = {PLACEHOLDER}, telephone = {PLACEHOLDER},
+                taux_horaire = {PLACEHOLDER}, frais_ecolage = {PLACEHOLDER},
+                profession = {PLACEHOLDER}, date_naissance = {PLACEHOLDER}, lieu_naissance = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [
+            record.get("nom"), record.get("prenom"), record.get("type"), record.get("is_active", 1),
+            record.get("email"), record.get("telephone"),
+            record.get("taux_horaire"), record.get("frais_ecolage"),
+            record.get("profession"), record.get("date_naissance"), record.get("lieu_naissance"),
+            id
+        ])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Employé modifié"}), 200
+    except Exception as e:
+        logger.error(f"❌ update_employee: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# === DELETE supprimer employé ===
+@app.route("/api/employees/<id>", methods=["DELETE"])
+def delete_employee(id):
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Supprimer d'abord les salaires liés (clé étrangère)
+        cur.execute(f"DELETE FROM salaries WHERE employee_id = {PLACEHOLDER}", [id])
+
+        # Supprimer l’employé
+        cur.execute(f"DELETE FROM employees WHERE id = {PLACEHOLDER}", [id])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Employé supprimé"}), 200
+    except Exception as e:
+        logger.error(f"❌ delete_employee: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+# === GET historique des salaires (CORRIGÉ avec logs) ===
+@app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM salaries ORDER BY date DESC")
-        salaries = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(salaries)} salary records")
-        return jsonify(salaries)
-    except Exception as e:
-        logger.error(f"Error retrieving salary history: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 9. 📊 Statistiques par zone (exemple fictif)
-@app.route('/api/statistics/zones/<employeeId>', methods=['GET'])
-def get_zone_statistics(employeeId):
-    try:
-        stats = [{"zone_name": "Zone A", "duration_seconds": 2700}, {"zone_name": "Zone B", "duration_seconds": 1800}]
-        logger.debug(f"Retrieved zone statistics for {employeeId}")
-        return jsonify(stats)
-    except Exception as e:
-        logger.error(f"Error retrieving zone statistics for {employeeId}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 10. 🚶 Historique des mouvements (pointages)
-@app.route('/api/movements/<employeeId>', methods=['GET'])
-def get_movement_history(employeeId):
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT employee_id, employee_name, type, timestamp, date
-            FROM pointages
-            WHERE employee_id = ?
-            ORDER BY timestamp DESC
-        ''', [employeeId])
-        movements = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(movements)} movements for {employeeId}")
-        return jsonify(movements)
-    except Exception as e:
-        logger.error(f"Error retrieving movements for {employeeId}: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 11. ⚠️ Alerte zone interdite
-@app.route('/api/alerts/forbidden-zone', methods=['POST'])
-def report_forbidden_zone():
-    alert = request.get_json()
-    required = ['employeeId', 'employeeName', 'zoneName', 'timestamp']
-    for field in required:
-        if field not in alert:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
-
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT INTO alerts (employeeId, employeeName, zone_name, timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', [
-            alert['employeeId'],
-            alert['employeeName'],
-            alert['zoneName'],
-            alert['timestamp']
-        ])
-        conn.commit()
-        logger.info(f"Forbidden zone alert recorded for {alert['employeeId']}")
-        return jsonify({"status": "alerte_enregistrée"}), 201
-    except Exception as e:
-        logger.error(f"Error recording forbidden zone alert: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 12. 📡 État ESP32
-@app.route('/api/esp32/status', methods=['GET'])
-def get_esp32_status():
-    try:
-        status = {
-            "is_online": True,
-            "last_seen": int(time.time() * 1000),
-            "firmware_version": "1.2.0",
-            "uptime_seconds": 3672
-        }
-        logger.debug("ESP32 status retrieved")
-        return jsonify(status)
-    except Exception as e:
-        logger.error(f"Error retrieving ESP32 status: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 13. 🔊 Activer le buzzer
-@app.route('/api/esp32/buzzer', methods=['POST'])
-def activate_buzzer():
-    data = request.get_json()
-    duration = data.get('durationMs', 1000)
-    try:
-        response = {
-            "status": "buzzer_activé",
-            "durationMs": duration,
-            "timestamp": int(time.time() * 1000)
-        }
-        logger.info(f"Buzzer activated for {duration}ms")
-        return jsonify(response)
-    except Exception as e:
-        logger.error(f"Error activating buzzer: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# --- Nouvelles routes utiles ---
-
-# 🔄 Synchronisation : Récupérer les données non synchronisées
-@app.route('/api/sync/pointages', methods=['GET'])
-def get_unsynced_pointages():
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM pointages WHERE is_synced = 0")
-        pointages = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(pointages)} unsynced pointages")
-        return jsonify(pointages)
-    except Exception as e:
-        logger.error(f"Error retrieving unsynced pointages: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 🔄 Envoyer des pointages depuis Android
-@app.route('/api/pointages', methods=['POST'])
-def add_pointage():
-    p = request.get_json()
-    required = ['id', 'employeeId', 'employeeName', 'type', 'timestamp', 'date']
-    for field in required:
-        if field not in p:
-            return jsonify({"error": f"Champ manquant: {field}"}), 400
-
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            INSERT OR IGNORE INTO pointages 
-            (id, employee_id, employee_name, type, timestamp, date, is_synced)
-            VALUES (?, ?, ?, ?, ?, ?, 1)
-        ''', [
-            p['id'],
-            p['employeeId'],
-            p['employeeName'],
-            p['type'],
-            p['timestamp'],
-            p['date']
-        ])
-        conn.commit()
-        logger.info(f"Pointage recorded: {p['id']}")
-        return jsonify({"status": "pointage_enregistré"}), 201
-    except Exception as e:
-        logger.error(f"Error recording pointage: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 📥 Télécharger tous les pointages (pour mise à jour locale)
-@app.route('/api/pointages', methods=['GET'])
-def get_all_pointages():
-    conn = get_db()
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM pointages ORDER BY timestamp DESC")
-        pointages = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(pointages)} pointages")
-        return jsonify(pointages)
-    except Exception as e:
-        logger.error(f"Error retrieving all pointages: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-
-# 💸 Liste des employés avec leurs paiements
-@app.route('/api/employee_payments', methods=['GET'])
-def get_employee_payments():
     try:
         conn = get_db()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT e.nom, e.prenom, e.type, s.employee_name, s.type AS payment_type, 
-                   s.amount, s.period, s.date
-            FROM employees e
-            LEFT JOIN salaries s ON e.id = s.employee_id
-            WHERE e.is_active = 1
-            ORDER BY s.date DESC
-        ''')
-        payments = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Retrieved {len(payments)} employee payments")
-        return jsonify(payments)
-    except Exception as e:
-        logger.error(f"Error retrieving employee payments: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# 📊 Tableau de bord HTML (sécurisé)
-@app.route('/dashboard', methods=['GET'])
-def dashboard():
-    if not session.get('logged_in'):
-        logger.warning("Unauthorized access to dashboard, redirecting to login")
-        return redirect(url_for('login'))
-    try:
-        conn = get_db()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT 
-                COALESCE(e.nom, SUBSTR(s.employee_name, 1, INSTR(s.employee_name, ' ') - 1)) AS nom,
-                COALESCE(e.prenom, SUBSTR(s.employee_name, INSTR(s.employee_name, ' ') + 1)) AS prenom,
-                COALESCE(e.type, s.type) AS type,
-                s.employee_name,
-                s.type AS payment_type,
-                s.amount,
-                s.period,
-                s.date
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type, s.period, s.date,
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
             FROM salaries s
             LEFT JOIN employees e ON e.id = s.employee_id
             ORDER BY s.date DESC
-        ''')
-        payments = [dict(row) for row in cursor.fetchall()]
-        logger.debug(f"Number of payments retrieved: {len(payments)}")
-        for payment in payments:
-            logger.debug(f"Payment data: nom={payment['nom']}, prenom={payment['prenom']}, type={payment['type']}, payment_type={payment['payment_type']}, date={payment['date']}, period={payment['period']}")
-        return render_template('dashboard.html', payments=payments)
-    except Exception as e:
-        logger.error(f"Error loading dashboard: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        """)
+        rows = cur.fetchall()
 
-# 📝 Page de login
-@app.route('/login', methods=['GET', 'POST'])
-def login_page():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        logger.debug(f"Login attempt: username={username}, password={password}")
-        if username == 'admin' and password == '1234':
-            session['logged_in'] = True
-            session['role'] = 'admin'
-            session['userId'] = 'ADMIN001'
-            logger.info("Login successful, session updated")
-            return redirect(url_for('dashboard'))
-        logger.warning("Login failed")
-        return render_template('login.html', error="Identifiants invalides")
-    return render_template('login.html')
+        salaries = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        # Log des enregistrements problématiques
+        invalid_records = [
+            record for record in salaries
+            if record["employee_id"] is None or not record["employee_name"] or record["amount"] <= 0
+        ]
+        if invalid_records:
+            logger.warning(f"⚠️ {len(invalid_records)} enregistrements invalides trouvés :")
+            for record in invalid_records:
+                logger.warning(f"  - ID={record['id']}, employee_id={record['employee_id']}, employee_name={record['employee_name']}, amount={record['amount']}")
+
+        cur.close()
+        conn.close()
+        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
+        # ✅ Android attend "salaries" pas "history"
+        return jsonify({"success":True, "salaries": salaries}), 200
+
+    except Exception as e:
+        logger.error(f"❌ get_salary_history: {e}")
+        return jsonify({"success":False  , "message": str(e)}), 500
+
+@app.route("/dashboard")
+def dashboard():
+    if not session.get("logged_in"):
+        return redirect(url_for("login_page"))
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type AS payment_type, s.period, s.date,
+                   e.nom, e.prenom, e.type, 
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM salaries s
+            LEFT JOIN employees e ON e.id = s.employee_id
+            ORDER BY s.date DESC
+        """)
+        rows = cursor.fetchall()
+
+        payments = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
+
+        conn.close()
+        return render_template("dashboard.html", payments=payments)
+    except Exception as e:
+        logger.error(f"❌ dashboard: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/pointages", methods=["POST"])
+def add_pointage():
+    data = request.get_json(silent=True)
+    logger.info(f"📥 Données pointage reçues: {data}")
+
+    if not data:
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
+    for field in required:
+        if field not in data or not data[field]:
+            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        emp_id = data.get("employeeId")
+        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+
+        if not employee:
+            return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
+
+        pointage_id = str(uuid.uuid4())
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            pointage_id,
+            data.get("employeeId"),
+            data.get("employeeName"),
+            data.get("type"),
+            int(data.get("timestamp")),
+            data.get("date")
+        ])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "success": True,
+            "message": "Pointage enregistré",
+            "pointageId": pointage_id
+        }), 201
+    except Exception as e:
+        logger.error(f"❌ add_pointage: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/pointages/history", methods=["GET"])
+def get_pointage_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute(f"""
+            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date,
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM pointages p
+            LEFT JOIN employees e ON e.id = p.employee_id
+            ORDER BY p.timestamp DESC
+        """)
+        rows = cur.fetchall()
+
+        pointages = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        cur.close()
+        conn.close()
+        # ✅ cohérent avec Android → renvoyer "pointages"
+        return jsonify({"success": True, "pointages": pointages}), 200
+    except Exception as e:
+        logger.error(f"❌ get_pointage_history: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Démarrage ---
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=True)  # Activer debug pour logs
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, debug=False) 
