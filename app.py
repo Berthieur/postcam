@@ -5,19 +5,19 @@ from flask_cors import CORS
 from datetime import datetime
 import uuid
 from flask_socketio import SocketIO, emit
+
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-# === Ajoute après app = Flask(...)
 socketio = SocketIO(
-    app, 
+    app,
     cors_allowed_origins="*",
-    async_mode='threading',  # ✅ toujours dispo
+    async_mode='threading',
     logger=True,
     engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25
+    ping_timeout=120,  # Augmenté pour éviter les déconnexions prématurées
+    ping_interval=30   # Intervalle raisonnable pour maintenir la connexion
 )
 
 # === Logger ===
@@ -43,6 +43,7 @@ try:
 except Exception as e:
     logger.error(f"❌ Échec init_db/verify_schema : {e}")
     raise
+
 # === WebSocket Events ===
 @socketio.on('connect')
 def handle_connect():
@@ -52,6 +53,83 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"❌ Client déconnecté: {request.sid}")
+
+@socketio.on('pointageUpdate')
+def handle_pointage_update(data):
+    logger.info(f"📥 Événement pointageUpdate reçu: {data}")
+    try:
+        # Valider les données reçues
+        required_fields = ["id", "employeeId", "employeeName", "type", "timestamp", "date"]
+        for field in required_fields:
+            if field not in data or not data[field]:
+                logger.error(f"❌ Champ manquant ou vide dans pointageUpdate: {field}")
+                return
+
+        # Sauvegarder dans la base de données
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            data["id"],
+            data["employeeId"],
+            data["employeeName"],
+            data["type"],
+            int(data["timestamp"]),
+            data["date"]
+        ])
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Diffuser l'événement à tous les clients
+        socketio.emit('pointageUpdate', data, broadcast=True)
+        logger.info(f"📡 Événement pointageUpdate émis: {data}")
+    except Exception as e:
+        logger.error(f"❌ Erreur traitement pointageUpdate: {e}")
+
+@socketio.on('salaryUpdate')
+def handle_salary_update(data):
+    logger.info(f"📥 Événement salaryUpdate reçu: {data}")
+    try:
+        # Valider les données reçues
+        if "salaries" not in data or not isinstance(data["salaries"], list):
+            logger.error("❌ Données salaryUpdate invalides: 'salaries' doit être une liste")
+            return
+
+        conn = get_db()
+        cur = conn.cursor()
+        for salary in data["salaries"]:
+            required_fields = ["id", "employee_id", "employee_name", "amount", "type", "period", "date"]
+            for field in required_fields:
+                if field not in salary or salary[field] is None:
+                    logger.error(f"❌ Champ manquant ou vide dans salaryUpdate: {field}")
+                    continue
+
+            cur.execute(f"""
+                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                salary["id"],
+                salary["employee_id"],
+                salary["employee_name"],
+                float(salary["amount"]),
+                salary.get("hours_worked", 0.0),
+                salary["type"],
+                salary["period"],
+                int(salary["date"])
+            ])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Diffuser l'événement à tous les clients
+        socketio.emit('salaryUpdate', data, broadcast=True)
+        logger.info(f"📡 Événement salaryUpdate émis: {data}")
+    except Exception as e:
+        logger.error(f"❌ Erreur traitement salaryUpdate: {e}")
 
 # === Filtres Jinja2 ===
 @app.template_filter("timestamp_to_datetime")
@@ -86,7 +164,6 @@ def logout():
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or request.form
-
     if not data:
         return jsonify({"success": False, "message": "Données manquantes"}), 400
 
@@ -101,7 +178,6 @@ def login():
             "role": "admin",
             "redirect_url": url_for("dashboard")
         })
-
     return jsonify({"success": False, "message": "Identifiants invalides"}), 401
 
 # === GET employés ===
@@ -167,12 +243,11 @@ def add_employee():
             "message": "Employé ajouté avec succès",
             "id": new_id
         }), 201
-
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST ajouter salaire (CORRIGÉ avec employee_id obligatoire) ===
+# === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
     data = request.get_json(silent=True)
@@ -182,14 +257,12 @@ def add_salary():
         logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
 
-    # Validation des champs requis
     required_fields = ["employeeId", "employeeName", "amount", "type"]
     for field in required_fields:
         if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
             logger.error(f"❌ Champ manquant ou vide: {field}")
             return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
 
-    # Validation spécifique pour amount
     try:
         amount = float(data["amount"])
         if amount <= 0:
@@ -206,7 +279,6 @@ def add_salary():
         emp_id = data["employeeId"]
         emp_name = data["employeeName"].strip()
 
-        # Vérifier si l'employé existe
         cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
 
@@ -222,7 +294,6 @@ def add_salary():
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
             """, [new_id, nom, prenom, data.get("type", "inconnu"), 1, int(datetime.now().timestamp() * 1000)])
 
-            # ✅ IMPORTANT: Utiliser l'ID de l'employé créé ou existant
             final_emp_id = new_id
             logger.info(f"✅ Employé créé avec ID: {final_emp_id}")
         else:
@@ -233,32 +304,46 @@ def add_salary():
         period = data.get("period") or datetime.now().strftime("%Y-%m")
         salary_id = str(uuid.uuid4())
 
-        # ✅ CORRECTION CRITIQUE: Utiliser final_emp_id au lieu de emp_id
         cur.execute(f"""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
-            salary_id, 
-            final_emp_id,  # ✅ Assurer que employee_id n'est jamais NULL
-            emp_name, 
-            amount, 
+            salary_id,
+            final_emp_id,
+            emp_name,
+            amount,
             data.get("hoursWorked", 0.0),
-            data["type"], 
-            period, 
+            data["type"],
+            period,
             salary_date
         ])
 
         conn.commit()
-        logger.info(f"✅ Salaire enregistré: ID={salary_id}, employee_id={final_emp_id}, amount={amount}, type={data['type']}")
+
+        # Émettre un événement WebSocket
+        salary_data = {
+            "salaries": [{
+                "id": salary_id,
+                "employee_id": final_emp_id,
+                "employee_name": emp_name,
+                "amount": amount,
+                "hours_worked": data.get("hoursWorked", 0.0),
+                "type": data["type"],
+                "period": period,
+                "date": salary_date
+            }]
+        }
+        socketio.emit("salaryUpdate", salary_data, broadcast=True)
+        logger.info(f"📡 Événement salaryUpdate émis pour salaire ID={salary_id}: {salary_data}")
 
         cur.close()
         conn.close()
         return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": final_emp_id}), 201
-
     except Exception as e:
         logger.error(f"❌ add_salary: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
 def update_employee(id):
     record = request.get_json(silent=True)
@@ -298,10 +383,7 @@ def delete_employee(id):
         conn = get_db()
         cur = conn.cursor()
 
-        # Supprimer d'abord les salaires liés (clé étrangère)
         cur.execute(f"DELETE FROM salaries WHERE employee_id = {PLACEHOLDER}", [id])
-
-        # Supprimer l’employé
         cur.execute(f"DELETE FROM employees WHERE id = {PLACEHOLDER}", [id])
 
         conn.commit()
@@ -312,13 +394,13 @@ def delete_employee(id):
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === GET historique des salaires ===
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
     try:
         conn = get_db()
         cur = conn.cursor()
-        
-        # Requête avec logs détaillés
+
         cur.execute(f"""
             SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
                    s.type, s.period, s.date,
@@ -339,13 +421,12 @@ def get_salary_history():
             else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
         )
 
-        # Logs détaillés pour chaque enregistrement
         logger.info(f"=== RÉCUPÉRATION HISTORIQUE SALAIRES ===")
         logger.info(f"Nombre total de records: {len(salaries)}")
-        
+
         valid_count = 0
         invalid_count = 0
-        
+
         for record in salaries:
             if (record.get("employee_id") and 
                 record.get("employee_name") and 
@@ -362,16 +443,16 @@ def get_salary_history():
                 logger.warning(f"⚠️ Record invalide ignoré: {record}")
 
         logger.info(f"Résumé: {valid_count} valides, {invalid_count} invalides")
-        
+
         cur.close()
         conn.close()
-        
-        # Retourner TOUS les records (même ceux marqués "invalides" dans les logs)
-        return jsonify({"success": True, "salaries": salaries}), 200
 
+        return jsonify({"success": True, "salaries": salaries}), 200
     except Exception as e:
         logger.error(f"❌ get_salary_history: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
+
+# === Dashboard ===
 @app.route("/dashboard")
 def dashboard():
     if not session.get("logged_in"):
@@ -403,6 +484,7 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === POST pointages ===
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -441,6 +523,19 @@ def add_pointage():
         ])
 
         conn.commit()
+
+        # Émettre un événement WebSocket
+        pointage_data = {
+            "id": pointage_id,
+            "employeeId": data.get("employeeId"),
+            "employeeName": data.get("employeeName"),
+            "type": data.get("type"),
+            "timestamp": int(data.get("timestamp")),
+            "date": data.get("date")
+        }
+        socketio.emit("pointageUpdate", pointage_data, broadcast=True)
+        logger.info(f"📡 Événement pointageUpdate émis pour pointage ID={pointage_id}: {pointage_data}")
+
         cur.close()
         conn.close()
 
@@ -453,6 +548,7 @@ def add_pointage():
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === GET historique des pointages ===
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
@@ -476,24 +572,24 @@ def get_pointage_history():
 
         cur.close()
         conn.close()
-        # ✅ cohérent avec Android → renvoyer "pointages"
         return jsonify({"success": True, "pointages": pointages}), 200
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 # === Route PIR ===
 @app.route("/api/motion", methods=["GET"])
 def motion_detected():
     logger.info("⚡ Mouvement détecté par ESP32 (PIR)")
     try:
-        # Émettre l'événement à tous les clients connectés
-        socketio.emit("motionDetected", {"motion": True, "timestamp": int(datetime.now().timestamp() * 1000)})
+        socketio.emit("motionDetected", {"motion": True, "timestamp": int(datetime.now().timestamp() * 1000)}, broadcast=True)
         logger.info("📡 Événement motionDetected émis")
         return jsonify({"success": True, "message": "Motion detected"}), 200
     except Exception as e:
         logger.error(f"❌ Erreur motion_detected: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-# === Route manquante pour /api/employees/active ===
+
+# === GET employés actifs ===
 @app.route("/api/employees/active", methods=["GET"])
 def get_active_employees():
     try:
@@ -515,8 +611,6 @@ def get_active_employees():
         return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Démarrage ---
-# --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    # ✅ Utiliser socketio.run au lieu de app.run
     socketio.run(app, host="0.0.0.0", port=port, debug=False)
