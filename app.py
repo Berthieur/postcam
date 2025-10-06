@@ -459,10 +459,19 @@ def receive_rssi_data():
             mac = badge.get("mac")
             rssi = badge.get("rssi")
             
-            # Extraire l'ID employé du SSID (format: BADGE_NomEmploye)
-            employee_name = ssid.replace("BADGE_", "")
+            # Vérifier que le SSID est valide
+            if not ssid or not isinstance(ssid, str):
+                logger.warning(f"❌ SSID invalide détecté: {ssid}")
+                continue
+
+            # Extraire l'ID ou nom employé depuis le SSID
+            # si vos badges ont "BADGE_" dans le SSID, sinon utiliser tel quel
+            if ssid.startswith("BADGE_"):
+                employee_name = ssid.replace("BADGE_", "").strip()
+            else:
+                employee_name = ssid.strip()
             
-            # Trouver l'employé dans la base
+            # Vérifier si l'employé existe
             cur.execute(f"""
                 SELECT id FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
@@ -470,9 +479,13 @@ def receive_rssi_data():
             """, (employee_name,))
             
             employee = cur.fetchone()
-            
             if not employee:
-                logger.warning(f"Employé non trouvé pour badge: {ssid}")
+                logger.warning(f"⚠️ Employé non trouvé pour badge: {ssid}")
+                # Optionnel : enregistrer le badge inconnu pour debug
+                cur.execute(f"""
+                    INSERT INTO unknown_badges (ssid, mac, rssi, anchor_id, timestamp)
+                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+                """, [ssid, mac, rssi, anchor_id, int(datetime.now().timestamp() * 1000)])
                 continue
             
             employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
@@ -495,12 +508,11 @@ def receive_rssi_data():
         cur.close()
         conn.close()
         
-        return jsonify({"success": True, "message": f"{len(badges)} mesures enregistrées"}), 201
+        return jsonify({"success": True, "message": f"{len(badges)} mesures traitées"}), 201
         
     except Exception as e:
         logger.error(f"❌ Erreur RSSI: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 def calculate_positions(cursor):
     """Calcule la position des employés par triangulation"""
