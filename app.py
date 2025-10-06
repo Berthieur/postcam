@@ -433,7 +433,170 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+# Dans app.py
 
+@app.route("/api/rssi-data", methods=["POST"])
+def receive_rssi_data():
+    """Reçoit les données RSSI des ESP32 et calcule les positions par triangulation"""
+    data = request.get_json(silent=True)
+    
+    if not data:
+        return jsonify({"success": False, "message": "Données manquantes"}), 400
+    
+    anchor_id = data.get("anchor_id")
+    anchor_x = data.get("anchor_x")
+    anchor_y = data.get("anchor_y")
+    badges = data.get("badges", [])
+    
+    logger.info(f"📡 RSSI reçu de l'ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
+    
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        
+        for badge in badges:
+            ssid = badge.get("ssid")
+            mac = badge.get("mac")
+            rssi = badge.get("rssi")
+            
+            # Extraire l'ID employé du SSID (format: BADGE_NomEmploye)
+            employee_name = ssid.replace("BADGE_", "")
+            
+            # Trouver l'employé dans la base
+            cur.execute(f"""
+                SELECT id FROM employees 
+                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
+                LIMIT 1
+            """, (employee_name,))
+            
+            employee = cur.fetchone()
+            
+            if not employee:
+                logger.warning(f"Employé non trouvé pour badge: {ssid}")
+                continue
+            
+            employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
+            
+            # Enregistrer les données RSSI
+            cur.execute(f"""
+                INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
+                int(datetime.now().timestamp() * 1000)
+            ])
+        
+        conn.commit()
+        
+        # Calculer les positions par triangulation
+        calculate_positions(cur)
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({"success": True, "message": f"{len(badges)} mesures enregistrées"}), 201
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur RSSI: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+def calculate_positions(cursor):
+    """Calcule la position des employés par triangulation"""
+    import math
+    
+    # Récupérer les mesures récentes (moins de 5 secondes)
+    threshold = int((datetime.now().timestamp() - 5) * 1000)
+    
+    cursor.execute(f"""
+        SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
+        FROM rssi_measurements
+        WHERE timestamp > {PLACEHOLDER}
+    """, (threshold,))
+    
+    measurements = cursor.fetchall()
+    
+    if not measurements:
+        return
+    
+    # Grouper par employee_id
+    from collections import defaultdict
+    employee_data = defaultdict(list)
+    
+    for row in measurements:
+        emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
+        anchor_id = row[1] if DB_DRIVER == "sqlite" else row['anchor_id']
+        anchor_x = row[2] if DB_DRIVER == "sqlite" else row['anchor_x']
+        anchor_y = row[3] if DB_DRIVER == "sqlite" else row['anchor_y']
+        rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
+        
+        # Convertir RSSI en distance (formule simplifiée)
+        distance = rssi_to_distance(rssi)
+        
+        employee_data[emp_id].append({
+            'anchor_id': anchor_id,
+            'x': anchor_x,
+            'y': anchor_y,
+            'distance': distance
+        })
+    
+    # Triangulation pour chaque employé
+    for emp_id, anchors in employee_data.items():
+        if len(anchors) >= 3:
+            pos_x, pos_y = trilateration(anchors)
+            
+            # Mettre à jour la position dans la BD
+            cursor.execute(f"""
+                UPDATE employees
+                SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+                WHERE id = {PLACEHOLDER}
+            """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
+            
+            logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
+
+
+def rssi_to_distance(rssi, tx_power=-59, n=2.0):
+    """Convertit RSSI en distance (mètres)
+    tx_power: puissance à 1m (calibration requise)
+    n: facteur d'atténuation (2.0 pour espace libre, 3-4 pour intérieur)
+    """
+    import math
+    if rssi == 0:
+        return -1.0
+    
+    ratio = (tx_power - rssi) / (10 * n)
+    return math.pow(10, ratio)
+
+
+def trilateration(anchors):
+    """Triangulation basique à 3 points"""
+    import numpy as np
+    
+    # Prendre les 3 ancres avec le meilleur signal
+    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
+    
+    # Système d'équations linéaires simplifié
+    x1, y1, r1 = anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']
+    x2, y2, r2 = anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']
+    x3, y3, r3 = anchors[2]['x'], anchors[2]['y'], anchors[2]['distance']
+    
+    A = 2*x2 - 2*x1
+    B = 2*y2 - 2*y1
+    C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
+    D = 2*x3 - 2*x2
+    E = 2*y3 - 2*y2
+    F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
+    
+    try:
+        x = (C*E - F*B) / (E*A - B*D)
+        y = (C*D - A*F) / (B*D - A*E)
+        return (x, y)
+    except:
+        # Fallback: centroïde
+        x = (x1 + x2 + x3) / 3
+        y = (y1 + y2 + y3) / 3
+        return (x, y)
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
