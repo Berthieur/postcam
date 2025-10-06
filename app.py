@@ -433,11 +433,8 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-# Dans app.py
-
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data():
-    """Reçoit les données RSSI des ESP32 et calcule les positions par triangulation"""
     data = request.get_json(silent=True)
     
     if not data:
@@ -448,7 +445,8 @@ def receive_rssi_data():
     anchor_y = data.get("anchor_y")
     badges = data.get("badges", [])
     
-    logger.info(f"📡 RSSI reçu de l'ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
+    logger.info(f"📡 RSSI ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
+    logger.info(f"   JSON reçu: {data}")  # DEBUG: voir le JSON complet
     
     try:
         conn = get_db()
@@ -459,38 +457,32 @@ def receive_rssi_data():
             mac = badge.get("mac")
             rssi = badge.get("rssi")
             
-            # Vérifier que le SSID est valide
-            if not ssid or not isinstance(ssid, str):
-                logger.warning(f"❌ SSID invalide détecté: {ssid}")
+            logger.info(f"   Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")  # DEBUG
+            
+            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
+                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
                 continue
 
-            # Extraire l'ID ou nom employé depuis le SSID
-            # si vos badges ont "BADGE_" dans le SSID, sinon utiliser tel quel
-            if ssid.startswith("BADGE_"):
-                employee_name = ssid.replace("BADGE_", "").strip()
-            else:
-                employee_name = ssid.strip()
+            employee_name = ssid.replace("BADGE_", "").strip()
             
-            # Vérifier si l'employé existe
+            # Recherche par nom complet
             cur.execute(f"""
-                SELECT id FROM employees 
+                SELECT id, nom, prenom FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
+                   OR nom = {PLACEHOLDER}
+                   OR prenom = {PLACEHOLDER}
                 LIMIT 1
-            """, (employee_name,))
+            """, (employee_name, employee_name, employee_name))
             
             employee = cur.fetchone()
             if not employee:
-                logger.warning(f"⚠️ Employé non trouvé pour badge: {ssid}")
-                # Optionnel : enregistrer le badge inconnu pour debug
-                cur.execute(f"""
-                    INSERT INTO unknown_badges (ssid, mac, rssi, anchor_id, timestamp)
-                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-                """, [ssid, mac, rssi, anchor_id, int(datetime.now().timestamp() * 1000)])
+                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé dans la BD")
                 continue
             
             employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
+            logger.info(f"✅ Employé trouvé: {employee_id}")
             
-            # Enregistrer les données RSSI
+            # Enregistrer RSSI
             cur.execute(f"""
                 INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
@@ -500,8 +492,6 @@ def receive_rssi_data():
             ])
         
         conn.commit()
-        
-        # Calculer les positions par triangulation
         calculate_positions(cur)
         conn.commit()
         
@@ -511,9 +501,8 @@ def receive_rssi_data():
         return jsonify({"success": True, "message": f"{len(badges)} mesures traitées"}), 201
         
     except Exception as e:
-        logger.error(f"❌ Erreur RSSI: {e}")
+        logger.error(f"❌ Erreur RSSI: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-
 def calculate_positions(cursor):
     """Calcule la position des employés par triangulation"""
     import math
