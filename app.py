@@ -571,17 +571,21 @@ def rssi_to_distance(rssi, tx_power=-59, n=2.0):
 
 
 def trilateration(anchors):
-    """Triangulation basique à 3 points"""
-    import numpy as np
+    """Triangulation basique à 3 points SANS NumPy"""
+    import math
     
-    # Prendre les 3 ancres avec le meilleur signal
+    # Prendre les 3 meilleures ancres
     anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
     
-    # Système d'équations linéaires simplifié
+    logger.info(f"  Ancres utilisées pour triangulation :")
+    for i, a in enumerate(anchors):
+        logger.info(f"    {i+1}. Ancre #{a['anchor_id']} à ({a['x']}, {a['y']}) distance={a['distance']:.2f}m")
+    
     x1, y1, r1 = anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']
     x2, y2, r2 = anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']
     x3, y3, r3 = anchors[2]['x'], anchors[2]['y'], anchors[2]['distance']
     
+    # Système d'équations linéaires
     A = 2*x2 - 2*x1
     B = 2*y2 - 2*y1
     C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
@@ -590,14 +594,59 @@ def trilateration(anchors):
     F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
     
     try:
-        x = (C*E - F*B) / (E*A - B*D)
-        y = (C*D - A*F) / (B*D - A*E)
+        denom1 = (E*A - B*D)
+        denom2 = (B*D - A*E)
+        
+        if abs(denom1) < 0.0001 or abs(denom2) < 0.0001:
+            raise ZeroDivisionError("Dénominateur proche de zéro")
+        
+        x = (C*E - F*B) / denom1
+        y = (C*D - A*F) / denom2
+        
+        logger.info(f"  ✅ Triangulation réussie : x={x:.2f}, y={y:.2f}")
         return (x, y)
-    except:
-        # Fallback: centroïde
-        x = (x1 + x2 + x3) / 3
-        y = (y1 + y2 + y3) / 3
+    except Exception as e:
+        logger.warning(f"  ⚠️ Erreur triangulation : {e}. Utilisation du centroïde")
+        # Fallback: centroïde pondéré (plus proche = plus de poids)
+        total_weight = sum(1.0 / max(a['distance'], 0.1) for a in anchors)
+        x = sum(a['x'] / max(a['distance'], 0.1) for a in anchors) / total_weight
+        y = sum(a['y'] / max(a['distance'], 0.1) for a in anchors) / total_weight
+        logger.info(f"  Centroïde pondéré : x={x:.2f}, y={y:.2f}")
         return (x, y)
+@app.route("/api/employees/active", methods=["GET"])
+def get_active_employees():
+    """Récupère les employés actifs avec leurs positions en temps réel"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT id, nom, prenom, type, is_active, created_at,
+                   email, telephone, taux_horaire, frais_ecolage,
+                   profession, date_naissance, lieu_naissance,
+                   last_position_x, last_position_y, last_seen
+            FROM employees 
+            WHERE is_active = 1
+            ORDER BY nom, prenom
+        """)
+        rows = cursor.fetchall()
+
+        employees = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
+        )
+
+        conn.close()
+        logger.info(f"📤 {len(employees)} employés actifs renvoyés (avec positions)")
+        
+        # Log des positions pour debug
+        for emp in employees:
+            if emp.get('last_position_x') is not None:
+                logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
+        
+        return jsonify({"success": True, "employees": employees}), 200
+    except Exception as e:
+        logger.error(f"❌ get_active_employees: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
