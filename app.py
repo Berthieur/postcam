@@ -360,50 +360,67 @@ def add_pointage():
     data = request.get_json(silent=True)
     logger.info(f"📥 Données pointage reçues: {data}")
 
-    if not data:
-        return jsonify({"success": False, "message": "Requête vide"}), 400
+    if not data or not data.get("employeeId") or not data.get("employeeName"):
+        return jsonify({"success": False, "message": "employeeId et employeeName requis"}), 400
 
-    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
-    for field in required:
-        if field not in data or not data[field]:
-            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+    emp_id = data["employeeId"]
+    emp_name = data["employeeName"].strip()
+    now = int(datetime.now().timestamp() * 1000)
+    today = datetime.now().strftime("%Y-%m-%d")
 
     try:
         conn = get_db()
         cur = conn.cursor()
 
-        emp_id = data.get("employeeId")
-        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        # Vérifie si l'employé existe
+        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
-
         if not employee:
-            return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
+            return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
 
+        emp_id_db, nom, prenom, is_active = employee
+
+        # Déterminer type de pointage
+        if is_active == 0:
+            pointage_type = "ENTREE"
+            new_status = 1
+            message = f"{prenom} {nom} est entré."
+        else:
+            pointage_type = "SORTIE"
+            new_status = 0
+            message = f"{prenom} {nom} est sorti."
+
+        # Mettre à jour is_active
+        cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
+                    (new_status, emp_id_db))
+
+        # Enregistrer le pointage
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
-            pointage_id,
-            data.get("employeeId"),
-            data.get("employeeName"),
-            data.get("type"),
-            int(data.get("timestamp")),
-            data.get("date")
+            pointage_id, emp_id_db, f"{prenom} {nom}", pointage_type, now, today
         ])
 
         conn.commit()
         cur.close()
         conn.close()
 
+        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
         return jsonify({
             "success": True,
-            "message": "Pointage enregistré",
-            "pointageId": pointage_id
+            "action": pointage_type,
+            "message": message,
+            "employeeId": emp_id_db,
+            "timestamp": now,
+            "date": today
         }), 201
+
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
