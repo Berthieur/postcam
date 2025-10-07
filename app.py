@@ -448,18 +448,20 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data():
     """
     Reçoit les données RSSI envoyées par les ESP32 et met à jour :
-      - Position estimée (x, y)
+      - Position estimée (x, y) via trilatération si 3 ancres disponibles
       - Statut de présence (is_active)
       - Historique de pointage (entrée/sortie)
     """
     try:
         data = request.get_json()
-        logger.info(f"📡 RSSI reçu de l'ancre #{data.get('anchor_id')} ({data.get('anchor_x')}, {data.get('anchor_y')})")
+        anchor_id = data.get("anchor_id")
+        anchor_x = data.get("anchor_x")
+        anchor_y = data.get("anchor_y")
+        logger.info(f"📡 RSSI reçu de l'ancre #{anchor_id} ({anchor_x}, {anchor_y})")
 
         conn = get_db()
         cur = conn.cursor()
@@ -484,36 +486,36 @@ def receive_rssi_data():
             distance = rssi_to_distance(rssi)
             logger.info(f"   → Distance estimée: {distance:.2f} m")
 
-            # 🔢 Enregistrer la distance et position de l'ancre pour ce badge
-            # (on pourrait stocker dans une table temporaire pour 3 ancres)
-            anchor_data = [{
-                "anchor_id": data.get("anchor_id"),
-                "x": data.get("anchor_x"),
-                "y": data.get("anchor_y"),
+            # 🗂 Stockage temporaire des positions pour trilatération
+            # Ici on suppose que tu collectes les données dans une table ou un dict global
+            if "anchors_data" not in badge:
+                badge["anchors_data"] = []
+            badge["anchors_data"].append({
+                "anchor_id": anchor_id,
+                "x": anchor_x,
+                "y": anchor_y,
                 "distance": distance
-            }]
+            })
 
-            # ➕ Ici tu pourrais combiner plusieurs ancres avant trilatération
-            x, y = data.get("anchor_x"), data.get("anchor_y")
+            # 🧮 Position : si 3 ancres disponibles → trilatération, sinon utilise la dernière ancre
+            if len(badge["anchors_data"]) >= 3:
+                x, y = trilateration(badge["anchors_data"])
+            else:
+                x, y = anchor_x, anchor_y  # fallback
 
-            # 🧮 Si au moins 3 ancres → calculer position réelle
-            # Exemple (à activer quand tu collectes 3 ancres)
-            # x, y = trilateration(anchors_data)
-
-            # ✅ Mise à jour de la position
+            # ✅ Mise à jour de la position et du timestamp
+            timestamp_ms = int(datetime.now().timestamp() * 1000)
             cur.execute("""
                 UPDATE employees
-                SET last_position_x = %s, last_position_y = %s, last_seen = NOW()
+                SET last_position_x = %s, last_position_y = %s, last_seen = %s
                 WHERE id = %s
-            """, (x, y, emp_id))
+            """, (x, y, timestamp_ms, emp_id))
 
-            # ✅ Gestion du pointage (activation badge)
+            # ✅ Gestion du pointage
             if is_active == 0:
-                # Badge entre → activation
                 new_status = 1
                 pointage_type = "ENTREE"
             else:
-                # Badge sort → désactivation
                 new_status = 0
                 pointage_type = "SORTIE"
 
@@ -528,13 +530,13 @@ def receive_rssi_data():
                 emp_id,
                 f"{prenom} {nom}",
                 pointage_type,
-                int(datetime.now().timestamp() * 1000),
+                timestamp_ms,
                 datetime.now().strftime("%Y-%m-%d")
             ))
 
-            conn.commit()
             logger.info(f"🟢 Pointage enregistré pour {prenom} {nom}: {pointage_type}")
 
+        conn.commit()
         cur.close()
         conn.close()
         return jsonify({"success": True, "message": "RSSI data processed"}), 201
