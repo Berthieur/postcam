@@ -647,6 +647,56 @@ def get_active_employees():
     except Exception as e:
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/activate-qr", methods=["POST"])
+def activate_via_qr():
+    data = request.get_json(silent=True) or request.form
+    if not data:
+        return jsonify({"success": False, "message": "Données manquantes"}), 400
+
+    emp_id = data.get("employee_id")    # préférable : l'uuid
+    badge_id = data.get("badge_id")     # optionnel : id du badge / numéro
+    identifier = emp_id or badge_id
+    if not identifier:
+        return jsonify({"success": False, "message": "employee_id ou badge_id requis"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Première tentative : mettre is_active = 1 (utilisé dans ton code)
+        try:
+            cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
+                        [1, int(datetime.now().timestamp() * 1000), identifier])
+            if cur.rowcount == 0:
+                # peut-être la table utilise 'active' ou le QR contient un badge_id au lieu de id
+                cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
+                            [1, int(datetime.now().timestamp() * 1000), identifier])
+        except Exception as e:
+            # si erreur (colonne inconnue), essayer la colonne 'active'
+            logger.warning(f"🔁 update is_active failed: {e}, trying 'active' column")
+            cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
+                        [1, int(datetime.now().timestamp() * 1000), identifier])
+
+        # Si aucune ligne modifiée, peut-être le QR est un badge_id (badge_code). Chercher employee par badge.
+        if cur.rowcount == 0:
+            # adapter le nom de la table/colonne badge selon ton schéma : ici j'essaie rssi_data / badges
+            cur.execute(f"SELECT employee_id FROM rssi_data WHERE badge_id = {PLACEHOLDER} LIMIT 1", [identifier])
+            row = cur.fetchone()
+            if row:
+                emp_id_from_badge = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
+                cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
+                            [1, int(datetime.now().timestamp() * 1000), emp_id_from_badge])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "message": "Employé activé"}), 200
+
+    except Exception as e:
+        logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
