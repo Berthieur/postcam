@@ -433,6 +433,78 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+@app.route("/api/scan", methods=["POST"])
+def scan_qr_code():
+    """Active ou désactive le badge de l'employé via son QR code et enregistre un pointage"""
+    data = request.get_json(silent=True)
+    logger.info(f"📸 Scan reçu : {data}")
+
+    if not data or "qr_code" not in data:
+        return jsonify({"success": False, "message": "QR code manquant"}), 400
+
+    qr_code = data["qr_code"].strip()
+    if not qr_code:
+        return jsonify({"success": False, "message": "QR code vide"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Vérifie si l'employé existe
+        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
+        employee = cur.fetchone()
+
+        if not employee:
+            logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
+            return jsonify({"success": False, "message": "Employé non trouvé"}), 404
+
+        emp_id, nom, prenom, is_active = employee
+        now = int(datetime.now().timestamp() * 1000)
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Déterminer le type de pointage
+        if is_active == 0:
+            pointage_type = "ENTREE"
+            cur.execute(f"UPDATE employees SET is_active = 1 WHERE id = {PLACEHOLDER}", (emp_id,))
+            message = f"{prenom} {nom} est entré."
+        else:
+            pointage_type = "SORTIE"
+            cur.execute(f"UPDATE employees SET is_active = 0 WHERE id = {PLACEHOLDER}", (emp_id,))
+            message = f"{prenom} {nom} est sorti."
+
+        # Insérer un enregistrement dans la table "pointages"
+        pointage_id = str(uuid.uuid4())
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            pointage_id,
+            emp_id,
+            f"{prenom} {nom}",
+            pointage_type,
+            now,
+            today
+        ])
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
+
+        return jsonify({
+            "success": True,
+            "action": pointage_type,
+            "message": message,
+            "employeeId": emp_id,
+            "timestamp": now,
+            "date": today
+        }), 200
+
+    except Exception as e:
+        logger.error(f"❌ scan_qr_code: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data():
     data = request.get_json(silent=True)
