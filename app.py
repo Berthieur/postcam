@@ -470,24 +470,23 @@ def receive_rssi_data():
             ssid = badge.get("ssid")
             mac = badge.get("mac")
             rssi = badge.get("rssi")
-
             logger.info(f"🔹 Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")
 
-            # 🔍 Trouver l’employé
+            # 🔍 Trouver l’employé par SSID
             cur.execute("SELECT id, nom, prenom, is_active FROM employees WHERE ssid = %s", (ssid,))
             employee = cur.fetchone()
             if not employee:
-                logger.warning(f"❌ Aucun employé trouvé pour SSID={ssid}")
+                logger.warning(f"❌ Aucun employé trouvé pour SSID={ssid} (ignorer ce badge)")
                 continue
 
             emp_id, nom, prenom, is_active = employee
+            logger.info(f"✅ Employé trouvé: {prenom} {nom} (ID={emp_id})")
 
             # ✅ Conversion RSSI → distance
             distance = rssi_to_distance(rssi)
             logger.info(f"   → Distance estimée: {distance:.2f} m")
 
-            # 🗂 Stockage temporaire des positions pour trilatération
-            # Ici on suppose que tu collectes les données dans une table ou un dict global
+            # 🗂 Stockage temporaire pour trilatération
             if "anchors_data" not in badge:
                 badge["anchors_data"] = []
             badge["anchors_data"].append({
@@ -497,21 +496,23 @@ def receive_rssi_data():
                 "distance": distance
             })
 
-            # 🧮 Position : si 3 ancres disponibles → trilatération, sinon utilise la dernière ancre
+            # 🧮 Position finale
             if len(badge["anchors_data"]) >= 3:
                 x, y = trilateration(badge["anchors_data"])
             else:
-                x, y = anchor_x, anchor_y  # fallback
+                x, y = anchor_x, anchor_y  # fallback si moins de 3 ancres
 
-            # ✅ Mise à jour de la position et du timestamp
+            # ✅ Timestamp en ms (bigint)
             timestamp_ms = int(datetime.now().timestamp() * 1000)
+
+            # 🔄 Mise à jour position et last_seen
             cur.execute("""
                 UPDATE employees
                 SET last_position_x = %s, last_position_y = %s, last_seen = %s
                 WHERE id = %s
             """, (x, y, timestamp_ms, emp_id))
 
-            # ✅ Gestion du pointage
+            # 🔄 Gestion pointage
             if is_active == 0:
                 new_status = 1
                 pointage_type = "ENTREE"
@@ -521,18 +522,12 @@ def receive_rssi_data():
 
             cur.execute("UPDATE employees SET is_active = %s WHERE id = %s", (new_status, emp_id))
 
-            # ✅ Historique du pointage
+            # ✅ Historique pointage
+            pointage_id = str(uuid.uuid4())
             cur.execute("""
                 INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                str(uuid.uuid4()),
-                emp_id,
-                f"{prenom} {nom}",
-                pointage_type,
-                timestamp_ms,
-                datetime.now().strftime("%Y-%m-%d")
-            ))
+            """, (pointage_id, emp_id, f"{prenom} {nom}", pointage_type, timestamp_ms, datetime.now().strftime("%Y-%m-%d")))
 
             logger.info(f"🟢 Pointage enregistré pour {prenom} {nom}: {pointage_type}")
 
@@ -544,6 +539,7 @@ def receive_rssi_data():
     except Exception as e:
         logger.error(f"❌ receive_rssi_data: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 def calculate_positions(cursor):
     """Calcule la position des employés par triangulation"""
