@@ -373,7 +373,7 @@ def add_pointage():
         cur = conn.cursor()
 
         # Vérifie si l'employé existe
-        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        cur.execute("SELECT id, nom, prenom, is_active FROM employees WHERE id = %s", (emp_id,))
         employee = cur.fetchone()
         if not employee:
             return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
@@ -390,15 +390,14 @@ def add_pointage():
             new_status = 0
             message = f"{prenom} {nom} est sorti."
 
-        # Mettre à jour is_active
-        cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                    (new_status, emp_id_db))
+        # ✅ Mettre à jour is_active
+        cur.execute("UPDATE employees SET is_active = %s WHERE id = %s", (new_status, emp_id_db))
 
-        # Enregistrer le pointage
+        # ✅ Enregistrer le pointage
         pointage_id = str(uuid.uuid4())
-        cur.execute(f"""
+        cur.execute("""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, [
             pointage_id, emp_id_db, f"{prenom} {nom}", pointage_type, now, today
         ])
@@ -420,7 +419,6 @@ def add_pointage():
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
@@ -450,148 +448,101 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-@app.route("/api/scan", methods=["POST"])
-def scan_qr_code():
-    """Active ou désactive le badge de l'employé via son QR code et enregistre un pointage"""
-    data = request.get_json(silent=True)
-    logger.info(f"📸 Scan reçu : {data}")
-
-    if not data or "qr_code" not in data:
-        return jsonify({"success": False, "message": "QR code manquant"}), 400
-
-    qr_code = data["qr_code"].strip()
-    if not qr_code:
-        return jsonify({"success": False, "message": "QR code vide"}), 400
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Vérifie si l'employé existe
-        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
-        employee = cur.fetchone()
-
-        if not employee:
-            logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
-            return jsonify({"success": False, "message": "Employé non trouvé"}), 404
-
-        emp_id, nom, prenom, is_active = employee
-        now = int(datetime.now().timestamp() * 1000)
-        today = datetime.now().strftime("%Y-%m-%d")
-
-        # Déterminer le type de pointage
-        if is_active == 0:
-            pointage_type = "ENTREE"
-            cur.execute(f"UPDATE employees SET is_active = 1 WHERE id = {PLACEHOLDER}", (emp_id,))
-            message = f"{prenom} {nom} est entré."
-        else:
-            pointage_type = "SORTIE"
-            cur.execute(f"UPDATE employees SET is_active = 0 WHERE id = {PLACEHOLDER}", (emp_id,))
-            message = f"{prenom} {nom} est sorti."
-
-        # Insérer un enregistrement dans la table "pointages"
-        pointage_id = str(uuid.uuid4())
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id,
-            emp_id,
-            f"{prenom} {nom}",
-            pointage_type,
-            now,
-            today
-        ])
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
-
-        return jsonify({
-            "success": True,
-            "action": pointage_type,
-            "message": message,
-            "employeeId": emp_id,
-            "timestamp": now,
-            "date": today
-        }), 200
-
-    except Exception as e:
-        logger.error(f"❌ scan_qr_code: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data():
-    data = request.get_json(silent=True)
-    
-    if not data:
-        return jsonify({"success": False, "message": "Données manquantes"}), 400
-    
-    anchor_id = data.get("anchor_id")
-    anchor_x = data.get("anchor_x")
-    anchor_y = data.get("anchor_y")
-    badges = data.get("badges", [])
-    
-    logger.info(f"📡 RSSI ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-    logger.info(f"   JSON reçu: {data}")  # DEBUG: voir le JSON complet
-    
+    """
+    Reçoit les données RSSI envoyées par les ESP32 et met à jour :
+      - Position estimée (x, y)
+      - Statut de présence (is_active)
+      - Historique de pointage (entrée/sortie)
+    """
     try:
+        data = request.get_json()
+        logger.info(f"📡 RSSI reçu de l'ancre #{data.get('anchor_id')} ({data.get('anchor_x')}, {data.get('anchor_y')})")
+
         conn = get_db()
         cur = conn.cursor()
-        
-        for badge in badges:
+
+        for badge in data.get("badges", []):
             ssid = badge.get("ssid")
             mac = badge.get("mac")
             rssi = badge.get("rssi")
-            
-            logger.info(f"   Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")  # DEBUG
-            
-            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
-                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
-                continue
 
-            employee_name = ssid.replace("BADGE_", "").strip()
-            
-            # Recherche par nom complet
-            cur.execute(f"""
-                SELECT id, nom, prenom FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
-                   OR nom = {PLACEHOLDER}
-                   OR prenom = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name, employee_name, employee_name))
-            
+            logger.info(f"🔹 Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")
+
+            # 🔍 Trouver l’employé
+            cur.execute("SELECT id, nom, prenom, is_active FROM employees WHERE ssid = %s", (ssid,))
             employee = cur.fetchone()
             if not employee:
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé dans la BD")
+                logger.warning(f"❌ Aucun employé trouvé pour SSID={ssid}")
                 continue
-            
-            employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-            logger.info(f"✅ Employé trouvé: {employee_id}")
-            
-            # Enregistrer RSSI
-            cur.execute(f"""
-                INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
-                int(datetime.now().timestamp() * 1000)
-            ])
-        
-        conn.commit()
-        calculate_positions(cur)
-        conn.commit()
-        
+
+            emp_id, nom, prenom, is_active = employee
+
+            # ✅ Conversion RSSI → distance
+            distance = rssi_to_distance(rssi)
+            logger.info(f"   → Distance estimée: {distance:.2f} m")
+
+            # 🔢 Enregistrer la distance et position de l'ancre pour ce badge
+            # (on pourrait stocker dans une table temporaire pour 3 ancres)
+            anchor_data = [{
+                "anchor_id": data.get("anchor_id"),
+                "x": data.get("anchor_x"),
+                "y": data.get("anchor_y"),
+                "distance": distance
+            }]
+
+            # ➕ Ici tu pourrais combiner plusieurs ancres avant trilatération
+            x, y = data.get("anchor_x"), data.get("anchor_y")
+
+            # 🧮 Si au moins 3 ancres → calculer position réelle
+            # Exemple (à activer quand tu collectes 3 ancres)
+            # x, y = trilateration(anchors_data)
+
+            # ✅ Mise à jour de la position
+            cur.execute("""
+                UPDATE employees
+                SET last_position_x = %s, last_position_y = %s, last_seen = NOW()
+                WHERE id = %s
+            """, (x, y, emp_id))
+
+            # ✅ Gestion du pointage (activation badge)
+            if is_active == 0:
+                # Badge entre → activation
+                new_status = 1
+                pointage_type = "ENTREE"
+            else:
+                # Badge sort → désactivation
+                new_status = 0
+                pointage_type = "SORTIE"
+
+            cur.execute("UPDATE employees SET is_active = %s WHERE id = %s", (new_status, emp_id))
+
+            # ✅ Historique du pointage
+            cur.execute("""
+                INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
+                str(uuid.uuid4()),
+                emp_id,
+                f"{prenom} {nom}",
+                pointage_type,
+                int(datetime.now().timestamp() * 1000),
+                datetime.now().strftime("%Y-%m-%d")
+            ))
+
+            conn.commit()
+            logger.info(f"🟢 Pointage enregistré pour {prenom} {nom}: {pointage_type}")
+
         cur.close()
         conn.close()
-        
-        return jsonify({"success": True, "message": f"{len(badges)} mesures traitées"}), 201
-        
+        return jsonify({"success": True, "message": "RSSI data processed"}), 201
+
     except Exception as e:
-        logger.error(f"❌ Erreur RSSI: {e}", exc_info=True)
+        logger.error(f"❌ receive_rssi_data: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 def calculate_positions(cursor):
     """Calcule la position des employés par triangulation"""
     import math
@@ -702,89 +653,8 @@ def trilateration(anchors):
         y = sum(a['y'] / max(a['distance'], 0.1) for a in anchors) / total_weight
         logger.info(f"  Centroïde pondéré : x={x:.2f}, y={y:.2f}")
         return (x, y)
-@app.route("/api/employees/active", methods=["GET"])
-def get_active_employees():
-    """Récupère les employés actifs avec leurs positions en temps réel"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(f"""
-            SELECT id, nom, prenom, type, is_active, created_at,
-                   email, telephone, taux_horaire, frais_ecolage,
-                   profession, date_naissance, lieu_naissance,
-                   last_position_x, last_position_y, last_seen
-            FROM employees 
-            WHERE is_active = 1
-            ORDER BY nom, prenom
-        """)
-        rows = cursor.fetchall()
 
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
 
-        conn.close()
-        logger.info(f"📤 {len(employees)} employés actifs renvoyés (avec positions)")
-        
-        # Log des positions pour debug
-        for emp in employees:
-            if emp.get('last_position_x') is not None:
-                logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
-        
-        return jsonify({"success": True, "employees": employees}), 200
-    except Exception as e:
-        logger.error(f"❌ get_active_employees: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-@app.route("/api/activate-qr", methods=["POST"])
-def activate_via_qr():
-    data = request.get_json(silent=True) or request.form
-    if not data:
-        return jsonify({"success": False, "message": "Données manquantes"}), 400
-
-    emp_id = data.get("employee_id")    # préférable : l'uuid
-    badge_id = data.get("badge_id")     # optionnel : id du badge / numéro
-    identifier = emp_id or badge_id
-    if not identifier:
-        return jsonify({"success": False, "message": "employee_id ou badge_id requis"}), 400
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Première tentative : mettre is_active = 1 (utilisé dans ton code)
-        try:
-            cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
-            if cur.rowcount == 0:
-                # peut-être la table utilise 'active' ou le QR contient un badge_id au lieu de id
-                cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                            [1, int(datetime.now().timestamp() * 1000), identifier])
-        except Exception as e:
-            # si erreur (colonne inconnue), essayer la colonne 'active'
-            logger.warning(f"🔁 update is_active failed: {e}, trying 'active' column")
-            cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
-
-        # Si aucune ligne modifiée, peut-être le QR est un badge_id (badge_code). Chercher employee par badge.
-        if cur.rowcount == 0:
-            # adapter le nom de la table/colonne badge selon ton schéma : ici j'essaie rssi_data / badges
-            cur.execute(f"SELECT employee_id FROM rssi_data WHERE badge_id = {PLACEHOLDER} LIMIT 1", [identifier])
-            row = cur.fetchone()
-            if row:
-                emp_id_from_badge = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
-                cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                            [1, int(datetime.now().timestamp() * 1000), emp_id_from_badge])
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "message": "Employé activé"}), 200
-
-    except Exception as e:
-        logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Démarrage ---
 if __name__ == "__main__":
