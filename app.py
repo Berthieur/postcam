@@ -12,7 +12,7 @@ from collections import defaultdict
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*")  # Ajout de SocketIO pour WebSocket
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)  # Activer les journaux SocketIO
 
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
@@ -502,7 +502,15 @@ def scan_qr_code():
         logger.error(f"❌ scan_qr_code: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === WebSocket RSSI data ===
+# === WebSocket pour RSSI ===
+@socketio.on('connect', namespace='/api/rssi-data')
+def handle_rssi_connect():
+    logger.info("📡 Client WebSocket connecté à /api/rssi-data")
+
+@socketio.on('disconnect', namespace='/api/rssi-data')
+def handle_rssi_disconnect():
+    logger.info("📡 Client WebSocket déconnecté de /api/rssi-data")
+
 @socketio.on('message', namespace='/api/rssi-data')
 def handle_rssi_data(data):
     logger.info(f"📡 RSSI reçu via WebSocket: {data}")
@@ -528,14 +536,13 @@ def handle_rssi_data(data):
                 continue
 
             employee_name = ssid.strip()  # Pas de préfixe BADGE_
-            logger.info(f"Badge: ssid='{employee_name}', mac={mac}, rssi={rssi}")
 
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
                 LIMIT 1
             """, (employee_name,))
-            
+
             employee = cur.fetchone()
             if not employee:
                 logger.warning(f"⚠️ Employé '{employee_name}' non trouvé")
@@ -568,19 +575,19 @@ def handle_rssi_data(data):
 # === Calcul et diffusion des positions ===
 def calculate_and_broadcast_positions(cursor):
     threshold = int((datetime.now().timestamp() - 5) * 1000)
-    
+
     cursor.execute(f"""
         SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
         FROM rssi_measurements
         WHERE timestamp > {PLACEHOLDER}
     """, (threshold,))
-    
+
     measurements = cursor.fetchall()
-    
+
     if not measurements:
         logger.info("Aucune mesure récente pour triangulation")
         return
-    
+
     employee_data = defaultdict(list)
     for row in measurements:
         emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
@@ -588,7 +595,7 @@ def calculate_and_broadcast_positions(cursor):
         anchor_x = row[2] if DB_DRIVER == "sqlite" else row['anchor_x']
         anchor_y = row[3] if DB_DRIVER == "sqlite" else row['anchor_y']
         rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
-        
+
         distance = rssi_to_distance(rssi)
         employee_data[emp_id].append({
             'anchor_id': anchor_id,
@@ -596,17 +603,17 @@ def calculate_and_broadcast_positions(cursor):
             'y': anchor_y,
             'distance': distance
         })
-    
+
     for emp_id, anchors in employee_data.items():
         if len(anchors) >= 3:
             pos_x, pos_y = trilateration(anchors)
-            
+
             cursor.execute(f"""
                 UPDATE employees
                 SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
                 WHERE id = {PLACEHOLDER}
             """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
-            
+
             logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
     cursor.execute(f"""
@@ -643,11 +650,11 @@ def trilateration(anchors):
     logger.info(f"Ancres utilisées pour triangulation :")
     for i, a in enumerate(anchors):
         logger.info(f"  {i+1}. Ancre #{a['anchor_id']} à ({a['x']}, {a['y']}) distance={a['distance']:.2f}m")
-    
+
     x1, y1, r1 = anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']
     x2, y2, r2 = anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']
     x3, y3, r3 = anchors[2]['x'], anchors[2]['y'], anchors[2]['distance']
-    
+
     try:
         A = 2*x2 - 2*x1
         B = 2*y2 - 2*y1
@@ -655,16 +662,16 @@ def trilateration(anchors):
         D = 2*x3 - 2*x2
         E = 2*y3 - 2*y2
         F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
-        
+
         denom1 = (E*A - B*D)
         denom2 = (B*D - A*E)
-        
+
         if abs(denom1) < 0.0001 or abs(denom2) < 0.0001:
             raise ZeroDivisionError("Dénominateur proche de zéro")
-        
+
         x = (C*E - F*B) / denom1
         y = (C*D - A*F) / denom2
-        
+
         logger.info(f"✅ Triangulation réussie : x={x:.2f}, y={y:.2f}")
         return (x, y)
     except Exception as e:
@@ -750,7 +757,13 @@ def activate_via_qr():
         logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === Route temporaire pour déboguer les requêtes HTTP erronées ===
+@app.route("/api/rssi-data", methods=["GET", "POST"])
+def receive_rssi_data_http():
+    logger.warning("⚠️ Requête HTTP reçue sur /api/rssi-data (WebSocket attendu)")
+    return jsonify({"success": False, "message": "Utilisez WebSocket (wss://) pour /api/rssi-data"}), 400
+
 # --- Démarrage ---
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+    port = int(os.getenv("PORT", 8000))  # Port 8000 pour Koyeb
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)  # allow_unsafe pour SocketIO
