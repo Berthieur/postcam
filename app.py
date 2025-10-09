@@ -511,18 +511,19 @@ def handle_rssi_connect():
 def handle_rssi_disconnect():
     logger.info("📡 Client WebSocket déconnecté de /api/rssi-data")
 
-@socketio.on('message', namespace='/api/rssi-data')
+# 👇 Correction ici : on écoute 'rssi_data' (et non 'message')
+@socketio.on('rssi_data', namespace='/api/rssi-data')
 def handle_rssi_data(data):
     logger.info(f"📡 RSSI reçu via WebSocket: {data}")
 
-    anchor_id = data.get("anchor_id")
-    anchor_x = data.get("anchor_x")
-    anchor_y = data.get("anchor_y")
-    badges = data.get("badges", [])
-
-    logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-
     try:
+        anchor_id = data.get("anchor_id")
+        anchor_x = data.get("anchor_x")
+        anchor_y = data.get("anchor_y")
+        badges = data.get("badges", [])
+
+        logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
+
         conn = get_db()
         cur = conn.cursor()
 
@@ -535,7 +536,7 @@ def handle_rssi_data(data):
                 logger.warning(f"❌ SSID invalide: {repr(ssid)}")
                 continue
 
-            employee_name = ssid.strip()  # Pas de préfixe BADGE_
+            employee_name = ssid.strip()
 
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
@@ -566,6 +567,7 @@ def handle_rssi_data(data):
         cur.close()
         conn.close()
 
+        # ✅ Réponse positive à l’ESP32
         emit('ack', {'success': True, 'message': f'{len(badges)} mesures traitées'}, namespace='/api/rssi-data')
 
     except Exception as e:
