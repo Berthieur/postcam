@@ -640,48 +640,40 @@ def calculate_and_broadcast_positions(cursor):
     socketio.emit('positions', {'success': True, 'employees': employees}, namespace='/api/employees/active')
 
 def rssi_to_distance(rssi, tx_power=-59, n=2.0):
+    """Convertit un RSSI en distance estimée (mètres)."""
     if rssi == 0:
         return -1.0
     ratio = (tx_power - rssi) / (10 * n)
-    return math.pow(10, ratio)
+    return round(math.pow(10, ratio), 2)
+
 
 def trilateration(anchors):
+    """Calcule la position (x, y) à partir de 3 ancres RSSI."""
     anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
-    logger.info(f"Ancres utilisées pour triangulation :")
+    logger.info("📡 Ancres utilisées pour la triangulation :")
     for i, a in enumerate(anchors):
-        logger.info(f"  {i+1}. Ancre #{a['anchor_id']} à ({a['x']}, {a['y']}) distance={a['distance']:.2f}m")
+        logger.info(f"  {i+1}. Ancre #{a['anchor_id']} ({a['x']}, {a['y']}) d={a['distance']:.2f}m")
 
-    x1, y1, r1 = anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']
-    x2, y2, r2 = anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']
-    x3, y3, r3 = anchors[2]['x'], anchors[2]['y'], anchors[2]['distance']
+    (x1, y1, r1), (x2, y2, r2), (x3, y3, r3) = \
+        (anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']), \
+        (anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']), \
+        (anchors[2]['x'], anchors[2]['y'], anchors[2]['distance'])
 
-    try:
-        A = 2*x2 - 2*x1
-        B = 2*y2 - 2*y1
-        C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
-        D = 2*x3 - 2*x2
-        E = 2*y3 - 2*y2
-        F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
+    A = 2*(x2 - x1)
+    B = 2*(y2 - y1)
+    C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
+    D = 2*(x3 - x2)
+    E = 2*(y3 - y2)
+    F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
 
-        denom1 = (E*A - B*D)
-        denom2 = (B*D - A*E)
+    denom = (A*E - B*D)
+    if denom == 0:
+        logger.warning("⚠️ Triangulation impossible (points alignés)")
+        return (x1, y1)
 
-        if abs(denom1) < 0.0001 or abs(denom2) < 0.0001:
-            raise ZeroDivisionError("Dénominateur proche de zéro")
-
-        x = (C*E - F*B) / denom1
-        y = (C*D - A*F) / denom2
-
-        logger.info(f"✅ Triangulation réussie : x={x:.2f}, y={y:.2f}")
-        return (x, y)
-    except Exception as e:
-        logger.warning(f"⚠️ Erreur triangulation : {e}. Utilisation du centroïde")
-        total_weight = sum(1.0 / max(a['distance'], 0.1) for a in anchors)
-        x = sum(a['x'] / max(a['distance'], 0.1) for a in anchors) / total_weight
-        y = sum(a['y'] / max(a['distance'], 0.1) for a in anchors) / total_weight
-        logger.info(f"Centroïde pondéré : x={x:.2f}, y={y:.2f}")
-        return (x, y)
-
+    x = (C*E - B*F) / denom
+    y = (A*F - C*D) / denom
+    return round(x, 2), round(y, 2)
 # === GET employés actifs ===
 @app.route("/api/employees/active", methods=["GET"])
 def get_active_employees():
