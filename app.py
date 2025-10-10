@@ -5,14 +5,16 @@ from flask_cors import CORS
 from datetime import datetime
 import uuid
 from flask_socketio import SocketIO, emit
-
+import eventlet
+import eventlet.wsgi
 # === Initialisation SocketIO (à mettre en haut du fichier principal, après app = Flask(...)) ===
 
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -795,7 +797,11 @@ def activate_via_qr():
         logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-# --- Démarrage ---
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    
+
+    port = int(os.getenv("PORT", 5000))  # Koyeb fournit la variable PORT
+    print(f"🚀 Serveur démarré sur 0.0.0.0:{port} avec WebSocket")
+
+    # socketio.run utilise eventlet si async_mode='eventlet'
+    socketio.run(app, host="0.0.0.0", port=port)
