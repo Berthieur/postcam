@@ -7,12 +7,12 @@ import uuid
 from flask_socketio import SocketIO, emit
 
 # === Initialisation SocketIO (à mettre en haut du fichier principal, après app = Flask(...)) ===
-socketio = SocketIO(app, cors_allowed_origins="*")
+
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-
+socketio = SocketIO(app, cors_allowed_origins="*")
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -798,4 +798,4 @@ def activate_via_qr():
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
