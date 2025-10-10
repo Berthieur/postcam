@@ -4,7 +4,10 @@ from flask import Flask, jsonify, request, render_template, session, redirect, u
 from flask_cors import CORS
 from datetime import datetime
 import uuid
+from flask_socketio import SocketIO, emit
 
+# === Initialisation SocketIO (à mettre en haut du fichier principal, après app = Flask(...)) ===
+socketio = SocketIO(app, cors_allowed_origins="*")
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
@@ -504,6 +507,14 @@ def scan_qr_code():
     except Exception as e:
         logger.error(f"❌ scan_qr_code: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+@socketio.on("connect")
+def handle_connect():
+    logger.info("🟢 Client WebSocket connecté")
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    logger.info("🔴 Client WebSocket déconnecté")
+
 
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data():
@@ -518,18 +529,19 @@ def receive_rssi_data():
     badges = data.get("badges", [])
     
     logger.info(f"📡 RSSI ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-    logger.info(f"   JSON reçu: {data}")  # DEBUG: voir le JSON complet
+    logger.info(f"   JSON reçu: {data}")  # DEBUG
     
     try:
         conn = get_db()
         cur = conn.cursor()
-        
+        processed = []
+
         for badge in badges:
             ssid = badge.get("ssid")
             mac = badge.get("mac")
             rssi = badge.get("rssi")
             
-            logger.info(f"   Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")  # DEBUG
+            logger.info(f"   Badge: ssid='{ssid}', mac={mac}, rssi={rssi}")
             
             if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
                 logger.warning(f"❌ SSID invalide: {repr(ssid)}")
@@ -537,7 +549,7 @@ def receive_rssi_data():
 
             employee_name = ssid.replace("BADGE_", "").strip()
             
-            # Recherche par nom complet
+            # Recherche de l'employé
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
@@ -562,7 +574,16 @@ def receive_rssi_data():
                 employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
                 int(datetime.now().timestamp() * 1000)
             ])
-        
+            
+            processed.append({
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "anchor_id": anchor_id,
+                "rssi": rssi,
+                "mac": mac,
+                "timestamp": int(datetime.now().timestamp() * 1000)
+            })
+
         conn.commit()
         calculate_positions(cur)
         conn.commit()
@@ -570,6 +591,11 @@ def receive_rssi_data():
         cur.close()
         conn.close()
         
+        # === 🔴 Diffusion temps réel via WebSocket ===
+        if processed:
+            socketio.emit("rssi_update", {"data": processed})
+            logger.info(f"📶 WebSocket émis: {len(processed)} valeurs RSSI")
+
         return jsonify({"success": True, "message": f"{len(badges)} mesures traitées"}), 201
         
     except Exception as e:
