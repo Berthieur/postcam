@@ -843,4 +843,5 @@ def activate_via_qr():
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+   socketio.run(app, host="0.0.0.0", port=port, debug=False, log_output=True, use_reloader=False, server='eventlet')
+
