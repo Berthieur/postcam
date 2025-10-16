@@ -7,6 +7,7 @@ from datetime import datetime
 import uuid
 from collections import defaultdict
 import math
+import eventlet
 
 # === Configuration Flask ===
 app = Flask(__name__)
@@ -15,7 +16,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Initialize SocketIO ===
 socketio = SocketIO(app, cors_allowed_origins="*", engineio_logger=True)
-
+eventlet.monkey_patch()
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
