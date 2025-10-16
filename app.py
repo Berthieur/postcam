@@ -7,7 +7,6 @@ from datetime import datetime
 import uuid
 from collections import defaultdict
 import math
-
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
