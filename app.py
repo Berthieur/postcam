@@ -7,13 +7,14 @@ from datetime import datetime
 import uuid
 from collections import defaultdict
 import math
+
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # === Initialize SocketIO ===
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", engineio_logger=True)
 
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
@@ -58,12 +59,12 @@ def timestamp_to_datetime_full_filter(timestamp):
 # === WebSocket Events ===
 @socketio.on("connect")
 def handle_connect():
-    logger.info("📡 Client WebSocket connecté")
+    logger.info(f"📡 Client WebSocket connecté: SID={request.sid}, Remote={request.remote_addr}")
     emit("connection_response", {"message": "Connecté au serveur WebSocket"})
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    logger.info("📡 Client WebSocket déconnecté")
+    logger.info(f"📡 Client WebSocket déconnecté: SID={request.sid}")
 
 @socketio.on("subscribe_positions")
 def handle_subscribe_positions():
@@ -83,8 +84,9 @@ def handle_subscribe_positions():
         )
         conn.close()
         emit("position_update", {"employees": employees})
+        logger.info(f"📤 {len(employees)} positions initiales envoyées")
     except Exception as e:
-        logger.error(f"❌ Erreur envoi positions initiales: {e}")
+        logger.error(f"❌ Erreur envoi positions initiales: {e}", exc_info=True)
 
 @socketio.on("subscribe_pointages")
 def handle_subscribe_pointages():
@@ -105,8 +107,9 @@ def handle_subscribe_pointages():
         )
         conn.close()
         emit("pointage_update", {"pointages": pointages})
+        logger.info(f"📤 {len(pointages)} pointages initiaux envoyés")
     except Exception as e:
-        logger.error(f"❌ Erreur envoi pointages initiaux: {e}")
+        logger.error(f"❌ Erreur envoi pointages initiaux: {e}", exc_info=True)
 
 # === Routes Web ===
 @app.route("/")
@@ -160,7 +163,7 @@ def get_all_employees():
         conn.close()
         return jsonify({"success": True, "employees": employees})
     except Exception as e:
-        logger.error(f"❌ get_all_employees: {e}")
+        logger.error(f"❌ get_all_employees: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST ajouter employé ===
@@ -208,7 +211,7 @@ def add_employee():
         }), 201
 
     except Exception as e:
-        logger.error(f"❌ add_employee: {e}")
+        logger.error(f"❌ add_employee: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST ajouter salaire ===
@@ -279,7 +282,7 @@ def add_salary():
         return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": emp_id}), 201
 
     except Exception as e:
-        logger.error(f"❌ add_salary: {e}")
+        logger.error(f"❌ add_salary: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === PUT modifier employé ===
@@ -313,7 +316,7 @@ def update_employee(id):
         conn.close()
         return jsonify({"success": True, "message": "Employé modifié"}), 200
     except Exception as e:
-        logger.error(f"❌ update_employee: {e}")
+        logger.error(f"❌ update_employee: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === DELETE supprimer employé ===
@@ -331,7 +334,7 @@ def delete_employee(id):
         conn.close()
         return jsonify({"success": True, "message": "Employé supprimé"}), 200
     except Exception as e:
-        logger.error(f"❌ delete_employee: {e}")
+        logger.error(f"❌ delete_employee: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === GET historique salaires ===
@@ -372,7 +375,7 @@ def get_salary_history():
         return jsonify({"success": True, "salaries": salaries}), 200
 
     except Exception as e:
-        logger.error(f"❌ get_salary_history: {e}")
+        logger.error(f"❌ get_salary_history: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === Dashboard ===
@@ -404,7 +407,7 @@ def dashboard():
         conn.close()
         return render_template("dashboard.html", payments=payments)
     except Exception as e:
-        logger.error(f"❌ dashboard: {e}")
+        logger.error(f"❌ dashboard: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST pointage ===
@@ -467,7 +470,7 @@ def add_pointage():
             "pointageId": pointage_id
         }), 201
     except Exception as e:
-        logger.error(f"❌ add_pointage: {e}")
+        logger.error(f"❌ add_pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === GET historique pointages ===
@@ -496,7 +499,7 @@ def get_pointage_history():
         conn.close()
         return jsonify({"success": True, "pointages": pointages}), 200
     except Exception as e:
-        logger.error(f"❌ get_pointage_history: {e}")
+        logger.error(f"❌ get_pointage_history: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST scan QR code ===
@@ -577,7 +580,7 @@ def scan_qr_code():
         }), 200
 
     except Exception as e:
-        logger.error(f"❌ scan_qr_code: {e}")
+        logger.error(f"❌ scan_qr_code: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST RSSI data ===
@@ -610,7 +613,7 @@ def receive_rssi_data():
                 logger.warning(f"❌ SSID invalide: {repr(ssid)}")
                 continue
 
-            employee_name = ssid.replace("BADGE_", "").strip()
+            employee_name = ssid.strip()  # Utiliser SSID directement, sans retirer "BADGE_"
             
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
@@ -653,6 +656,7 @@ def receive_rssi_data():
             else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
         )
         socketio.emit("position_update", {"employees": employees})
+        logger.info(f"📤 Mise à jour position envoyée: {len(employees)} employés")
         
         cur.close()
         conn.close()
@@ -677,6 +681,7 @@ def calculate_positions(cursor):
     measurements = cursor.fetchall()
     
     if not measurements:
+        logger.info("⚠️ Aucune mesure RSSI récente trouvée")
         return
     
     employee_data = defaultdict(list)
@@ -709,7 +714,7 @@ def calculate_positions(cursor):
             
             logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
-def rssi_to_distance(rssi, tx_power=-59, n=2.0):
+def rssi_to_distance(rssi, tx_power=-59, n=2.5):
     """Convertit RSSI en distance (mètres)"""
     if rssi == 0:
         return -1.0
@@ -787,7 +792,7 @@ def get_active_employees():
         
         return jsonify({"success": True, "employees": employees}), 200
     except Exception as e:
-        logger.error(f"❌ get_active_employees: {e}")
+        logger.error(f"❌ get_active_employees: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === POST activer via QR ===
