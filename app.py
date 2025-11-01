@@ -166,7 +166,7 @@ def add_salary():
         logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
 
-    required_fields = ["employeeId", "employeeName", "amount", "type"]
+    required_fields = [ "employeeName", "amount", "type"]
     for field in required_fields:
         if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
             logger.error(f"❌ Champ manquant ou vide: {field}")
