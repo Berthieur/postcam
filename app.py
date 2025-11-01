@@ -434,7 +434,9 @@ def get_pointage_history():
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST scan QR code ===
+# === POST scan QR code (MODIFIÉ) ===
+# Remplacez votre fonction scan_qr_code() existante par celle-ci
+
 @app.route("/api/scan", methods=["POST"])
 def scan_qr_code():
     data = request.get_json(silent=True)
@@ -451,17 +453,34 @@ def scan_qr_code():
         conn = get_db()
         cur = conn.cursor()
 
-        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
+        # Récupérer TOUTES les infos de l'employé (incluant type/profession)
+        cur.execute(f"""
+            SELECT id, nom, prenom, type, is_active, profession 
+            FROM employees 
+            WHERE id = {PLACEHOLDER}
+        """, (qr_code,))
+        
         employee = cur.fetchone()
 
         if not employee:
             logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
             return jsonify({"success": False, "message": "Employé non trouvé"}), 404
 
-        emp_id, nom, prenom, is_active = employee
+        # Extraire les données selon le driver DB
+        if DB_DRIVER == "sqlite":
+            emp_id, nom, prenom, emp_type, is_active, profession = employee
+        else:
+            emp_id = employee['id']
+            nom = employee['nom']
+            prenom = employee['prenom']
+            emp_type = employee['type']
+            is_active = employee['is_active']
+            profession = employee.get('profession', emp_type)
+        
         now = int(datetime.now().timestamp() * 1000)
         today = datetime.now().strftime("%Y-%m-%d")
 
+        # Déterminer l'action (ENTREE ou SORTIE)
         if is_active == 0:
             pointage_type = "ENTREE"
             cur.execute(f"UPDATE employees SET is_active = 1 WHERE id = {PLACEHOLDER}", (emp_id,))
@@ -471,6 +490,7 @@ def scan_qr_code():
             cur.execute(f"UPDATE employees SET is_active = 0 WHERE id = {PLACEHOLDER}", (emp_id,))
             message = f"{prenom} {nom} est sorti."
 
+        # Enregistrer le pointage
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
@@ -489,6 +509,30 @@ def scan_qr_code():
         conn.close()
 
         logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
+        
+        # 🎯 NOUVEAU : Préparer les données pour l'ESP32
+        pointage_data = {
+            "success": True,
+            "action": pointage_type,
+            "nom": nom,
+            "prenom": prenom,
+            "employee_name": f"{prenom} {nom}",
+            "employee_type": emp_type,
+            "profession": profession if profession else emp_type,
+            "employeeId": emp_id,
+            "timestamp": now,
+            "date": today,
+            "message": message
+        }
+        
+        # 🎯 DIFFUSER via WebSocket vers tous les ESP32 connectés
+        try:
+            socketio.emit('pointage', pointage_data, namespace='/api/rssi-data')
+            logger.info(f"📡 Pointage diffusé via WebSocket vers ESP32: {pointage_data}")
+        except Exception as ws_error:
+            logger.error(f"❌ Erreur émission WebSocket: {ws_error}")
+        
+        # Retourner la réponse HTTP normale
         return jsonify({
             "success": True,
             "action": pointage_type,
@@ -501,7 +545,6 @@ def scan_qr_code():
     except Exception as e:
         logger.error(f"❌ scan_qr_code: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 # === WebSocket pour RSSI ===
 @socketio.on('connect', namespace='/api/rssi-data')
 def handle_rssi_connect():
