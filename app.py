@@ -419,78 +419,86 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# 2️⃣ Dans la fonction add_pointage(), après l'enregistrement:
+
+# 1️⃣ Fonction add_pointage() CORRIGÉE
 
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
     logger.info(f"📥 Données pointage reçues: {data}")
-
+    
     if not data:
         return jsonify({"success": False, "message": "Requête vide"}), 400
-
+    
     required = ["employeeId", "employeeName", "type", "timestamp", "date"]
     for field in required:
         if field not in data or not data[field]:
             return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
-
+    
     try:
         conn = get_db()
         cur = conn.cursor()
-
+        
         emp_id = data.get("employeeId")
         cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
-
+        
         if not employee:
+            cur.close()
+            conn.close()
             return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
-
+        
+        # Extraire nom et prénom selon le driver
+        if DB_DRIVER == "sqlite":
+            emp_nom = employee[1]
+            emp_prenom = employee[2]
+        else:
+            emp_nom = employee['nom']
+            emp_prenom = employee['prenom']
+        
         pointage_id = str(uuid.uuid4())
+        pointage_type = data.get("type").upper()  # Normaliser en MAJUSCULES
+        
+        # Mapper "arrivee" -> "ENTREE" et "depart" -> "SORTIE"
+        if pointage_type.lower() == "arrivee":
+            pointage_type = "ENTREE"
+        elif pointage_type.lower() == "depart":
+            pointage_type = "SORTIE"
+        
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
             pointage_id,
-            data.get("employeeId"),
+            emp_id,
             data.get("employeeName"),
-            data.get("type"),
+            pointage_type,
             int(data.get("timestamp")),
             data.get("date")
         ])
-
+        
         conn.commit()
+        cur.close()
+        conn.close()
         
-        # ✅ AJOUTER CES LIGNES ICI ✅
-        # Extraire nom et prénom
-        if DB_DRIVER == "sqlite":
-            nom = employee[1]
-            prenom = employee[2]
-        else:
-            nom = employee['nom']
-            prenom = employee['prenom']
-        
-        # Formater la date et l'heure
+        # ✅ ÉMETTRE VERS ESP32 (SYNTAXE CORRECTE)
         timestamp = int(data.get("timestamp"))
         dt = datetime.fromtimestamp(timestamp / 1000)
         date_formatted = dt.strftime("%d/%m/%y")
         time_formatted = dt.strftime("%H:%M:%S")
         
-        # Émettre vers ESP32
+        # ⚠️ CORRECTION: Utiliser room=None au lieu de broadcast=True
         socketio.emit('pointage_event', {
-            'nom': nom,
-            'prenom': prenom,
-            'type': data.get("type"),
+            'nom': emp_nom,
+            'prenom': emp_prenom,
+            'type': pointage_type,
             'date': date_formatted,
             'time': time_formatted,
             'timestamp': timestamp
-        }, namespace='/api/rssi-data', broadcast=True)
+        }, namespace='/api/rssi-data')  # Pas de broadcast=True ici
         
-        logger.info(f"📡 Événement pointage émis: {prenom} {nom}")
-        # ✅ FIN DES LIGNES À AJOUTER ✅
+        logger.info(f"📡 Événement pointage émis vers ESP32: {emp_prenom} {emp_nom} - {pointage_type}")
         
-        cur.close()
-        conn.close()
-
         return jsonify({
             "success": True,
             "message": "Pointage enregistré",
@@ -498,8 +506,12 @@ def add_pointage():
         }), 201
         
     except Exception as e:
-        logger.error(f"❌ add_pointage: {e}")
+        logger.error(f"❌ add_pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+# 2️⃣ Fonction scan_qr_code() CORRIGÉE
+
 # === GET historique pointages ===
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
@@ -529,33 +541,38 @@ def get_pointage_history():
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+# 2️⃣ Fonction scan_qr_code() CORRIGÉE
+
 @app.route("/api/scan", methods=["POST"])
 def scan_qr_code():
     data = request.get_json(silent=True)
     logger.info(f"📸 Scan reçu : {data}")
-
+    
     if not data or "qr_code" not in data:
         return jsonify({"success": False, "message": "QR code manquant"}), 400
-
+    
     qr_code = data["qr_code"].strip()
     if not qr_code:
         return jsonify({"success": False, "message": "QR code vide"}), 400
-
+    
     try:
         conn = get_db()
         cur = conn.cursor()
-
+        
         cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
         employee = cur.fetchone()
-
+        
         if not employee:
             logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
+            cur.close()
+            conn.close()
             return jsonify({"success": False, "message": "Employé non trouvé"}), 404
-
+        
         emp_id, nom, prenom, is_active = employee
         now = int(datetime.now().timestamp() * 1000)
         today = datetime.now().strftime("%Y-%m-%d")
-
+        
         if is_active == 0:
             pointage_type = "ENTREE"
             cur.execute(f"UPDATE employees SET is_active = 1 WHERE id = {PLACEHOLDER}", (emp_id,))
@@ -564,7 +581,7 @@ def scan_qr_code():
             pointage_type = "SORTIE"
             cur.execute(f"UPDATE employees SET is_active = 0 WHERE id = {PLACEHOLDER}", (emp_id,))
             message = f"{prenom} {nom} est sorti."
-
+        
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
@@ -577,18 +594,17 @@ def scan_qr_code():
             now,
             today
         ])
-
+        
         conn.commit()
         cur.close()
         conn.close()
-
-        # ✅ AJOUTER CES LIGNES ICI ✅
-        # Formater la date et l'heure pour l'affichage LCD
-        dt = datetime.fromtimestamp(now / 1000)
-        date_formatted = dt.strftime("%d/%m/%y")  # Format: 02/11/25
-        time_formatted = dt.strftime("%H:%M:%S")  # Format: 14:30:45
         
-        # Émettre l'événement vers tous les ESP32 connectés
+        # ✅ ÉMETTRE VERS ESP32 (SYNTAXE CORRECTE)
+        dt = datetime.fromtimestamp(now / 1000)
+        date_formatted = dt.strftime("%d/%m/%y")
+        time_formatted = dt.strftime("%H:%M:%S")
+        
+        # ⚠️ CORRECTION: Utiliser sans broadcast=True
         socketio.emit('pointage_event', {
             'nom': nom,
             'prenom': prenom,
@@ -596,12 +612,11 @@ def scan_qr_code():
             'date': date_formatted,
             'time': time_formatted,
             'timestamp': now
-        }, namespace='/api/rssi-data', broadcast=True)
+        }, namespace='/api/rssi-data')  # Pas de broadcast=True
         
         logger.info(f"📡 Événement pointage émis vers ESP32: {prenom} {nom} - {pointage_type}")
-        # ✅ FIN DES LIGNES À AJOUTER ✅
-
         logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
+        
         return jsonify({
             "success": True,
             "action": pointage_type,
@@ -610,11 +625,10 @@ def scan_qr_code():
             "timestamp": now,
             "date": today
         }), 200
-
+    
     except Exception as e:
-        logger.error(f"❌ scan_qr_code: {e}")
+        logger.error(f"❌ scan_qr_code: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 # === WebSocket pour RSSI ===
 @socketio.on('connect', namespace='/api/rssi-data')
