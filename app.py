@@ -166,14 +166,29 @@ def add_salary():
         logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
 
-    required_fields = [ "employeeName", "amount", "type"]
-    for field in required_fields:
-        if field not in data or data[field] is None or (isinstance(data[field], str) and not data[field].strip()):
-            logger.error(f"❌ Champ manquant ou vide: {field}")
-            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+    # ✅ CORRECTION : Accepter les deux formats (camelCase ET snake_case)
+    employee_id = data.get("employeeId") or data.get("employee_id")
+    employee_name = data.get("employeeName") or data.get("employee_name")
+    amount = data.get("amount")
+    record_type = data.get("type")
+    hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
 
+    # Validation des champs requis
+    if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
+        logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
+
+    if not amount:
+        logger.error(f"❌ amount manquant")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: amount"}), 400
+
+    if not record_type:
+        logger.error(f"❌ type manquant")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
+
+    # Validation du montant
     try:
-        amount = float(data["amount"])
+        amount = float(amount)
         if amount <= 0:
             logger.error(f"❌ Montant invalide: {amount}")
             return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
@@ -185,48 +200,76 @@ def add_salary():
         conn = get_db()
         cur = conn.cursor()
 
-        emp_id = data["employeeId"]
-        emp_name = data["employeeName"].strip()
+        # Nettoyer le nom
+        employee_name = employee_name.strip()
 
-        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
-        employee = cur.fetchone()
+        # Si employee_id fourni, vérifier qu'il existe
+        if employee_id:
+            cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
+            employee = cur.fetchone()
 
-        if not employee:
-            logger.warning(f"⚠️ Employé {emp_id} non trouvé, création automatique")
-            emp_name_parts = emp_name.split(" ")
-            nom = emp_name_parts[-1] if len(emp_name_parts) > 1 else emp_name
-            prenom = emp_name_parts[0] if len(emp_name_parts) > 1 else "Inconnu"
-            new_id = emp_id or str(uuid.uuid4())
-
-            cur.execute(f"""
-                INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [new_id, nom, prenom, data.get("type", "inconnu"), 1, int(datetime.now().timestamp() * 1000)])
-
-            emp_id = new_id
+            if not employee:
+                logger.warning(f"⚠️ Employé {employee_id} non trouvé")
+                # Ne pas créer automatiquement, juste utiliser l'ID fourni
         else:
-            logger.info(f"✅ Employé trouvé: {employee['nom']} {employee['prenom']}")
+            # Chercher l'employé par nom
+            cur.execute(f"""
+                SELECT id FROM employees 
+                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
+                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
+                LIMIT 1
+            """, (employee_name, employee_name))
+            
+            employee = cur.fetchone()
+            
+            if employee:
+                employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
+                logger.info(f"✅ Employé trouvé par nom: {employee_id}")
+            else:
+                # Créer un nouvel employé si introuvable
+                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
+                emp_name_parts = employee_name.split(" ", 1)
+                prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
+                nom = emp_name_parts[1] if len(emp_name_parts) > 1 else employee_name
+                
+                employee_id = str(uuid.uuid4())
+                
+                cur.execute(f"""
+                    INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
+                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+                """, [employee_id, nom, prenom, "employe", 1, int(datetime.now().timestamp() * 1000)])
+                
+                logger.info(f"✅ Nouvel employé créé: {employee_id}")
 
+        # Préparer les données
         salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
         period = data.get("period") or datetime.now().strftime("%Y-%m")
+        salary_id = data.get("id") or str(uuid.uuid4())
 
+        # Insérer le salaire
         cur.execute(f"""
             INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
-            str(uuid.uuid4()), emp_id, emp_name, amount, data.get("hoursWorked", 0.0),
-            data["type"], period, salary_date
+            salary_id, employee_id, employee_name, amount, hours_worked,
+            record_type, period, salary_date
         ])
 
         conn.commit()
-        logger.info(f"✅ Salaire enregistré: employee_id={emp_id}, amount={amount}, type={data['type']}")
+        logger.info(f"✅ Salaire enregistré: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
 
         cur.close()
         conn.close()
-        return jsonify({"success": True, "message": "Salaire enregistré", "employeeId": emp_id}), 201
+        
+        return jsonify({
+            "success": True, 
+            "message": "Salaire enregistré", 
+            "id": salary_id,
+            "employeeId": employee_id
+        }), 201
 
     except Exception as e:
-        logger.error(f"❌ add_salary: {e}")
+        logger.error(f"❌ add_salary: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
 # === PUT modifier employé ===
