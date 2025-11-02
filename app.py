@@ -210,7 +210,6 @@ def add_salary():
 
             if not employee:
                 logger.warning(f"⚠️ Employé {employee_id} non trouvé")
-                # Ne pas créer automatiquement, juste utiliser l'ID fourni
         else:
             # Chercher l'employé par nom
             cur.execute(f"""
@@ -246,32 +245,55 @@ def add_salary():
         period = data.get("period") or datetime.now().strftime("%Y-%m")
         salary_id = data.get("id") or str(uuid.uuid4())
 
-        # Insérer le salaire
-        cur.execute(f"""
-            INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            salary_id, employee_id, employee_name, amount, hours_worked,
-            record_type, period, salary_date
-        ])
+        # ✅ CORRECTION : Vérifier si l'enregistrement existe déjà
+        cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
+        existing = cur.fetchone()
+
+        if existing:
+            logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
+            
+            # UPDATE au lieu de INSERT
+            cur.execute(f"""
+                UPDATE salaries 
+                SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
+                    amount = {PLACEHOLDER}, hours_worked = {PLACEHOLDER}, 
+                    type = {PLACEHOLDER}, period = {PLACEHOLDER}, date = {PLACEHOLDER}
+                WHERE id = {PLACEHOLDER}
+            """, [
+                employee_id, employee_name, amount, hours_worked,
+                record_type, period, salary_date, salary_id
+            ])
+            
+            action = "mis à jour"
+        else:
+            # INSERT normal
+            cur.execute(f"""
+                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                salary_id, employee_id, employee_name, amount, hours_worked,
+                record_type, period, salary_date
+            ])
+            
+            action = "créé"
 
         conn.commit()
-        logger.info(f"✅ Salaire enregistré: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
+        logger.info(f"✅ Salaire {action}: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
 
         cur.close()
         conn.close()
         
         return jsonify({
             "success": True, 
-            "message": "Salaire enregistré", 
+            "message": f"Salaire {action} avec succès", 
             "id": salary_id,
-            "employeeId": employee_id
-        }), 201
+            "employeeId": employee_id,
+            "action": action
+        }), 201 if action == "créé" else 200
 
     except Exception as e:
         logger.error(f"❌ add_salary: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-
 # === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
 def update_employee(id):
