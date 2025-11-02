@@ -419,7 +419,8 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST pointages ===
+# 2️⃣ Dans la fonction add_pointage(), après l'enregistrement:
+
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -438,7 +439,7 @@ def add_pointage():
         cur = conn.cursor()
 
         emp_id = data.get("employeeId")
-        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
 
         if not employee:
@@ -458,6 +459,35 @@ def add_pointage():
         ])
 
         conn.commit()
+        
+        # ✅ AJOUTER CES LIGNES ICI ✅
+        # Extraire nom et prénom
+        if DB_DRIVER == "sqlite":
+            nom = employee[1]
+            prenom = employee[2]
+        else:
+            nom = employee['nom']
+            prenom = employee['prenom']
+        
+        # Formater la date et l'heure
+        timestamp = int(data.get("timestamp"))
+        dt = datetime.fromtimestamp(timestamp / 1000)
+        date_formatted = dt.strftime("%d/%m/%y")
+        time_formatted = dt.strftime("%H:%M:%S")
+        
+        # Émettre vers ESP32
+        socketio.emit('pointage_event', {
+            'nom': nom,
+            'prenom': prenom,
+            'type': data.get("type"),
+            'date': date_formatted,
+            'time': time_formatted,
+            'timestamp': timestamp
+        }, namespace='/api/rssi-data', broadcast=True)
+        
+        logger.info(f"📡 Événement pointage émis: {prenom} {nom}")
+        # ✅ FIN DES LIGNES À AJOUTER ✅
+        
         cur.close()
         conn.close()
 
@@ -466,10 +496,10 @@ def add_pointage():
             "message": "Pointage enregistré",
             "pointageId": pointage_id
         }), 201
+        
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 # === GET historique pointages ===
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
@@ -499,7 +529,6 @@ def get_pointage_history():
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST scan QR code ===
 @app.route("/api/scan", methods=["POST"])
 def scan_qr_code():
     data = request.get_json(silent=True)
@@ -553,6 +582,25 @@ def scan_qr_code():
         cur.close()
         conn.close()
 
+        # ✅ AJOUTER CES LIGNES ICI ✅
+        # Formater la date et l'heure pour l'affichage LCD
+        dt = datetime.fromtimestamp(now / 1000)
+        date_formatted = dt.strftime("%d/%m/%y")  # Format: 02/11/25
+        time_formatted = dt.strftime("%H:%M:%S")  # Format: 14:30:45
+        
+        # Émettre l'événement vers tous les ESP32 connectés
+        socketio.emit('pointage_event', {
+            'nom': nom,
+            'prenom': prenom,
+            'type': pointage_type,
+            'date': date_formatted,
+            'time': time_formatted,
+            'timestamp': now
+        }, namespace='/api/rssi-data', broadcast=True)
+        
+        logger.info(f"📡 Événement pointage émis vers ESP32: {prenom} {nom} - {pointage_type}")
+        # ✅ FIN DES LIGNES À AJOUTER ✅
+
         logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
         return jsonify({
             "success": True,
@@ -566,6 +614,7 @@ def scan_qr_code():
     except Exception as e:
         logger.error(f"❌ scan_qr_code: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 # === WebSocket pour RSSI ===
 @socketio.on('connect', namespace='/api/rssi-data')
