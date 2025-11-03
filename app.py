@@ -931,12 +931,76 @@ def activate_via_qr():
         logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === Route temporaire pour déboguer les requêtes HTTP erronées ===
-@app.route("/api/rssi-data", methods=["GET", "POST"])
+# ✅ NOUVELLE ROUTE HTTPS pour recevoir RSSI
+@app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data_http():
-    logger.warning("⚠️ Requête HTTP reçue sur /api/rssi-data (WebSocket attendu)")
-    return jsonify({"success": False, "message": "Utilisez WebSocket (wss://) pour /api/rssi-data"}), 400
-
+    data = request.get_json(silent=True)
+    
+    if not data:
+        logger.error("❌ Requête vide")
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+    
+    logger.info(f"📡 RSSI reçu via HTTPS: {data}")
+    
+    try:
+        anchor_id = data.get("anchor_id")
+        anchor_x = data.get("anchor_x")
+        anchor_y = data.get("anchor_y")
+        badges = data.get("badges", [])
+        
+        logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        for badge in badges:
+            ssid = badge.get("ssid")
+            mac = badge.get("mac")
+            rssi = badge.get("rssi")
+            
+            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
+                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
+                continue
+            
+            employee_name = ssid.strip()
+            
+            cur.execute(f"""
+                SELECT id, nom, prenom FROM employees 
+                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
+                LIMIT 1
+            """, (employee_name,))
+            
+            employee = cur.fetchone()
+            if not employee:
+                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé")
+                continue
+            
+            employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
+            logger.info(f"✅ Employé trouvé: {employee_id}")
+            
+            cur.execute(f"""
+                INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
+                int(datetime.now().timestamp() * 1000)
+            ])
+        
+        conn.commit()
+        calculate_and_broadcast_positions(cur)
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"{len(badges)} mesures traitées"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur HTTPS RSSI: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))  # Port 8000 pour Koyeb
