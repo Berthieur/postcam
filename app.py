@@ -12,8 +12,17 @@ from collections import defaultdict
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)  # Activer les journaux SocketIO
-
+# ✅ NOUVELLE VERSION (remplacez par ceci)
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    logger=True, 
+    engineio_logger=True,
+    ping_interval=60,           # Ping toutes les 60 secondes (au lieu de 25)
+    ping_timeout=120,           # Timeout de 120 secondes (au lieu de 20)
+    max_http_buffer_size=1e8,   # Buffer plus large
+    async_mode='threading'      # Mode threading pour plus de stabilité
+)
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
