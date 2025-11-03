@@ -704,48 +704,86 @@ def handle_rssi_data(data):
 
 # === Calcul et diffusion des positions ===
 def calculate_and_broadcast_positions(cursor):
-    threshold = int((datetime.now().timestamp() - 5) * 1000)
-
-    cursor.execute(f"""
-        SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
-        FROM rssi_measurements
-        WHERE timestamp > {PLACEHOLDER}
-    """, (threshold,))
+    # ✅ NOUVELLE APPROCHE : Récupérer la dernière mesure de CHAQUE ancre pour CHAQUE employé
+    
+    if DB_DRIVER == "postgres":
+        # PostgreSQL supporte DISTINCT ON
+        cursor.execute(f"""
+            SELECT DISTINCT ON (employee_id, anchor_id)
+                   employee_id, anchor_id, anchor_x, anchor_y, rssi, timestamp
+            FROM rssi_measurements
+            ORDER BY employee_id, anchor_id, timestamp DESC
+        """)
+    else:
+        # SQLite : utiliser GROUP BY avec MAX(timestamp)
+        cursor.execute(f"""
+            SELECT r1.employee_id, r1.anchor_id, r1.anchor_x, r1.anchor_y, r1.rssi, r1.timestamp
+            FROM rssi_measurements r1
+            INNER JOIN (
+                SELECT employee_id, anchor_id, MAX(timestamp) as max_ts
+                FROM rssi_measurements
+                GROUP BY employee_id, anchor_id
+            ) r2 ON r1.employee_id = r2.employee_id 
+                AND r1.anchor_id = r2.anchor_id 
+                AND r1.timestamp = r2.max_ts
+            ORDER BY r1.employee_id, r1.timestamp DESC
+        """)
 
     measurements = cursor.fetchall()
 
     if not measurements:
-        logger.info("Aucune mesure récente pour triangulation")
+        logger.info("Aucune mesure pour triangulation")
         return
 
     employee_data = defaultdict(list)
+    now = datetime.now().timestamp() * 1000
+    
     for row in measurements:
         emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
         anchor_id = row[1] if DB_DRIVER == "sqlite" else row['anchor_id']
         anchor_x = row[2] if DB_DRIVER == "sqlite" else row['anchor_x']
         anchor_y = row[3] if DB_DRIVER == "sqlite" else row['anchor_y']
         rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
+        timestamp = row[5] if DB_DRIVER == "sqlite" else row['timestamp']
+
+        # ✅ Ignorer les mesures trop anciennes (> 60 secondes)
+        age_seconds = (now - timestamp) / 1000
+        if age_seconds > 60:
+            logger.debug(f"⏰ Mesure ignorée (trop ancienne: {age_seconds:.1f}s) - Ancre #{anchor_id}")
+            continue
 
         distance = rssi_to_distance(rssi)
         employee_data[emp_id].append({
             'anchor_id': anchor_id,
             'x': anchor_x,
             'y': anchor_y,
-            'distance': distance
+            'distance': distance,
+            'age': age_seconds
         })
 
     for emp_id, anchors in employee_data.items():
+        logger.info(f"📊 Employé {emp_id} : {len(anchors)} ancres disponibles")
+        
         if len(anchors) >= 3:
             pos_x, pos_y = trilateration(anchors)
+        elif len(anchors) >= 1:
+            # Utiliser l'ancre la plus proche
+            closest = min(anchors, key=lambda x: x['distance'])
+            pos_x, pos_y = closest['x'], closest['y']
+            logger.warning(f"⚠️ Seulement {len(anchors)} ancre(s), position approximative à l'ancre #{closest['anchor_id']}")
+        else:
+            logger.warning(f"⚠️ Aucune ancre valide pour {emp_id}")
+            continue
 
-            cursor.execute(f"""
-                UPDATE employees
-                SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
-                WHERE id = {PLACEHOLDER}
-            """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
+        cursor.execute(f"""
+            UPDATE employees
+            SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [pos_x, pos_y, int(now), emp_id])
 
-            logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
+        logger.info(f"✅ Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
+    # Récupérer tous les employés actifs pour diffusion
     cursor.execute(f"""
         SELECT id, nom, prenom, type, is_active, created_at,
                email, telephone, taux_horaire, frais_ecolage,
@@ -768,7 +806,6 @@ def calculate_and_broadcast_positions(cursor):
             logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
 
     socketio.emit('positions', {'success': True, 'employees': employees}, namespace='/api/employees/active')
-
 def rssi_to_distance(rssi, tx_power=-59, n=2.0):
     """Convertit un RSSI en distance estimée (mètres)."""
     if rssi == 0:
