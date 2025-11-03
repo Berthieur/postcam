@@ -779,7 +779,23 @@ def rssi_to_distance(rssi, tx_power=-59, n=2.0):
 
 def trilateration(anchors):
     """Calcule la position (x, y) à partir de 3 ancres RSSI."""
-    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
+    # ✅ Filtrer les doublons : ne garder que la mesure la plus proche par ancre
+    unique_anchors = {}
+    for anchor in anchors:
+        anchor_id = anchor['anchor_id']
+        if anchor_id not in unique_anchors or anchor['distance'] < unique_anchors[anchor_id]['distance']:
+            unique_anchors[anchor_id] = anchor
+    
+    # Vérifier qu'on a au moins 3 ancres différentes
+    if len(unique_anchors) < 3:
+        logger.warning(f"⚠️ Seulement {len(unique_anchors)} ancres uniques disponibles (3 requises)")
+        # Retourner la position de l'ancre la plus proche
+        closest = min(unique_anchors.values(), key=lambda x: x['distance'])
+        return (closest['x'], closest['y'])
+    
+    # Trier par distance et prendre les 3 meilleures
+    anchors = sorted(unique_anchors.values(), key=lambda x: x['distance'])[:3]
+    
     logger.info("📡 Ancres utilisées pour la triangulation :")
     for i, a in enumerate(anchors):
         logger.info(f"  {i+1}. Ancre #{a['anchor_id']} ({a['x']}, {a['y']}) d={a['distance']:.2f}m")
