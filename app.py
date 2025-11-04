@@ -12,7 +12,8 @@ from collections import defaultdict
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
+socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)  # Activer les journaux SocketIO
+
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -418,6 +419,7 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# ========== CORRECTIONS POUR VOS FONCTIONS PYTHON ==========
 
 # 1️⃣ Fonction add_pointage() CORRIGÉE
 
@@ -508,9 +510,6 @@ def add_pointage():
         logger.error(f"❌ add_pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-
-# 2️⃣ Fonction scan_qr_code() CORRIGÉE
-
 # === GET historique pointages ===
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
@@ -539,7 +538,6 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 # 2️⃣ Fonction scan_qr_code() CORRIGÉE
 
@@ -703,86 +701,48 @@ def handle_rssi_data(data):
 
 # === Calcul et diffusion des positions ===
 def calculate_and_broadcast_positions(cursor):
-    # ✅ NOUVELLE APPROCHE : Récupérer la dernière mesure de CHAQUE ancre pour CHAQUE employé
-    
-    if DB_DRIVER == "postgres":
-        # PostgreSQL supporte DISTINCT ON
-        cursor.execute(f"""
-            SELECT DISTINCT ON (employee_id, anchor_id)
-                   employee_id, anchor_id, anchor_x, anchor_y, rssi, timestamp
-            FROM rssi_measurements
-            ORDER BY employee_id, anchor_id, timestamp DESC
-        """)
-    else:
-        # SQLite : utiliser GROUP BY avec MAX(timestamp)
-        cursor.execute(f"""
-            SELECT r1.employee_id, r1.anchor_id, r1.anchor_x, r1.anchor_y, r1.rssi, r1.timestamp
-            FROM rssi_measurements r1
-            INNER JOIN (
-                SELECT employee_id, anchor_id, MAX(timestamp) as max_ts
-                FROM rssi_measurements
-                GROUP BY employee_id, anchor_id
-            ) r2 ON r1.employee_id = r2.employee_id 
-                AND r1.anchor_id = r2.anchor_id 
-                AND r1.timestamp = r2.max_ts
-            ORDER BY r1.employee_id, r1.timestamp DESC
-        """)
+    threshold = int((datetime.now().timestamp() - 5) * 1000)
+
+    cursor.execute(f"""
+        SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
+        FROM rssi_measurements
+        WHERE timestamp > {PLACEHOLDER}
+    """, (threshold,))
 
     measurements = cursor.fetchall()
 
     if not measurements:
-        logger.info("Aucune mesure pour triangulation")
+        logger.info("Aucune mesure récente pour triangulation")
         return
 
     employee_data = defaultdict(list)
-    now = datetime.now().timestamp() * 1000
-    
     for row in measurements:
         emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
         anchor_id = row[1] if DB_DRIVER == "sqlite" else row['anchor_id']
         anchor_x = row[2] if DB_DRIVER == "sqlite" else row['anchor_x']
         anchor_y = row[3] if DB_DRIVER == "sqlite" else row['anchor_y']
         rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
-        timestamp = row[5] if DB_DRIVER == "sqlite" else row['timestamp']
-
-        # ✅ Ignorer les mesures trop anciennes (> 60 secondes)
-        age_seconds = (now - timestamp) / 1000
-        if age_seconds > 60:
-            logger.debug(f"⏰ Mesure ignorée (trop ancienne: {age_seconds:.1f}s) - Ancre #{anchor_id}")
-            continue
 
         distance = rssi_to_distance(rssi)
         employee_data[emp_id].append({
             'anchor_id': anchor_id,
             'x': anchor_x,
             'y': anchor_y,
-            'distance': distance,
-            'age': age_seconds
+            'distance': distance
         })
 
     for emp_id, anchors in employee_data.items():
-        logger.info(f"📊 Employé {emp_id} : {len(anchors)} ancres disponibles")
-        
         if len(anchors) >= 3:
             pos_x, pos_y = trilateration(anchors)
-        elif len(anchors) >= 1:
-            # Utiliser l'ancre la plus proche
-            closest = min(anchors, key=lambda x: x['distance'])
-            pos_x, pos_y = closest['x'], closest['y']
-            logger.warning(f"⚠️ Seulement {len(anchors)} ancre(s), position approximative à l'ancre #{closest['anchor_id']}")
-        else:
-            logger.warning(f"⚠️ Aucune ancre valide pour {emp_id}")
-            continue
 
-        cursor.execute(f"""
-            UPDATE employees
-            SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
-            WHERE id = {PLACEHOLDER}
-        """, [pos_x, pos_y, int(now), emp_id])
+            cursor.execute(f"""
+                UPDATE employees
+                SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+                WHERE id = {PLACEHOLDER}
+            """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
 
-        logger.info(f"✅ Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
+            logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
-    # Récupérer tous les employés actifs pour diffusion
     cursor.execute(f"""
         SELECT id, nom, prenom, type, is_active, created_at,
                email, telephone, taux_horaire, frais_ecolage,
@@ -805,6 +765,7 @@ def calculate_and_broadcast_positions(cursor):
             logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
 
     socketio.emit('positions', {'success': True, 'employees': employees}, namespace='/api/employees/active')
+
 def rssi_to_distance(rssi, tx_power=-59, n=2.0):
     """Convertit un RSSI en distance estimée (mètres)."""
     if rssi == 0:
@@ -815,23 +776,7 @@ def rssi_to_distance(rssi, tx_power=-59, n=2.0):
 
 def trilateration(anchors):
     """Calcule la position (x, y) à partir de 3 ancres RSSI."""
-    # ✅ Filtrer les doublons : ne garder que la mesure la plus proche par ancre
-    unique_anchors = {}
-    for anchor in anchors:
-        anchor_id = anchor['anchor_id']
-        if anchor_id not in unique_anchors or anchor['distance'] < unique_anchors[anchor_id]['distance']:
-            unique_anchors[anchor_id] = anchor
-    
-    # Vérifier qu'on a au moins 3 ancres différentes
-    if len(unique_anchors) < 3:
-        logger.warning(f"⚠️ Seulement {len(unique_anchors)} ancres uniques disponibles (3 requises)")
-        # Retourner la position de l'ancre la plus proche
-        closest = min(unique_anchors.values(), key=lambda x: x['distance'])
-        return (closest['x'], closest['y'])
-    
-    # Trier par distance et prendre les 3 meilleures
-    anchors = sorted(unique_anchors.values(), key=lambda x: x['distance'])[:3]
-    
+    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
     logger.info("📡 Ancres utilisées pour la triangulation :")
     for i, a in enumerate(anchors):
         logger.info(f"  {i+1}. Ancre #{a['anchor_id']} ({a['x']}, {a['y']}) d={a['distance']:.2f}m")
@@ -931,76 +876,12 @@ def activate_via_qr():
         logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-# ✅ NOUVELLE ROUTE HTTPS pour recevoir RSSI
-@app.route("/api/rssi-data", methods=["POST"])
+# === Route temporaire pour déboguer les requêtes HTTP erronées ===
+@app.route("/api/rssi-data", methods=["GET", "POST"])
 def receive_rssi_data_http():
-    data = request.get_json(silent=True)
-    
-    if not data:
-        logger.error("❌ Requête vide")
-        return jsonify({"success": False, "message": "Requête vide"}), 400
-    
-    logger.info(f"📡 RSSI reçu via HTTPS: {data}")
-    
-    try:
-        anchor_id = data.get("anchor_id")
-        anchor_x = data.get("anchor_x")
-        anchor_y = data.get("anchor_y")
-        badges = data.get("badges", [])
-        
-        logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-        
-        conn = get_db()
-        cur = conn.cursor()
-        
-        for badge in badges:
-            ssid = badge.get("ssid")
-            mac = badge.get("mac")
-            rssi = badge.get("rssi")
-            
-            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
-                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
-                continue
-            
-            employee_name = ssid.strip()
-            
-            cur.execute(f"""
-                SELECT id, nom, prenom FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name,))
-            
-            employee = cur.fetchone()
-            if not employee:
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé")
-                continue
-            
-            employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-            logger.info(f"✅ Employé trouvé: {employee_id}")
-            
-            cur.execute(f"""
-                INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
-                int(datetime.now().timestamp() * 1000)
-            ])
-        
-        conn.commit()
-        calculate_and_broadcast_positions(cur)
-        conn.commit()
-        
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"{len(badges)} mesures traitées"
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"❌ Erreur HTTPS RSSI: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
+    logger.warning("⚠️ Requête HTTP reçue sur /api/rssi-data (WebSocket attendu)")
+    return jsonify({"success": False, "message": "Utilisez WebSocket (wss://) pour /api/rssi-data"}), 400
+
 # --- Démarrage ---
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))  # Port 8000 pour Koyeb
