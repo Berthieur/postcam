@@ -302,6 +302,30 @@
             background: #dc2626;
         }
 
+        .btn-edit {
+            background: #3b82f6;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 0.5rem;
+        }
+
+        .btn-qr {
+            background: var(--success);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 0.5rem;
+        }
+
+        .btn-delete {
+            background: var(--danger);
+            color: white;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.8rem;
+            border-radius: 0.5rem;
+        }
+
         /* Table */
         .table {
             width: 100%;
@@ -393,24 +417,9 @@
             font-weight: 600;
         }
 
-        .action-btn {
-            padding: 0.5rem 0.75rem;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-
-        .btn-edit {
-            background: #3b82f6;
-            color: white;
-        }
-
-        .btn-delete {
-            background: var(--danger);
-            color: white;
+        .employee-actions {
+            display: flex;
+            gap: 0.5rem;
         }
 
         /* Chat */
@@ -503,6 +512,20 @@
             text-align: center;
             margin-top: 1rem;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        /* QR Modal */
+        #qrModal .modal-content {
+            max-width: 400px;
+            text-align: center;
+        }
+
+        #qrImage {
+            max-width: 100%;
+            height: auto;
+            margin: 1rem 0;
+            border-radius: 1rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         /* Responsive */
@@ -606,7 +629,8 @@
             <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
            
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
-                <h3>Nouvel Employé/Étudiant</h3>
+                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
+                <input type="hidden" id="editEmployeeId">
                 <div class="form-group">
                     <label class="form-label">Type</label>
                     <select class="form-select" id="employeeType" onchange="toggleFinancialFields()">
@@ -727,7 +751,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
-                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
+                <span class="close-btn wybrać="closeModal('chatModal')">&times;</span>
             </div>
             <div class="chat-container">
                 <div class="chat-messages" id="chatMessages"></div>
@@ -753,11 +777,24 @@
         </div>
     </div>
 
+    <!-- Modal QR Code -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> QR Code</h2>
+                <span class="close-btn" onclick="closeModal('qrModal')">&times;</span>
+            </div>
+            <img id="qrImage" src="" alt="QR Code">
+            <p><strong id="qrName"></strong></p>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
         const API_URL = 'https://postcam-1.onrender.com/api';
         let videoStream = null;
         let scanInterval = null;
+        let currentEditId = null;
 
         // Gestion des modals
         function openModal(modalId) {
@@ -771,6 +808,23 @@
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
             if (modalId === 'scanModal') stopCamera();
+            if (modalId === 'employeesModal') resetForm();
+        }
+
+        // Réinitialiser le formulaire
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+            document.getElementById('editEmployeeId').value = '';
+            document.getElementById('employeeNom').value = '';
+            document.getElementById('employeePrenom').value = '';
+            document.getElementById('employeeEmail').value = '';
+            document.getElementById('employeeTelephone').value = '';
+            document.getElementById('employeeTauxHoraire').value = '';
+            document.getElementById('employeeFraisEcolage').value = '';
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+            currentEditId = null;
         }
 
         // Scanner QR
@@ -839,11 +893,12 @@
         }
 
         function showAddEmployeeForm() {
+            resetForm();
             document.getElementById('addEmployeeForm').style.display = 'block';
         }
 
         function hideAddEmployeeForm() {
-            document.getElementById('addEmployeeForm').style.display = 'none';
+            resetForm();
         }
 
         async function saveEmployee() {
@@ -856,15 +911,22 @@
                 taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
                 frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
             };
+
+            const url = currentEditId 
+                ? `${API_URL}/employees/${currentEditId}` 
+                : `${API_URL}/employees`;
+
+            const method = currentEditId ? 'PUT' : 'POST';
+
             try {
-                const response = await fetch(`${API_URL}/employees`, {
-                    method: 'POST',
+                const response = await fetch(url, {
+                    method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(employee)
                 });
                 const result = await response.json();
                 if (result.success) {
-                    alert('Employé ajouté avec succès!');
+                    alert(currentEditId ? 'Employé modifié !' : 'Employé ajouté !');
                     hideAddEmployeeForm();
                     loadEmployees();
                 } else {
@@ -888,8 +950,9 @@
                                 <span class="employee-type">${emp.type}</span>
                             </div>
                             <div class="employee-actions">
-                                <button class="action-btn btn-edit" onclick="showQR('${emp.id}')">QR</button>
-                                <button class="action-btn btn-delete" onclick="deleteEmployee('${emp.id}')">Supprimer</button>
+                                <button class="btn-qr" onclick="showQRCode('${emp.id}', '${emp.prenom} ${emp.nom}')"><i class="fas fa-qrcode"></i></button>
+                                <button class="btn-edit" onclick="editEmployee('${emp.id}')"><i class="fas fa-edit"></i></button>
+                                <button class="btn-delete" onclick="deleteEmployee('${emp.id}')"><i class="fas fa-trash"></i></button>
                             </div>
                         </div>
                     `).join('');
@@ -899,8 +962,31 @@
             }
         }
 
+        async function editEmployee(id) {
+            try {
+                const response = await fetch(`${API_URL}/employees/${id}`);
+                const emp = await response.json();
+                if (emp.success) {
+                    currentEditId = id;
+                    document.getElementById('formTitle').textContent = 'Modifier Employé';
+                    document.getElementById('editEmployeeId').value = id;
+                    document.getElementById('employeeType').value = emp.employee.type;
+                    document.getElementById('employeeNom').value = emp.employee.nom;
+                    document.getElementById('employeePrenom').value = emp.employee.prenom;
+                    document.getElementById('employeeEmail').value = emp.employee.email;
+                    document.getElementById('employeeTelephone').value = emp.employee.telephone;
+                    document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
+                    document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
+                    toggleFinancialFields();
+                    document.getElementById('addEmployeeForm').style.display = 'block';
+                }
+            } catch (err) {
+                alert('Erreur chargement: ' + err.message);
+            }
+        }
+
         async function deleteEmployee(id) {
-            if (!confirm('Supprimer cet employé?')) return;
+            if (!confirm('Supprimer cet employé ?')) return;
             try {
                 await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
                 loadEmployees();
@@ -909,10 +995,15 @@
             }
         }
 
-        function showQR(employeeId) {
-            alert('QR Code pour employé: ' + employeeId);
+        // Afficher le QR Code
+        function showQRCode(employeeId, name) {
+            const qrUrl = `${API_URL}/qrcode/${employeeId}`;
+            document.getElementById('qrImage').src = qrUrl;
+            document.getElementById('qrName').textContent = name;
+            openModal('qrModal');
         }
 
+        // Autres fonctions (pointages, salaires, etc.) inchangées...
         async function loadPointages() {
             try {
                 const response = await fetch(`${API_URL}/pointages/history`);
@@ -1058,7 +1149,7 @@
             }
         }
 
-        // Charger les données au démarrage
+        // Charger au démarrage
         document.addEventListener('DOMContentLoaded', () => {
             console.log('Application web RH chargée');
             document.getElementById('chatMessages').innerHTML = `
