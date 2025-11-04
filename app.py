@@ -421,7 +421,9 @@ def dashboard():
 
 # ========== CORRECTIONS POUR VOS FONCTIONS PYTHON ==========
 
-# 1️⃣ Fonction add_pointage() CORRIGÉE
+# ========== MODIFICATIONS DES FONCTIONS POINTAGE ==========
+
+# 1️⃣ Fonction add_pointage() MODIFIÉE (automatise is_active)
 
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
@@ -458,7 +460,7 @@ def add_pointage():
             emp_prenom = employee['prenom']
         
         pointage_id = str(uuid.uuid4())
-        pointage_type = data.get("type").upper()  # Normaliser en MAJUSCULES
+        pointage_type = data.get("type").upper()
         
         # Mapper "arrivee" -> "ENTREE" et "depart" -> "SORTIE"
         if pointage_type.lower() == "arrivee":
@@ -466,6 +468,19 @@ def add_pointage():
         elif pointage_type.lower() == "depart":
             pointage_type = "SORTIE"
         
+        # ✅ DÉTERMINER is_active SELON LE TYPE DE POINTAGE
+        new_is_active = 1 if pointage_type == "ENTREE" else 0
+        
+        # ✅ METTRE À JOUR is_active DANS employees
+        cur.execute(f"""
+            UPDATE employees 
+            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [new_is_active, int(data.get("timestamp")), emp_id])
+        
+        logger.info(f"✅ is_active mis à jour: {emp_prenom} {emp_nom} -> {new_is_active} ({pointage_type})")
+        
+        # Enregistrer le pointage
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
@@ -482,28 +497,29 @@ def add_pointage():
         cur.close()
         conn.close()
         
-        # ✅ ÉMETTRE VERS ESP32 (SYNTAXE CORRECTE)
+        # Émettre vers ESP32
         timestamp = int(data.get("timestamp"))
         dt = datetime.fromtimestamp(timestamp / 1000)
         date_formatted = dt.strftime("%d/%m/%y")
         time_formatted = dt.strftime("%H:%M:%S")
         
-        # ⚠️ CORRECTION: Utiliser room=None au lieu de broadcast=True
         socketio.emit('pointage_event', {
             'nom': emp_nom,
             'prenom': emp_prenom,
             'type': pointage_type,
             'date': date_formatted,
             'time': time_formatted,
-            'timestamp': timestamp
-        }, namespace='/api/rssi-data')  # Pas de broadcast=True ici
+            'timestamp': timestamp,
+            'is_active': new_is_active
+        }, namespace='/api/rssi-data')
         
         logger.info(f"📡 Événement pointage émis vers ESP32: {emp_prenom} {emp_nom} - {pointage_type}")
         
         return jsonify({
             "success": True,
-            "message": "Pointage enregistré",
-            "pointageId": pointage_id
+            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
+            "pointageId": pointage_id,
+            "is_active": new_is_active
         }), 201
         
     except Exception as e:
@@ -538,8 +554,7 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
-# 2️⃣ Fonction scan_qr_code() CORRIGÉE
+# 2️⃣ Fonction scan_qr_code() MODIFIÉE (automatise is_active)
 
 @app.route("/api/scan", methods=["POST"])
 def scan_qr_code():
@@ -570,15 +585,21 @@ def scan_qr_code():
         now = int(datetime.now().timestamp() * 1000)
         today = datetime.now().strftime("%Y-%m-%d")
         
+        # ✅ DÉTERMINER LE TYPE DE POINTAGE SELON is_active ACTUEL
         if is_active == 0:
             pointage_type = "ENTREE"
-            cur.execute(f"UPDATE employees SET is_active = 1 WHERE id = {PLACEHOLDER}", (emp_id,))
-            message = f"{prenom} {nom} est entré."
+            new_is_active = 1
+            message = f"{prenom} {nom} est entré (activé)."
         else:
             pointage_type = "SORTIE"
-            cur.execute(f"UPDATE employees SET is_active = 0 WHERE id = {PLACEHOLDER}", (emp_id,))
-            message = f"{prenom} {nom} est sorti."
+            new_is_active = 0
+            message = f"{prenom} {nom} est sorti (désactivé)."
         
+        # ✅ METTRE À JOUR is_active
+        cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}", 
+                    [new_is_active, now, emp_id])
+        
+        # Enregistrer le pointage
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
@@ -596,23 +617,23 @@ def scan_qr_code():
         cur.close()
         conn.close()
         
-        # ✅ ÉMETTRE VERS ESP32 (SYNTAXE CORRECTE)
+        # Émettre vers ESP32
         dt = datetime.fromtimestamp(now / 1000)
         date_formatted = dt.strftime("%d/%m/%y")
         time_formatted = dt.strftime("%H:%M:%S")
         
-        # ⚠️ CORRECTION: Utiliser sans broadcast=True
         socketio.emit('pointage_event', {
             'nom': nom,
             'prenom': prenom,
             'type': pointage_type,
             'date': date_formatted,
             'time': time_formatted,
-            'timestamp': now
-        }, namespace='/api/rssi-data')  # Pas de broadcast=True
+            'timestamp': now,
+            'is_active': new_is_active
+        }, namespace='/api/rssi-data')
         
         logger.info(f"📡 Événement pointage émis vers ESP32: {prenom} {nom} - {pointage_type}")
-        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom}")
+        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom} (is_active={new_is_active})")
         
         return jsonify({
             "success": True,
@@ -620,13 +641,75 @@ def scan_qr_code():
             "message": message,
             "employeeId": emp_id,
             "timestamp": now,
-            "date": today
+            "date": today,
+            "is_active": new_is_active
         }), 200
     
     except Exception as e:
         logger.error(f"❌ scan_qr_code: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+# 3️⃣ NOUVELLE FONCTION : Synchroniser is_active avec le dernier pointage
+
+@app.route("/api/pointages/sync-active", methods=["POST"])
+def sync_active_status():
+    """
+    Synchronise is_active de tous les employés avec leur dernier pointage.
+    Utile pour corriger les incohérences.
+    """
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        
+        # Récupérer tous les employés
+        cur.execute(f"SELECT id, nom, prenom FROM employees")
+        employees = cur.fetchall()
+        
+        updated_count = 0
+        
+        for emp in employees:
+            emp_id = emp[0] if DB_DRIVER == "sqlite" else emp['id']
+            
+            # Trouver le dernier pointage
+            cur.execute(f"""
+                SELECT type FROM pointages 
+                WHERE employee_id = {PLACEHOLDER}
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            """, (emp_id,))
+            
+            last_pointage = cur.fetchone()
+            
+            if last_pointage:
+                last_type = last_pointage[0] if DB_DRIVER == "sqlite" else last_pointage['type']
+                
+                # Déterminer is_active
+                should_be_active = 1 if last_type == "ENTREE" else 0
+                
+                # Mettre à jour
+                cur.execute(f"""
+                    UPDATE employees 
+                    SET is_active = {PLACEHOLDER}
+                    WHERE id = {PLACEHOLDER}
+                """, [should_be_active, emp_id])
+                
+                updated_count += 1
+                logger.info(f"✅ {emp[2]} {emp[1]}: is_active={should_be_active} (dernier: {last_type})")
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "success": True,
+            "message": f"{updated_count} employés synchronisés",
+            "updated_count": updated_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ sync_active_status: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
 # === WebSocket pour RSSI ===
 @socketio.on('connect', namespace='/api/rssi-data')
 def handle_rssi_connect():
