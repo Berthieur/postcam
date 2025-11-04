@@ -21,13 +21,7 @@
             --glass: rgba(255, 255, 255, 0.15);
             --glass-border: rgba(255, 255, 255, 0.2);
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
@@ -35,18 +29,10 @@
             min-height: 100vh;
             background-attachment: fixed;
         }
-
-        .app-container {
-            max-width: 1500px;
-            margin: 0 auto;
-            padding: 1.5rem;
-        }
-
-        /* Header Pro */
+        .app-container { max-width: 1500px; margin: 0 auto; padding: 1.5rem; }
         .header {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
             border: 1px solid var(--glass-border);
             padding: 1.5rem 2rem;
             border-radius: 1.5rem;
@@ -59,492 +45,119 @@
             top: 1rem;
             z-index: 100;
         }
-
-        .header h1 {
-            color: white;
-            font-size: 1.8rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .header h1 i {
-            color: var(--primary);
-            font-size: 2rem;
-        }
-
+        .header h1 { color: white; font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+        .header h1 i { color: var(--primary); font-size: 2rem; }
         .logout-btn {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            background: var(--danger); color: white; border: none; padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
         }
-
-        .logout-btn:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-        }
-
-        /* Grille principale */
-        .main-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
+        .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid var(--glass-border);
-            padding: 1.75rem;
-            border-radius: 1.25rem;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
         }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            transform: scaleX(0);
-            transform-origin: left;
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
             transition: transform 0.4s ease;
         }
-
-        .card:hover::before {
-            transform: scaleX(1);
+        .card:hover::before { transform: scaleX(1); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.3); }
+        .card-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
-
-        .card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .card-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            display: block;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .card-title {
-            font-size: 1.35rem;
-            font-weight: 600;
-            color: white;
-            margin-bottom: 0.5rem;
-        }
-
-        .card-desc {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        /* Modal Pro */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(8px);
-            z-index: 1000;
-            overflow-y: auto;
+        .card-title { font-size: 1.35rem; font-weight: 600; color: white; margin-bottom: 0.5rem; }
+        .card-desc { color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; line-height: 1.5; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
             animation: fadeIn 0.3s ease;
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .modal-content {
-            background: white;
-            margin: 3rem auto;
-            padding: 2rem;
-            border-radius: 1.5rem;
-            max-width: 950px;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
+            max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
             animation: slideUp 0.4s ease;
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
+            padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);
         }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--gray-200);
+        .modal-title { font-size: 1.6rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 0.75rem; }
+        .modal-title i { color: var(--primary); }
+        .close-btn { font-size: 2rem; cursor: pointer; color: var(--gray-600); width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;
         }
-
-        .modal-title {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--gray-800);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+        .close-btn:hover { background: var(--gray-100); color: var(--danger); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); font-size: 0.95rem; }
+        .form-input, .form-select { width: 100%; padding: 0.875rem 1rem; border: 2px solid var(--gray-200);
+            border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white;
         }
-
-        .modal-title i {
-            color: var(--primary);
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+        .btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.75rem;
+            cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem;
         }
-
-        .close-btn {
-            font-size: 2rem;
-            cursor: pointer;
-            color: var(--gray-600);
-            transition: all 0.3s ease;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .btn-secondary { background: var(--gray-600); }
+        .btn-secondary:hover { background: var(--gray-800); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-edit, .btn-qr, .btn-delete { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
+        .btn-edit { background: #3b82f6; color: white; }
+        .btn-qr { background: var(--success); color: white; }
+        .btn-delete { background: var(--danger); color: white; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
-
-        .close-btn:hover {
-            background: var(--gray-100);
-            color: var(--danger);
+        .table th { background: var(--gray-100); padding: 1rem; text-align: left; font-weight: 600; color: var(--gray-800);
+            font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;
         }
-
-        /* Formulaires */
-        .form-group {
-            margin-bottom: 1.25rem;
+        .table td { padding: 1rem; border-bottom: 1px solid var(--gray-200); color: var(--gray-800); }
+        .table tr:hover { background: #f8fafc; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
+            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
         }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--gray-800);
-            font-size: 0.95rem;
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
+        .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem;
+            background: var(--gray-100); border-radius: 0.75rem; margin-bottom: 0.75rem; transition: all 0.3s ease;
         }
-
-        .form-input, .form-select {
-            width: 100%;
-            padding: 0.875rem 1rem;
-            border: 2px solid var(--gray-200);
-            border-radius: 0.75rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: white;
+        .employee-item:hover { background: #e2e8f0; transform: translateX(4px); }
+        .employee-name { font-weight: 600; color: var(--gray-800); }
+        .employee-type { font-size: 0.75rem; color: white; background: var(--primary); padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem; font-weight: 600;
         }
-
-        .form-input:focus, .form-select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        .employee-actions { display: flex; gap: 0.5rem; }
+        .chat-container { display: flex; flex-direction: column; height: 520px; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
-
-        /* Boutons */
-        .btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-secondary {
-            background: var(--gray-600);
-        }
-
-        .btn-secondary:hover {
-            background: var(--gray-800);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-
-        .btn-edit {
-            background: #3b82f6;
-            color: white;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem;
-            border-radius: 0.5rem;
-        }
-
-        .btn-qr {
-            background: var(--success);
-            color: white;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem;
-            border-radius: 0.5rem;
-        }
-
-        .btn-delete {
-            background: var(--danger);
-            color: white;
-            padding: 0.5rem 0.75rem;
-            font-size: 0.8rem;
-            border-radius: 0.5rem;
-        }
-
-        /* Table */
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1.5rem;
-            background: white;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        .table th {
-            background: var(--gray-100);
-            padding: 1rem;
-            text-align: left;
-            font-weight: 600;
-            color: var(--gray-800);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .table td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--gray-200);
-            color: var(--gray-800);
-        }
-
-        .table tr:hover {
-            background: #f8fafc;
-        }
-
-        /* Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin: 1.5rem 0;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-            padding: 1.5rem;
-            border-radius: 1rem;
-            text-align: center;
-            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.2);
-        }
-
-        .stat-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-label {
-            font-size: 0.85rem;
-            opacity: 0.9;
-        }
-
-        /* Employee Item */
-        .employee-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            background: var(--gray-100);
-            border-radius: 0.75rem;
-            margin-bottom: 0.75rem;
-            transition: all 0.3s ease;
-        }
-
-        .employee-item:hover {
-            background: #e2e8f0;
-            transform: translateX(4px);
-        }
-
-        .employee-name {
-            font-weight: 600;
-            color: var(--gray-800);
-        }
-
-        .employee-type {
-            font-size: 0.75rem;
-            color: white;
-            background: var(--primary);
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.5rem;
-            font-weight: 600;
-        }
-
-        .employee-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        /* Chat */
-        .chat-container {
-            display: flex;
-            flex-direction: column;
-            height: 520px;
-            background: white;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-
-        .chat-messages {
-            flex: 1;
-            padding: 1.5rem;
-            overflow-y: auto;
-            background: #f8fafc;
-        }
-
-        .message {
-            margin-bottom: 1rem;
-            padding: 0.75rem 1rem;
-            border-radius: 1rem;
-            max-width: 80%;
-            line-height: 1.5;
+        .chat-messages { flex: 1; padding: 1.5rem; overflow-y: auto; background: #f8fafc; }
+        .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
             animation: fadeInUp 0.3s ease;
         }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
+        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
+        .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
+        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
+        .chat-input:focus { outline: none; border-color: var(--primary); }
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-
-        .message-user {
-            background: var(--primary);
-            color: white;
-            margin-left: auto;
-            border-bottom-right-radius: 0.25rem;
+        #scanner-video { width: 100%; display: block; }
+        .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
+            margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
         }
-
-        .message-ai {
-            background: white;
-            border: 1px solid var(--gray-200);
-            border-bottom-left-radius: 0.25rem;
-        }
-
-        .chat-input-container {
-            display: flex;
-            gap: 0.75rem;
-            padding: 1rem;
-            background: white;
-            border-top: 1px solid var(--gray-200);
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--gray-200);
-            border-radius: 0.75rem;
-            font-size: 1rem;
-        }
-
-        .chat-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        /* Video */
-        .video-container {
-            position: relative;
-            width: 100%;
-            max-width: 640px;
-            margin: 1.5rem auto;
-            border-radius: 1rem;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        #scanner-video {
-            width: 100%;
-            display: block;
-        }
-
-        .status-card {
-            background: var(--success);
-            color: white;
-            padding: 1.25rem;
-            border-radius: 1rem;
-            text-align: center;
-            margin-top: 1rem;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-        }
-
-        /* QR Modal */
-        #qrModal .modal-content {
-            max-width: 400px;
-            text-align: center;
-        }
-
-        #qrImage {
-            max-width: 100%;
-            height: auto;
-            margin: 1rem 0;
-            border-radius: 1rem;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        /* Responsive */
+        #qrModal .modal-content { max-width: 400px; text-align: center; }
+        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
         @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            .main-grid {
-                grid-template-columns: 1fr;
-            }
-            .modal-content {
-                margin: 1rem;
-                padding: 1.5rem;
-            }
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+            .header { flex-direction: column; gap: 1rem; text-align: center; }
+            .main-grid { grid-template-columns: 1fr; }
+            .modal-content { margin: 1rem; padding: 1.5rem; }
+            .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -553,9 +166,7 @@
         <!-- Header -->
         <div class="header">
             <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
-            <button class="logout-btn" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i> Déconnexion
-            </button>
+            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
         </div>
 
         <!-- Main Dashboard -->
@@ -627,7 +238,7 @@
                 <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
             </div>
             <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
-           
+          
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
                 <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
                 <input type="hidden" id="editEmployeeId">
@@ -751,7 +362,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
-                <span class="close-btn wybrać="closeModal('chatModal')">&times;</span>
+                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
             </div>
             <div class="chat-container">
                 <div class="chat-messages" id="chatMessages"></div>
@@ -792,114 +403,102 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
         const API_URL = 'https://postcam-1.onrender.com/api';
-        let videoStream = null;
-        let scanInterval = null;
-        let currentEditId = null;
+        let videoStream = null, scanInterval = null, currentEditId = null;
 
-        // Gestion des modals
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
-            if (modalId === 'employeesModal') loadEmployees();
-            if (modalId === 'pointagesModal') loadPointages();
-            if (modalId === 'salaryModal') loadSalaryData();
-            if (modalId === 'statsModal') loadStatistics();
+        // === FONCTION SÉCURISÉE POUR FETCH + JSON ===
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { console.warn("Réponse non-JSON, fallback utilisé"); return fallback; }
+            } catch (err) { console.error("Erreur réseau:", err); return fallback; }
         }
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-            if (modalId === 'scanModal') stopCamera();
-            if (modalId === 'employeesModal') resetForm();
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
         }
 
-        // Réinitialiser le formulaire
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'scanModal') stopCamera();
+            if (id === 'employeesModal') resetForm();
+        }
+
         function resetForm() {
             document.getElementById('addEmployeeForm').style.display = 'none';
             document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
             document.getElementById('editEmployeeId').value = '';
-            document.getElementById('employeeNom').value = '';
-            document.getElementById('employeePrenom').value = '';
-            document.getElementById('employeeEmail').value = '';
-            document.getElementById('employeeTelephone').value = '';
-            document.getElementById('employeeTauxHoraire').value = '';
-            document.getElementById('employeeFraisEcolage').value = '';
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('employeeType').value = 'employe';
             toggleFinancialFields();
             currentEditId = null;
         }
 
-        // Scanner QR
-        async function startCamera() {
-            try {
-                videoStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }
-                });
-                const video = document.getElementById('scanner-video');
-                video.srcObject = videoStream;
-                scanInterval = setInterval(() => scanQRCode(video), 500);
-            } catch (err) {
-                alert('Erreur caméra: ' + err.message);
-            }
-        }
-
-        function stopCamera() {
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                clearInterval(scanInterval);
-            }
-        }
-
-        function scanQRCode(video) {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            if (code) {
-                handleQRScan(code.data);
-                stopCamera();
-            }
-        }
-
-        async function handleQRScan(qrData) {
-            try {
-                const response = await fetch(`${API_URL}/scan`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ qr_code: qrData })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    document.getElementById('scan-result').innerHTML = `
-                        <div class="status-card">
-                            <h3>${result.message}</h3>
-                            <p>${result.action} enregistré(e)</p>
+        // === CHARGEMENT EMPLOYÉS ===
+        async function loadEmployees() {
+            const data = await safeFetch(`${API_URL}/employees`, { success: false, employees: [] });
+            const list = document.getElementById('employeesList');
+            if (data.success && data.employees.length > 0) {
+                list.innerHTML = data.employees.map(emp => `
+                    <div class="employee-item">
+                        <div><div class="employee-name">${emp.prenom} ${emp.nom}</div><span class="employee-type">${emp.type}</span></div>
+                        <div class="employee-actions">
+                            <button class="btn-qr" onclick="showQRCode('${emp.id}', '${emp.prenom} ${emp.nom}')"><i class="fas fa-qrcode"></i></button>
+                            <button class="btn-edit" onclick="editEmployee('${emp.id}')"><i class="fas fa-edit"></i></button>
+                            <button class="btn-delete" onclick="deleteEmployee('${emp.id}')"><i class="fas fa-trash"></i></button>
                         </div>
-                    `;
-                } else {
-                    alert('Erreur: ' + result.message);
-                }
-            } catch (err) {
-                alert('Erreur serveur: ' + err.message);
+                    </div>
+                `).join('');
+            } else {
+                list.innerHTML = `<p style="color:#ef4444; text-align:center;">Aucun employé ou serveur indisponible.</p>`;
             }
         }
 
-        // Gestion Employés
+        // === MODIFIER EMPLOYÉ (SANS CRASH) ===
+        async function editEmployee(id) {
+            const emp = await safeFetch(`${API_URL}/employees/${id}`, { success: false });
+            if (emp.success && emp.employee) {
+                currentEditId = id;
+                document.getElementById('formTitle').textContent = 'Modifier Employé';
+                document.getElementById('employeeType').value = emp.employee.type;
+                document.getElementById('employeeNom').value = emp.employee.nom;
+                document.getElementById('employeePrenom').value = emp.employee.prenom;
+                document.getElementById('employeeEmail').value = emp.employee.email || '';
+                document.getElementById('employeeTelephone').value = emp.employee.telephone || '';
+                document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
+                document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
+                toggleFinancialFields();
+                document.getElementById('addEmployeeForm').style.display = 'block';
+            } else {
+                alert("Impossible de charger l'employé. Serveur hors ligne ?");
+            }
+        }
+
+        // === QR CODE TOUJOURS AFFICHÉ (FALLBACK) ===
+        function showQRCode(employeeId, name) {
+            const img = document.getElementById('qrImage');
+            const apiUrl = `${API_URL}/qrcode/${employeeId}`;
+            const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(employeeId)}`;
+
+            img.src = apiUrl;
+            img.onerror = () => { img.src = fallbackUrl; };
+            document.getElementById('qrName').textContent = name;
+            openModal('qrModal');
+        }
+
         function toggleFinancialFields() {
             const type = document.getElementById('employeeType').value;
             document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
             document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
         }
 
-        function showAddEmployeeForm() {
-            resetForm();
-            document.getElementById('addEmployeeForm').style.display = 'block';
-        }
-
-        function hideAddEmployeeForm() {
-            resetForm();
-        }
+        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
+        function hideAddEmployeeForm() { resetForm(); }
 
         async function saveEmployee() {
             const employee = {
@@ -911,185 +510,109 @@
                 taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
                 frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
             };
-
-            const url = currentEditId 
-                ? `${API_URL}/employees/${currentEditId}` 
-                : `${API_URL}/employees`;
-
+            const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
             const method = currentEditId ? 'PUT' : 'POST';
 
             try {
-                const response = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(employee)
-                });
-                const result = await response.json();
+                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(employee) });
+                const result = await safeFetch(url, { success: false });
                 if (result.success) {
-                    alert(currentEditId ? 'Employé modifié !' : 'Employé ajouté !');
+                    alert(currentEditId ? 'Modifié !' : 'Ajouté !');
                     hideAddEmployeeForm();
                     loadEmployees();
                 } else {
-                    alert('Erreur: ' + result.message);
+                    alert('Erreur serveur');
                 }
-            } catch (err) {
-                alert('Erreur serveur: ' + err.message);
-            }
-        }
-
-        async function loadEmployees() {
-            try {
-                const response = await fetch(`${API_URL}/employees`);
-                const data = await response.json();
-                if (data.success) {
-                    const list = document.getElementById('employeesList');
-                    list.innerHTML = data.employees.map(emp => `
-                        <div class="employee-item">
-                            <div class="employee-info">
-                                <div class="employee-name">${emp.prenom} ${emp.nom}</div>
-                                <span class="employee-type">${emp.type}</span>
-                            </div>
-                            <div class="employee-actions">
-                                <button class="btn-qr" onclick="showQRCode('${emp.id}', '${emp.prenom} ${emp.nom}')"><i class="fas fa-qrcode"></i></button>
-                                <button class="btn-edit" onclick="editEmployee('${emp.id}')"><i class="fas fa-edit"></i></button>
-                                <button class="btn-delete" onclick="deleteEmployee('${emp.id}')"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-            } catch (err) {
-                console.error('Erreur chargement employés:', err);
-            }
-        }
-
-        async function editEmployee(id) {
-            try {
-                const response = await fetch(`${API_URL}/employees/${id}`);
-                const emp = await response.json();
-                if (emp.success) {
-                    currentEditId = id;
-                    document.getElementById('formTitle').textContent = 'Modifier Employé';
-                    document.getElementById('editEmployeeId').value = id;
-                    document.getElementById('employeeType').value = emp.employee.type;
-                    document.getElementById('employeeNom').value = emp.employee.nom;
-                    document.getElementById('employeePrenom').value = emp.employee.prenom;
-                    document.getElementById('employeeEmail').value = emp.employee.email;
-                    document.getElementById('employeeTelephone').value = emp.employee.telephone;
-                    document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
-                    document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
-                    toggleFinancialFields();
-                    document.getElementById('addEmployeeForm').style.display = 'block';
-                }
-            } catch (err) {
-                alert('Erreur chargement: ' + err.message);
-            }
+            } catch { alert('Erreur réseau'); }
         }
 
         async function deleteEmployee(id) {
-            if (!confirm('Supprimer cet employé ?')) return;
+            if (!confirm('Supprimer ?')) return;
+            try { await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' }); loadEmployees(); }
+            catch { alert('Erreur suppression'); }
+        }
+
+        // === SCANNER QR ===
+        async function startCamera() {
             try {
-                await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
-                loadEmployees();
-            } catch (err) {
-                alert('Erreur suppression: ' + err.message);
-            }
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.getElementById('scanner-video');
+                video.srcObject = videoStream;
+                scanInterval = setInterval(() => scanQRCode(video), 500);
+            } catch (err) { alert('Caméra: ' + err.message); }
+        }
+        function stopCamera() { if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); clearInterval(scanInterval); } }
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) { handleQRScan(code.data); stopCamera(); }
+        }
+        async function handleQRScan(qrData) {
+            try {
+                const res = await fetch(`${API_URL}/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_code: qrData }) });
+                const result = await safeFetch(`${API_URL}/scan`, { success: false });
+                document.getElementById('scan-result').innerHTML = result.success
+                    ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                    : `<p style="color:red;">Échec pointage</p>`;
+            } catch { alert('Erreur scan'); }
         }
 
-        // Afficher le QR Code
-        function showQRCode(employeeId, name) {
-            const qrUrl = `${API_URL}/qrcode/${employeeId}`;
-            document.getElementById('qrImage').src = qrUrl;
-            document.getElementById('qrName').textContent = name;
-            openModal('qrModal');
-        }
-
-        // Autres fonctions (pointages, salaires, etc.) inchangées...
+        // === AUTRES FONCTIONS ===
         async function loadPointages() {
-            try {
-                const response = await fetch(`${API_URL}/pointages/history`);
-                const data = await response.json();
-                if (data.success) {
-                    const list = document.getElementById('pointagesList');
-                    list.innerHTML = `
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Employé</th>
-                                    <th>Type</th>
-                                    <th>Date</th>
-                                    <th>Heure</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.pointages.map(p => `
-                                    <tr>
-                                        <td>${p.employee_name}</td>
-                                        <td>${p.type}</td>
-                                        <td>${new Date(p.timestamp).toLocaleDateString()}</td>
-                                        <td>${new Date(p.timestamp).toLocaleTimeString()}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
-                }
-            } catch (err) {
-                console.error('Erreur pointages:', err);
+            const data = await safeFetch(`${API_URL}/pointages/history`, { success: false, pointages: [] });
+            if (data.success) {
+                document.getElementById('pointagesList').innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
+                        <tbody>${data.pointages.map(p => `
+                            <tr><td>${p.employee_name}</td><td>${p.type}</td>
+                            <td>${new Date(p.timestamp).toLocaleDateString()}</td>
+                            <td>${new Date(p.timestamp).toLocaleTimeString()}</td></tr>
+                        `).join('')}</tbody>
+                    </table>`;
             }
         }
 
         async function loadSalaryData() {
-            try {
-                const response = await fetch(`${API_URL}/salary/history`);
-                const data = await response.json();
-                if (data.success) {
-                    let totalRevenue = 0;
-                    let totalExpenses = 0;
-                    data.salaries.forEach(s => {
-                        if (s.type === 'ecolage') totalRevenue += s.amount;
-                        if (s.type === 'salaire') totalExpenses += s.amount;
-                    });
-                    document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2) + '€';
-                    document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2) + '€';
-                    document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + '€';
-                }
-            } catch (err) {
-                console.error('Erreur salaires:', err);
+            const data = await safeFetch(`${API_URL}/salary/history`, { success: false, salaries: [] });
+            if (data.success) {
+                let totalRevenue = 0, totalExpenses = 0;
+                data.salaries.forEach(s => {
+                    if (s.type === 'ecolage') totalRevenue += s.amount;
+                    if (s.type === 'salaire') totalExpenses += s.amount;
+                });
+                document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2) + '€';
+                document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2) + '€';
+                document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + '€';
             }
         }
 
         async function loadStatistics() {
-            try {
-                const [empRes, pointRes] = await Promise.all([
-                    fetch(`${API_URL}/employees`),
-                    fetch(`${API_URL}/pointages/history`)
-                ]);
-                const empData = await empRes.json();
-                const pointData = await pointRes.json();
-                if (empData.success) {
-                    const employees = empData.employees.filter(e => e.type === 'employe').length;
-                    const students = empData.employees.filter(e => e.type === 'etudiant').length;
-                    document.getElementById('totalEmployees').textContent = employees;
-                    document.getElementById('totalStudents').textContent = students;
-                }
-                if (pointData.success) {
-                    const today = new Date().toISOString().split('T')[0];
-                    const todayPointages = pointData.pointages.filter(p =>
-                        new Date(p.timestamp).toISOString().split('T')[0] === today
-                    );
-                    const presence = todayPointages.filter(p => p.type === 'ENTREE').length;
-                    const total = empData.employees.length;
-                    const presenceRate = total > 0 ? (presence / total * 100).toFixed(0) : 0;
-                    document.getElementById('presenceRate').textContent = presenceRate + '%';
-                    document.getElementById('absenceRate').textContent = (100 - presenceRate) + '%';
-                }
-            } catch (err) {
-                console.error('Erreur statistiques:', err);
+            const [empData, pointData] = await Promise.all([
+                safeFetch(`${API_URL}/employees`, { success: false, employees: [] }),
+                safeFetch(`${API_URL}/pointages/history`, { success: false, pointages: [] })
+            ]);
+            if (empData.success) {
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const students = empData.employees.filter(e => e.type === 'etudiant').length;
+                document.getElementById('totalEmployees').textContent = employees;
+                document.getElementById('totalStudents').textContent = students;
+            }
+            if (pointData.success && empData.success) {
+                const today = new Date().toISOString().split('T')[0];
+                const todayPointages = pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today);
+                const presence = todayPointages.filter(p => p.type === 'ENTREE').length;
+                const total = empData.employees.length;
+                const rate = total > 0 ? (presence / total * 100).toFixed(0) : 0;
+                document.getElementById('presenceRate').textContent = rate + '%';
+                document.getElementById('absenceRate').textContent = (100 - rate) + '%';
             }
         }
 
-        // Chat IA
-        async function sendMessage() {
+        function sendMessage() {
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
             if (!message) return;
@@ -1098,72 +621,28 @@
             input.value = '';
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             setTimeout(() => {
-                messagesDiv.innerHTML += `
-                    <div class="message message-ai">
-                        Je traite votre demande concernant: "${message}".
-                        Pour une vraie intégration, connectez l'API Gemini.
-                    </div>
-                `;
+                messagesDiv.innerHTML += `<div class="message message-ai">Je traite : "${message}". (API Gemini non connectée)</div>`;
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }, 1000);
         }
 
-        // ESP32 WebSocket
-        let esp32Socket = null;
         function connectESP32() {
-            const wsUrl = 'wss://postcam-1.onrender.com/api/rssi-data';
-            esp32Socket = new WebSocket(wsUrl);
-            esp32Socket.onopen = () => {
-                document.getElementById('esp32-status').innerHTML = `
-                    <div class="status-card">
-                        <h3>Connecté au serveur</h3>
-                        <p>En attente de données ESP32...</p>
-                    </div>
-                `;
-            };
-            esp32Socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                console.log('Données ESP32:', data);
-            };
-            esp32Socket.onerror = (error) => {
-                document.getElementById('esp32-status').innerHTML = `
-                    <div class="status-card" style="background:#ef4444;">
-                        <h3>Erreur de connexion</h3>
-                        <p>Impossible de se connecter</p>
-                    </div>
-                `;
-            };
+            const ws = new WebSocket('wss://postcam-1.onrender.com/api/rssi-data');
+            ws.onopen = () => document.getElementById('esp32-status').innerHTML = `<div class="status-card"><h3>Connecté</h3><p>En attente...</p></div>`;
+            ws.onmessage = e => console.log('ESP32:', JSON.parse(e.data));
+            ws.onerror = () => document.getElementById('esp32-status').innerHTML = `<div class="status-card" style="background:#ef4444;"><h3>Erreur</h3><p>Connexion échouée</p></div>`;
         }
 
-        // Déconnexion
-        function logout() {
-            if (confirm('Se déconnecter?')) {
-                window.location.href = '/login';
-            }
-        }
+        function logout() { if (confirm('Déconnexion ?')) window.location.href = '/login'; }
 
-        // Fermer modal en cliquant à l'extérieur
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-            }
-        }
+        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
 
-        // Charger au démarrage
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Application web RH chargée');
-            document.getElementById('chatMessages').innerHTML = `
-                <div class="message message-ai">
-                    Bonjour! Je suis votre assistant IA.
-                    Posez-moi des questions sur les employés, salaires, statistiques...
-                </div>
-            `;
-            const chatInput = document.getElementById('chatInput');
-            if (chatInput) {
-                chatInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') sendMessage();
-                });
-            }
+            console.log('App RH chargée');
+            document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour ! Posez-moi une question.</div>`;
+            const input = document.getElementById('chatInput');
+            if (input) input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            loadEmployees();
         });
     </script>
 </body>
