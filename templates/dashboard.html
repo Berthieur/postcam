@@ -266,11 +266,11 @@
                     <input type="text" class="form-input" id="employeeTelephone">
                 </div>
                 <div class="form-group" id="tauxHoraireGroup">
-                    <label class="form-label">Taux Horaire (€)</label>
+                    <label class="form-label">Taux Horaire (Ar)</label>
                     <input type="number" class="form-input" id="employeeTauxHoraire" step="0.01">
                 </div>
                 <div class="form-group" id="fraisEcolageGroup" style="display:none;">
-                    <label class="form-label">Frais Écolage (€)</label>
+                    <label class="form-label">Frais Écolage (Ar)</label>
                     <input type="number" class="form-input" id="employeeFraisEcolage" step="0.01">
                 </div>
                 <button class="btn" onclick="saveEmployee()"><i class="fas fa-save"></i> Enregistrer</button>
@@ -300,15 +300,15 @@
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-value" id="totalRevenue">0€</div>
+                    <div class="stat-value" id="totalRevenue">0Ar</div>
                     <div class="stat-label">Revenus (Écolage)</div>
                 </div>
                 <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
-                    <div class="stat-value" id="totalExpenses">0€</div>
+                    <div class="stat-value" id="totalExpenses">0Ar</div>
                     <div class="stat-label">Dépenses (Salaires)</div>
                 </div>
                 <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                    <div class="stat-value" id="netProfit">0€</div>
+                    <div class="stat-value" id="netProfit">0Ar</div>
                     <div class="stat-label">Bénéfice Net</div>
                 </div>
             </div>
@@ -479,17 +479,70 @@
             }
         }
 
-        // === QR CODE TOUJOURS AFFICHÉ (FALLBACK) ===
-        function showQRCode(employeeId, name) {
-            const img = document.getElementById('qrImage');
-            const apiUrl = `${API_URL}/qrcode/${employeeId}`;
-            const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(employeeId)}`;
-
-            img.src = apiUrl;
-            img.onerror = () => { img.src = fallbackUrl; };
-            document.getElementById('qrName').textContent = name;
-            openModal('qrModal');
+       // ✅ NOUVELLE VERSION (CORRIGÉE)
+async function showQRCode(employeeId, name) {
+    try {
+        // 1️⃣ Récupérer les données complètes de l'employé
+        const empData = await safeFetch(`${API_URL}/employees/${employeeId}`, { success: false });
+        
+        if (!empData.success || !empData.employee) {
+            alert("Impossible de charger les données de l'employé");
+            return;
         }
+
+        const employee = empData.employee;
+
+        // 2️⃣ Créer l'objet JSON complet pour le QR code
+        const qrData = {
+            id: employee.id,
+            nom: employee.nom,
+            prenom: employee.prenom,
+            type: employee.type,
+            email: employee.email || "",
+            telephone: employee.telephone || "",
+            taux_horaire: employee.taux_horaire || null,
+            frais_ecolage: employee.frais_ecolage || null
+        };
+
+        // 3️⃣ Convertir en JSON string
+        const qrJsonString = JSON.stringify(qrData);
+
+        // 4️⃣ Générer le QR code avec les données complètes
+        const img = document.getElementById('qrImage');
+        const apiUrl = `${API_URL}/qrcode/${employeeId}`; // endpoint serveur (si disponible)
+        const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrJsonString)}`;
+
+        // Essayer l'API serveur d'abord, sinon fallback
+        img.src = apiUrl;
+        img.onerror = () => { 
+            img.src = fallbackUrl; 
+            console.log("QR Code généré avec fallback:", qrJsonString);
+        };
+
+        // 5️⃣ Afficher les infos dans le modal
+        document.getElementById('qrName').textContent = `${employee.prenom} ${employee.nom}`;
+        
+        // ✅ Ajouter un aperçu des données encodées (optionnel, pour debug)
+        const qrModal = document.getElementById('qrModal');
+        const existingInfo = qrModal.querySelector('.qr-data-info');
+        if (existingInfo) existingInfo.remove();
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'qr-data-info';
+        infoDiv.style.cssText = 'margin-top:15px; padding:12px; background:#f0f9ff; border-radius:8px; font-size:0.85rem; color:#1e40af; text-align:left;';
+        infoDiv.innerHTML = `
+            <strong>📱 Données encodées :</strong><br>
+            <code style="word-break:break-all; display:block; margin-top:5px; font-size:0.75rem; color:#374151;">${qrJsonString}</code>
+        `;
+        qrModal.querySelector('.modal-content').appendChild(infoDiv);
+
+        openModal('qrModal');
+
+    } catch (error) {
+        console.error("Erreur génération QR Code:", error);
+        alert("Erreur lors de la génération du QR Code");
+    }
+}
 
         function toggleFinancialFields() {
             const type = document.getElementById('employeeType').value;
