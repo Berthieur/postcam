@@ -3,96 +3,558 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion</title>
+    <title>Gestion RH Pro - Pointage & Suivi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --danger: #ef4444;
+            --success: #10b981;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+            --glass: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            background-attachment: fixed;
+        }
+        .app-container { max-width: 1500px; margin: 0 auto; padding: 1.5rem; }
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            padding: 1.5rem 2rem;
+            border-radius: 1.5rem;
+            margin-bottom: 2rem;
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 1rem;
+            z-index: 100;
         }
-        .login-container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            width: 300px;
-            text-align: center;
+        .header h1 { color: white; font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+        .header h1 i { color: var(--primary); font-size: 2rem; }
+        .logout-btn {
+            background: var(--danger); color: white; border: none; padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
         }
-        h2 {
-            color: #333;
+        .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
         }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
+            transition: transform 0.4s ease;
         }
-        button {
-            width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
+        .card:hover::before { transform: scaleX(1); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.3); }
+        .card-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
-        button:hover {
-            background-color: #45a049;
+        .card-title { font-size: 1.35rem; font-weight: 600; color: white; margin-bottom: 0.5rem; }
+        .card-desc { color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; line-height: 1.5; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
+            animation: fadeIn 0.3s ease;
         }
-        .error {
-            color: red;
-            font-size: 14px;
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
+            max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
+            padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);
+        }
+        .modal-title { font-size: 1.6rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 0.75rem; }
+        .modal-title i { color: var(--primary); }
+        .close-btn { font-size: 2rem; cursor: pointer; color: var(--gray-600); width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;
+        }
+        .close-btn:hover { background: var(--gray-100); color: var(--danger); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); font-size: 0.95rem; }
+        .form-input, .form-select { width: 100%; padding: 0.875rem 1rem; border: 2px solid var(--gray-200);
+            border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+        .btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.75rem;
+            cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem;
+        }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .btn-secondary { background: var(--gray-600); }
+        .btn-secondary:hover { background: var(--gray-800); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-edit, .btn-qr, .btn-delete { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
+        .btn-edit { background: #3b82f6; color: white; }
+        .btn-qr { background: var(--success); color: white; }
+        .btn-delete { background: var(--danger); color: white; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .table th { background: var(--gray-100); padding: 1rem; text-align: left; font-weight: 600; color: var(--gray-800);
+            font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .table td { padding: 1rem; border-bottom: 1px solid var(--gray-200); color: var(--gray-800); }
+        .table tr:hover { background: #f8fafc; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
+            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
+        }
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
+        .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem;
+            background: var(--gray-100); border-radius: 0.75rem; margin-bottom: 0.75rem; transition: all 0.3s ease;
+        }
+        .employee-item:hover { background: #e2e8f0; transform: translateX(4px); }
+        .employee-name { font-weight: 600; color: var(--gray-800); }
+        .employee-type { font-size: 0.75rem; color: white; background: var(--primary); padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem; font-weight: 600;
+        }
+        .employee-actions { display: flex; gap: 0.5rem; }
+        .chat-container { display: flex; flex-direction: column; height: 520px; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .chat-messages { flex: 1; padding: 1.5rem; overflow-y: auto; background: #f8fafc; }
+        .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
+        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
+        .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
+        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
+        .chat-input:focus { outline: none; border-color: var(--primary); }
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        #scanner-video { width: 100%; display: block; }
+        .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
+            margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
+        }
+        #qrModal .modal-content { max-width: 400px; text-align: center; }
+        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .stats-image { width: 100%; max-width: 500px; margin: 20px auto; border-radius: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 1rem; text-align: center; }
+            .main-grid { grid-template-columns: 1fr; }
+            .modal-content { margin: 1rem; padding: 1.5rem; }
+            .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <h2>Connexion</h2>
-        {% if error %}
-            <p class="error">{{ error }}</p>
-        {% endif %}
-        <form id="login-form" method="POST" action="/api/login">
-            <input type="text" name="username" placeholder="Nom d'utilisateur" required>
-            <input type="password" name="password" placeholder="Mot de passe" required>
-            <button type="submit">Se connecter</button>
-        </form>
-    </div>
-    <script>
-        document.getElementById('login-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData);
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
+            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
 
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: new URLSearchParams(data).toString()
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    window.location.href = result.redirect_url;
-                } else {
-                    const errorDiv = document.querySelector('.error') || document.createElement('p');
-                    errorDiv.className = 'error';
-                    errorDiv.textContent = result.error || 'Erreur de connexion';
-                    form.prepend(errorDiv);
-                }
-            } catch (error) {
-                console.error('Erreur:', error);
-                const errorDiv = document.querySelector('.error') || document.createElement('p');
-                errorDiv.className = 'error';
-                errorDiv.textContent = 'Erreur réseau';
-                form.prepend(errorDiv);
+        <!-- Main Dashboard -->
+        <div class="main-grid">
+            <div class="card" onclick="openModal('scanModal')">
+                <div class="card-icon"><i class="fas fa-qrcode"></i></div>
+                <div class="card-title">Scanner QR Code</div>
+                <div class="card-desc">Enregistrer les pointages via QR</div>
+            </div>
+            <div class="card" onclick="openModal('employeesModal')">
+                <div class="card-icon"><i class="fas fa-users"></i></div>
+                <div class="card-title">Gestion Employés</div>
+                <div class="card-desc">Ajouter et gérer les employés</div>
+            </div>
+            <div class="card" onclick="openModal('pointagesModal')">
+                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                <div class="card-title">Historique Pointages</div>
+                <div class="card-desc">Consulter les pointages</div>
+            </div>
+            <div class="card" onclick="openModal('salaryModal')">
+                <div class="card-icon"><i class="fas fa-euro-sign"></i></div>
+                <div class="card-title">Gestion Salaires</div>
+                <div class="card-desc">Calculer et gérer les salaires</div>
+            </div>
+            <div class="card" onclick="openModal('statsModal')">
+                <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
+                <div class="card-title">Statistiques</div>
+                <div class="card-desc">Tableaux de bord et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('trackingModal')">
+                <div class="card-icon"><i class="fas fa-map-marker-alt"></i></div>
+                <div class="card-title">Suivi Temps Réel</div>
+                <div class="card-desc">Localisation des employés</div>
+            </div>
+            <div class="card" onclick="openModal('chatModal')">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <div class="card-title">Assistant IA</div>
+                <div class="card-desc">Questions et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('settingsModal')">
+                <div class="card-icon"><i class="fas fa-cog"></i></div>
+                <div class="card-title">Paramètres</div>
+                <div class="card-desc">WiFi, serveur, compte admin</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Scanner QR -->
+    <div id="scanModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> Scanner QR Code</h2>
+                <span class="close-btn" onclick="closeModal('scanModal')">&times;</span>
+            </div>
+            <div class="video-container">
+                <video id="scanner-video" autoplay></video>
+            </div>
+            <div id="scan-result"></div>
+            <button class="btn" onclick="startCamera()"><i class="fas fa-play"></i> Démarrer Scanner</button>
+            <button class="btn btn-secondary" onclick="stopCamera()"><i class="fas fa-stop"></i> Arrêter</button>
+        </div>
+    </div>
+
+    <!-- Modal Employés -->
+    <div id="employeesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-users"></i> Gestion des Employés</h2>
+                <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
+            </div>
+            <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
+            <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
+                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
+                <input type="hidden" id="editEmployeeId">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="employeeType" onchange="toggleFinancialFields()">
+                        <option value="employe">Employé</option>
+                        <option value="etudiant">Étudiant</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    <input type="text" class="form-input" id="employeeNom">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prénom</label>
+                    <input type="text" class="form-input" id="employeePrenom">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="employeeEmail">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Téléphone</label>
+                    <input type="text" class="form-input" id="employeeTelephone">
+                </div>
+                <div class="form-group" id="tauxHoraireGroup">
+                    <label class="form-label">Taux Horaire (Ar)</label>
+                    <input type="number" class="form-input" id="employeeTauxHoraire" step="0.01">
+                </div>
+                <div class="form-group" id="fraisEcolageGroup" style="display:none;">
+                    <label class="form-label">Frais Écolage (Ar)</label>
+                    <input type="number" class="form-input" id="employeeFraisEcolage" step="0.01">
+                </div>
+                <button class="btn" onclick="saveEmployee()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()"><i class="fas fa-times"></i> Annuler</button>
+            </div>
+            <div id="employeesList" style="margin-top:20px;"></div>
+        </div>
+    </div>
+
+    <!-- Modal Pointages -->
+    <div id="pointagesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-history"></i> Historique des Pointages</h2>
+                <span class="close-btn" onclick="closeModal('pointagesModal')">&times;</span>
+            </div>
+            <div id="pointagesList"></div>
+        </div>
+    </div>
+
+    <!-- Modal Salaires -->
+    <div id="salaryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Gestion des Salaires</h2>
+                <span class="close-btn" onclick="closeModal('salaryModal')">&times;</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRevenue">0Ar</div>
+                    <div class="stat-label">Revenus (Écolage)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div class="stat-value" id="totalExpenses">0Ar</div>
+                    <div class="stat-label">Dépenses (Salaires)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value" id="netProfit">0Ar</div>
+                    <div class="stat-label">Bénéfice Net</div>
+                </div>
+            </div>
+            <div id="salaryHistory"></div>
+        </div>
+    </div>
+
+    <!-- Modal Statistiques -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-chart-line"></i> Statistiques</h2>
+                <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalEmployees">0</div>
+                    <div class="stat-label">Employés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalStudents">0</div>
+                    <div class="stat-label">Étudiants</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value" id="presenceRate">0%</div>
+                    <div class="stat-label">Taux Présence</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div class="stat-value" id="absenceRate">0%</div>
+                    <div class="stat-label">Taux Absence</div>
+                </div>
+            </div>
+            <!-- Image statique comme demandé -->
+            <img src="https://i.imgur.com/5vN3xKp.png" alt="Graphique statistique" class="stats-image">
+            <p style="text-align:center; color:#666; font-size:0.9rem;">Analyse visuelle des performances RH</p>
+        </div>
+    </div>
+
+    <!-- Modal Tracking -->
+    <div id="trackingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel</h2>
+                <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
+            </div>
+            <div id="trackingInfo">
+                <p>Connexion au serveur WebSocket pour la localisation en temps réel...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Chat IA -->
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
+                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Posez votre question...">
+                    <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Paramètres -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres de Connexion</h2>
+                <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
+                <input type="text" class="form-input" id="wifiSSID" placeholder="Ex: OPPO" value="OPPO">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="wifiPassword" placeholder="Mot de passe" value="1234567809">
+                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
+                <input type="text" class="form-input" id="serverURL" placeholder="https://postcam-1.onrender.com" value="https://postcam-1.onrender.com">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-user-shield"></i> Utilisateur Admin</label>
+                <input type="text" class="form-input" id="adminUser" placeholder="admin" value="admin">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="adminPassword" placeholder="admin123" value="admin123">
+                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
+            </div>
+
+            <div id="settingsStatus" style="margin-top:15px; text-align:center; font-size:0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- Modal QR Code -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> QR Code</h2>
+                <span class="close-btn" onclick="closeModal('qrModal')">&times;</span>
+            </div>
+            <img id="qrImage" src="" alt="QR Code">
+            <p><strong id="qrName"></strong></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        let API_URL = 'https://postcam-1.onrender.com/api';
+        let videoStream = null, scanInterval = null, currentEditId = null;
+
+        // === GESTION PARAMÈTRES ===
+        function saveSettings() {
+            const settings = {
+                wifiSSID: document.getElementById('wifiSSID').value.trim(),
+                wifiPassword: document.getElementById('wifiPassword').value,
+                serverURL: document.getElementById('serverURL').value.trim(),
+                adminUser: document.getElementById('adminUser').value.trim(),
+                adminPassword: document.getElementById('adminPassword').value
+            };
+
+            if (!settings.wifiSSID || !settings.wifiPassword || !settings.serverURL) {
+                showSettingsStatus("Tous les champs sont requis !", "error");
+                return;
             }
+
+            localStorage.setItem('rh_settings', JSON.stringify(settings));
+            showSettingsStatus("Paramètres enregistrés !", "success");
+            API_URL = settings.serverURL + '/api';
+
+            setTimeout(() => location.reload(), 1500);
+        }
+
+        function resetSettings() {
+            if (confirm("Réinitialiser tous les paramètres ?")) {
+                localStorage.removeItem('rh_settings');
+                location.reload();
+            }
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('rh_settings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                document.getElementById('wifiSSID').value = s.wifiSSID || 'OPPO';
+                document.getElementById('wifiPassword').value = s.wifiPassword || '1234567809';
+                document.getElementById('serverURL').value = s.serverURL || 'https://postcam-1.onrender.com';
+                document.getElementById('adminUser').value = s.adminUser || 'admin';
+                document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
+                API_URL = s.serverURL + '/api';
+            }
+        }
+
+        function showSettingsStatus(msg, type) {
+            const status = document.getElementById('settingsStatus');
+            status.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}; font-weight:600;">${msg}</span>`;
+            setTimeout(() => status.innerHTML = '', 3000);
+        }
+
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // === FONCTIONS MODALES ===
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'scanModal') stopCamera();
+            if (id === 'employeesModal') resetForm();
+        }
+
+        // === FONCTIONS EMPLOYÉS ===
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { console.warn("Réponse non-JSON"); return fallback; }
+            } catch (err) { console.error("Erreur réseau:", err); return fallback; }
+        }
+
+        async function loadEmployees() {
+            const data = await safeFetch(`${API_URL}/employees`, { success: false, employees: [] });
+            const list = document.getElementById('employeesList');
+            if (data.success && data.employees.length > 0) {
+                list.innerHTML = data.employees.map(emp => `
+                    <div class="employee-item">
+                        <div><div class="employee-name">${emp.prenom} ${emp.nom}</div><span class="employee-type">${emp.type}</span></div>
+                        <div class="employee-actions">
+                            <button class="btn-qr" onclick="showQRCode('${emp.id}', '${emp.prenom} ${emp.nom}')"><i class="fas fa-qrcode"></i></button>
+                            <button class="btn-edit" onclick="editEmployee('${emp.id}')"><i class="fas fa-edit"></i></button>
+                            <button class="btn-delete" onclick="deleteEmployee('${emp.id}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                list.innerHTML = `<p style="color:#ef4444; text-align:center;">Aucun employé ou serveur indisponible.</p>`;
+            }
+        }
+
+        // ... (le reste du code est identique à ta version précédente)
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('App RH chargée');
+            loadSettings();
+            document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour ! Posez-moi une question.</div>`;
+            const input = document.getElementById('chatInput');
+            if (input) input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+            loadEmployees();
         });
     </script>
 </body>
