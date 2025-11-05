@@ -206,10 +206,10 @@
                 <div class="card-title">Assistant IA</div>
                 <div class="card-desc">Questions et analyses</div>
             </div>
-            <div class="card" onclick="openModal('esp32Modal')">
-                <div class="card-icon"><i class="fas fa-video"></i></div>
-                <div class="card-title">Caméra ESP32</div>
-                <div class="card-desc">Scan via caméra ESP32</div>
+            <div class="card" onclick="openModal('settingsModal')">
+                <div class="card-icon"><i class="fas fa-cog"></i></div>
+                <div class="card-title">Paramètres</div>
+                <div class="card-desc">WiFi, serveur, compte admin</div>
             </div>
         </div>
     </div>
@@ -238,7 +238,6 @@
                 <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
             </div>
             <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
-          
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
                 <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
                 <input type="hidden" id="editEmployeeId">
@@ -374,17 +373,51 @@
         </div>
     </div>
 
-    <!-- Modal ESP32 -->
-    <div id="esp32Modal" class="modal">
+    <!-- Modal Paramètres -->
+    <div id="settingsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-video"></i> Caméra ESP32</h2>
-                <span class="close-btn" onclick="closeModal('esp32Modal')">&times;</span>
+                <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres de Connexion</h2>
+                <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
             </div>
-            <div id="esp32-status">
-                <p>Connexion au serveur Render...</p>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
+                <input type="text" class="form-input" id="wifiSSID" placeholder="Ex: OPPO" value="OPPO">
             </div>
-            <button class="btn" onclick="connectESP32()"><i class="fas fa-plug"></i> Connecter ESP32</button>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="wifiPassword" placeholder="Mot de passe" value="1234567809">
+                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
+                <input type="text" class="form-input" id="serverURL" placeholder="https://postcam-1.onrender.com" value="https://postcam-1.onrender.com">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-user-shield"></i> Utilisateur Admin</label>
+                <input type="text" class="form-input" id="adminUser" placeholder="admin" value="admin">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="adminPassword" placeholder="admin123" value="admin123">
+                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
+            </div>
+
+            <div id="settingsStatus" style="margin-top:15px; text-align:center; font-size:0.9rem;"></div>
         </div>
     </div>
 
@@ -402,19 +435,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
-        const API_URL = 'https://postcam-1.onrender.com/api';
+        let API_URL = 'https://postcam-1.onrender.com/api';
         let videoStream = null, scanInterval = null, currentEditId = null;
 
-        // === FONCTION SÉCURISÉE POUR FETCH + JSON ===
-        async function safeFetch(url, fallback = null) {
-            try {
-                const res = await fetch(url);
-                const text = await res.text();
-                try { return JSON.parse(text); }
-                catch { console.warn("Réponse non-JSON, fallback utilisé"); return fallback; }
-            } catch (err) { console.error("Erreur réseau:", err); return fallback; }
-        }
-
+        // === FONCTIONS MODALES ===
         function openModal(id) {
             document.getElementById(id).style.display = 'block';
             if (id === 'employeesModal') loadEmployees();
@@ -422,24 +446,82 @@
             if (id === 'salaryModal') loadSalaryData();
             if (id === 'statsModal') loadStatistics();
         }
-
         function closeModal(id) {
             document.getElementById(id).style.display = 'none';
             if (id === 'scanModal') stopCamera();
             if (id === 'employeesModal') resetForm();
         }
 
-        function resetForm() {
-            document.getElementById('addEmployeeForm').style.display = 'none';
-            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
-            document.getElementById('editEmployeeId').value = '';
-            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('employeeType').value = 'employe';
-            toggleFinancialFields();
-            currentEditId = null;
+        // === GESTION PARAMÈTRES ===
+        function saveSettings() {
+            const settings = {
+                wifiSSID: document.getElementById('wifiSSID').value.trim(),
+                wifiPassword: document.getElementById('wifiPassword').value,
+                serverURL: document.getElementById('serverURL').value.trim(),
+                adminUser: document.getElementById('adminUser').value.trim(),
+                adminPassword: document.getElementById('adminPassword').value
+            };
+
+            if (!settings.wifiSSID || !settings.wifiPassword || !settings.serverURL) {
+                showSettingsStatus("Tous les champs sont requis !", "error");
+                return;
+            }
+
+            localStorage.setItem('rh_settings', JSON.stringify(settings));
+            showSettingsStatus("Paramètres enregistrés !", "success");
+            API_URL = settings.serverURL + '/api';
+
+            setTimeout(() => location.reload(), 1500);
         }
 
-        // === CHARGEMENT EMPLOYÉS ===
+        function resetSettings() {
+            if (confirm("Réinitialiser tous les paramètres ?")) {
+                localStorage.removeItem('rh_settings');
+                location.reload();
+            }
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('rh_settings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                document.getElementById('wifiSSID').value = s.wifiSSID || 'OPPO';
+                document.getElementById('wifiPassword').value = s.wifiPassword || '1234567809';
+                document.getElementById('serverURL').value = s.serverURL || 'https://postcam-1.onrender.com';
+                document.getElementById('adminUser').value = s.adminUser || 'admin';
+                document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
+                API_URL = s.serverURL + '/api';
+            }
+        }
+
+        function showSettingsStatus(msg, type) {
+            const status = document.getElementById('settingsStatus');
+            status.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}; font-weight:600;">${msg}</span>`;
+            setTimeout(() => status.innerHTML = '', 3000);
+        }
+
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // === FONCTIONS EMPLOYÉS ===
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { console.warn("Réponse non-JSON"); return fallback; }
+            } catch (err) { console.error("Erreur réseau:", err); return fallback; }
+        }
+
         async function loadEmployees() {
             const data = await safeFetch(`${API_URL}/employees`, { success: false, employees: [] });
             const list = document.getElementById('employeesList');
@@ -459,7 +541,6 @@
             }
         }
 
-        // === MODIFIER EMPLOYÉ (SANS CRASH) ===
         async function editEmployee(id) {
             const emp = await safeFetch(`${API_URL}/employees/${id}`, { success: false });
             if (emp.success && emp.employee) {
@@ -475,98 +556,70 @@
                 toggleFinancialFields();
                 document.getElementById('addEmployeeForm').style.display = 'block';
             } else {
-                alert("Impossible de charger l'employé. Serveur hors ligne ?");
+                alert("Impossible de charger l'employé.");
             }
         }
 
-      // Fonction principale : Génère un QR code complet avec toutes les données de l'employé
-async function showQRCode(employeeId, name) {
-    try {
-        const img = document.getElementById('qrImage');
-        const qrModal = document.getElementById('qrModal');
-        const qrNameEl = document.getElementById('qrName');
+        async function showQRCode(employeeId, name) {
+            try {
+                const img = document.getElementById('qrImage');
+                const qrModal = document.getElementById('qrModal');
+                const qrNameEl = document.getElementById('qrName');
+                const oldInfo = qrModal.querySelector('.qr-data-info');
+                if (oldInfo) oldInfo.remove();
+                qrNameEl.textContent = name;
 
-        // 1. Nettoyer le modal précédent
-        const oldInfo = qrModal.querySelector('.qr-data-info');
-        if (oldInfo) oldInfo.remove();
+                let qrData = { id: employeeId, nom: name.split(' ')[1] || '', prenom: name.split(' ')[0] || '' };
+                try {
+                    const response = await fetch(`${API_URL}/employees/${employeeId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.employee) {
+                            const e = data.employee;
+                            qrData = {
+                                id: e.id, nom: e.nom, prenom: e.prenom, type: e.type,
+                                email: e.email || "", telephone: e.telephone || "",
+                                taux_horaire: e.taux_horaire || null, frais_ecolage: e.frais_ecolage || null
+                            };
+                        }
+                    }
+                } catch (err) { console.warn("Fallback activé:", err); }
 
-        // 2. Afficher le nom immédiatement
-        qrNameEl.textContent = name;
+                const qrJsonString = JSON.stringify(qrData);
+                const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrJsonString)}`;
+                img.src = `${API_URL}/qrcode/${employeeId}`;
+                img.onerror = () => { img.src = fallbackUrl; };
 
-        // 3. Essayer de charger les données complètes depuis le serveur
-        let qrData = { id: employeeId, nom: name.split(' ')[1] || '', prenom: name.split(' ')[0] || '' };
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'qr-data-info';
+                infoDiv.style.cssText = 'margin-top:15px; padding:12px; background:#f0f9ff; border-radius:8px; font-size:0.85rem; color:#1e40af; border:1px solid #bfdbfe; text-align:left;';
+                infoDiv.innerHTML = `<strong>Données encodées :</strong><br><code style="word-break:break-all; display:block; margin-top:5px; font-size:0.75rem; color:#374151; background:#fff; padding:6px; border-radius:4px; border:1px solid #e5e7eb;">${qrJsonString}</code>`;
+                qrModal.querySelector('.modal-content').appendChild(infoDiv);
 
-        try {
-            const response = await fetch(`${API_URL}/employees/${employeeId}`);
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.employee) {
-                    const e = data.employee;
-                    qrData = {
-                        id: e.id,
-                        nom: e.nom,
-                        prenom: e.prenom,
-                        type: e.type,
-                        email: e.email || "",
-                        telephone: e.telephone || "",
-                        taux_horaire: e.taux_horaire || null,
-                        frais_ecolage: e.frais_ecolage || null
-                    };
-                }
+                openModal('qrModal');
+            } catch (error) {
+                console.error("Erreur QR:", error);
+                alert("Erreur génération QR Code");
             }
-        } catch (fetchError) {
-            console.warn("Serveur indisponible, utilisation du fallback:", fetchError);
         }
 
-        // 4. Générer le JSON complet
-        const qrJsonString = JSON.stringify(qrData);
-        const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrJsonString)}`;
-
-        // 5. Essayer d'abord l'API serveur (si tu as un endpoint /qrcode)
-        const apiUrl = `${API_URL}/qrcode/${employeeId}`;
-        img.src = apiUrl;
-
-        // 6. Fallback si l'image serveur échoue
-        img.onerror = () => {
-            console.log("API QR serveur échouée → fallback QRServer");
-            img.src = fallbackUrl;
-        };
-
-        // 7. Ajouter les données encodées (debug + traçabilité)
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'qr-data-info';
-        infoDiv.style.cssText = `
-            margin-top: 15px; padding: 12px; background: #f0f9ff; 
-            border-radius: 8px; font-size: 0.85rem; color: #1e40af; 
-            border: 1px solid #bfdbfe; text-align: left;
-        `;
-        infoDiv.innerHTML = `
-            <strong>Données encodées :</strong><br>
-            <code style="word-break: break-all; display: block; margin-top: 5px; 
-                        font-size: 0.75rem; color: #374151; background: #fff; 
-                        padding: 6px; border-radius: 4px; border: 1px solid #e5e7eb;">
-                ${qrJsonString}
-            </code>
-        `;
-        qrModal.querySelector('.modal-content').appendChild(infoDiv);
-
-        // 8. Ouvrir le modal
-        openModal('qrModal');
-
-    } catch (error) {
-        console.error("Erreur critique showQRCode:", error);
-        alert("Erreur lors de la génération du QR Code");
-    }
-}
+        // === AUTRES FONCTIONS (inchangées) ===
         function toggleFinancialFields() {
             const type = document.getElementById('employeeType').value;
             document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
             document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
         }
-
         function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
         function hideAddEmployeeForm() { resetForm(); }
-
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+            document.getElementById('editEmployeeId').value = '';
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+            currentEditId = null;
+        }
         async function saveEmployee() {
             const employee = {
                 nom: document.getElementById('employeeNom').value,
@@ -579,27 +632,20 @@ async function showQRCode(employeeId, name) {
             };
             const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
             const method = currentEditId ? 'PUT' : 'POST';
-
             try {
-                const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(employee) });
-                const result = await safeFetch(url, { success: false });
-                if (result.success) {
-                    alert(currentEditId ? 'Modifié !' : 'Ajouté !');
-                    hideAddEmployeeForm();
-                    loadEmployees();
-                } else {
-                    alert('Erreur serveur');
-                }
+                await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(employee) });
+                alert(currentEditId ? 'Modifié !' : 'Ajouté !');
+                hideAddEmployeeForm();
+                loadEmployees();
             } catch { alert('Erreur réseau'); }
         }
-
         async function deleteEmployee(id) {
             if (!confirm('Supprimer ?')) return;
             try { await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' }); loadEmployees(); }
             catch { alert('Erreur suppression'); }
         }
 
-        // === SCANNER QR ===
+        // Scanner QR
         async function startCamera() {
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -627,7 +673,7 @@ async function showQRCode(employeeId, name) {
             } catch { alert('Erreur scan'); }
         }
 
-        // === AUTRES FONCTIONS ===
+        // Autres
         async function loadPointages() {
             const data = await safeFetch(`${API_URL}/pointages/history`, { success: false, pointages: [] });
             if (data.success) {
@@ -642,7 +688,6 @@ async function showQRCode(employeeId, name) {
                     </table>`;
             }
         }
-
         async function loadSalaryData() {
             const data = await safeFetch(`${API_URL}/salary/history`, { success: false, salaries: [] });
             if (data.success) {
@@ -656,7 +701,6 @@ async function showQRCode(employeeId, name) {
                 document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + 'Ar';
             }
         }
-
         async function loadStatistics() {
             const [empData, pointData] = await Promise.all([
                 safeFetch(`${API_URL}/employees`, { success: false, employees: [] }),
@@ -678,7 +722,6 @@ async function showQRCode(employeeId, name) {
                 document.getElementById('absenceRate').textContent = (100 - rate) + '%';
             }
         }
-
         function sendMessage() {
             const input = document.getElementById('chatInput');
             const message = input.value.trim();
@@ -692,20 +735,15 @@ async function showQRCode(employeeId, name) {
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             }, 1000);
         }
-
-        function connectESP32() {
-            const ws = new WebSocket('wss://postcam-1.onrender.com/api/rssi-data');
-            ws.onopen = () => document.getElementById('esp32-status').innerHTML = `<div class="status-card"><h3>Connecté</h3><p>En attente...</p></div>`;
-            ws.onmessage = e => console.log('ESP32:', JSON.parse(e.data));
-            ws.onerror = () => document.getElementById('esp32-status').innerHTML = `<div class="status-card" style="background:#ef4444;"><h3>Erreur</h3><p>Connexion échouée</p></div>`;
-        }
-
         function logout() { if (confirm('Déconnexion ?')) window.location.href = '/login'; }
 
+        // Fermeture modale au clic extérieur
         window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
 
+        // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
             console.log('App RH chargée');
+            loadSettings();
             document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour ! Posez-moi une question.</div>`;
             const input = document.getElementById('chatInput');
             if (input) input.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
