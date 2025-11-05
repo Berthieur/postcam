@@ -105,11 +105,11 @@
         <form id="loginForm">
             <div class="form-group">
                 <label class="form-label">Utilisateur</label>
-                <input type="text" class="form-input" id="username" placeholder="admin" value="">
+                <input type="text" class="form-input" id="username" placeholder="admin" value="admin">
             </div>
             <div class="form-group">
                 <label class="form-label">Mot de passe</label>
-                <input type="password" class="form-input" id="password" placeholder="admin123" value="">
+                <input type="password" class="form-input" id="password" placeholder="admin123" value="admin123">
             </div>
             <p class="error" id="errorMsg">Identifiants incorrects !</p>
             <button type="submit" class="btn">Se connecter</button>
@@ -117,13 +117,27 @@
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const user = document.getElementById('username').value.trim();
-            const pass = document.getElementById('password').value;
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
 
-            if (user === 'admin' && pass === 'admin123') {
-                window.location.href = 'dashboard.html';
+            // Appel API pour authentification
+            const res = await fetch('https://postcam-1.onrender.com/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await res.json();
+
+            if (data.token) {
+                localStorage.setItem('rh_user', JSON.stringify({
+                    username: data.username,
+                    token: data.token,
+                    expires: Date.now() + 24 * 60 * 60 * 1000
+                }));
+                window.location.href = '/dashboard'; // Redirection propre
             } else {
                 const error = document.getElementById('errorMsg');
                 error.style.display = 'block';
