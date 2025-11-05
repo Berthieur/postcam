@@ -742,7 +742,7 @@
                 messages.scrollTop = messages.scrollHeight;
             }, 800);
         }
-        function logout() { if (confirm('Déconnexion ?')) window.location.href = 'login.html'; }
+        function logout() { if (confirm('Déconnexion ?')) window.location.href = 'login'; }
         window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
 
         document.addEventListener('DOMContentLoaded', () => {
