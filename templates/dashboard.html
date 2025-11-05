@@ -341,9 +341,9 @@
                     <div class="stat-label">Taux Absence</div>
                 </div>
             </div>
-            <!-- Image statique comme demandé -->
-            <img src="https://i.imgur.com/5vN3xKp.png" alt="Graphique statistique" class="stats-image">
-            <p style="text-align:center; color:#666; font-size:0.9rem;">Analyse visuelle des performances RH</p>
+            <!-- Image statique -->
+            <img src="https://i.imgur.com/5vN3xKp.png" alt="Graphiques RH" class="stats-image">
+            <p style="text-align:center; color:#666; font-size:0.9rem;">Analyse visuelle des performances</p>
         </div>
     </div>
 
@@ -384,12 +384,10 @@
                 <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres de Connexion</h2>
                 <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
             </div>
-
             <div class="form-group">
                 <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
                 <input type="text" class="form-input" id="wifiSSID" placeholder="Ex: OPPO" value="OPPO">
             </div>
-
             <div class="form-group">
                 <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
                 <div style="position:relative;">
@@ -397,17 +395,14 @@
                     <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
                 </div>
             </div>
-
             <div class="form-group">
                 <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
                 <input type="text" class="form-input" id="serverURL" placeholder="https://postcam-1.onrender.com" value="https://postcam-1.onrender.com">
             </div>
-
             <div class="form-group">
                 <label class="form-label"><i class="fas fa-user-shield"></i> Utilisateur Admin</label>
                 <input type="text" class="form-input" id="adminUser" placeholder="admin" value="admin">
             </div>
-
             <div class="form-group">
                 <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
                 <div style="position:relative;">
@@ -415,12 +410,10 @@
                     <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color:#6366f1;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
                 </div>
             </div>
-
             <div style="display:flex; gap:10px; margin-top:20px;">
                 <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
                 <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
             </div>
-
             <div id="settingsStatus" style="margin-top:15px; text-align:center; font-size:0.9rem;"></div>
         </div>
     </div>
@@ -451,16 +444,13 @@
                 adminUser: document.getElementById('adminUser').value.trim(),
                 adminPassword: document.getElementById('adminPassword').value
             };
-
             if (!settings.wifiSSID || !settings.wifiPassword || !settings.serverURL) {
                 showSettingsStatus("Tous les champs sont requis !", "error");
                 return;
             }
-
             localStorage.setItem('rh_settings', JSON.stringify(settings));
             showSettingsStatus("Paramètres enregistrés !", "success");
             API_URL = settings.serverURL + '/api';
-
             setTimeout(() => location.reload(), 1500);
         }
 
@@ -545,7 +535,206 @@
             }
         }
 
-        // ... (le reste du code est identique à ta version précédente)
+        async function editEmployee(id) {
+            const emp = await safeFetch(`${API_URL}/employees/${id}`, { success: false });
+            if (emp.success && emp.employee) {
+                currentEditId = id;
+                document.getElementById('formTitle').textContent = 'Modifier Employé';
+                document.getElementById('employeeType').value = emp.employee.type;
+                document.getElementById('employeeNom').value = emp.employee.nom;
+                document.getElementById('employeePrenom').value = emp.employee.prenom;
+                document.getElementById('employeeEmail').value = emp.employee.email || '';
+                document.getElementById('employeeTelephone').value = emp.employee.telephone || '';
+                document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
+                document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
+                toggleFinancialFields();
+                document.getElementById('addEmployeeForm').style.display = 'block';
+            } else {
+                alert("Impossible de charger l'employé.");
+            }
+        }
+
+        async function showQRCode(employeeId, name) {
+            try {
+                const img = document.getElementById('qrImage');
+                const qrModal = document.getElementById('qrModal');
+                const qrNameEl = document.getElementById('qrName');
+                const oldInfo = qrModal.querySelector('.qr-data-info');
+                if (oldInfo) oldInfo.remove();
+                qrNameEl.textContent = name;
+                let qrData = { id: employeeId, nom: name.split(' ')[1] || '', prenom: name.split(' ')[0] || '' };
+                try {
+                    const response = await fetch(`${API_URL}/employees/${employeeId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.employee) {
+                            const e = data.employee;
+                            qrData = {
+                                id: e.id, nom: e.nom, prenom: e.prenom, type: e.type,
+                                email: e.email || "", telephone: e.telephone || "",
+                                taux_horaire: e.taux_horaire || null, frais_ecolage: e.frais_ecolage || null
+                            };
+                        }
+                    }
+                } catch (err) { console.warn("Fallback activé:", err); }
+                const qrJsonString = JSON.stringify(qrData);
+                const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrJsonString)}`;
+                img.src = `${API_URL}/qrcode/${employeeId}`;
+                img.onerror = () => { img.src = fallbackUrl; };
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'qr-data-info';
+                infoDiv.style.cssText = 'margin-top:15px; padding:12px; background:#f0f9ff; border-radius:8px; font-size:0.85rem; color:#1e40af; border:1px solid #bfdbfe; text-align:left;';
+                infoDiv.innerHTML = `<strong>Données encodées :</strong><br><code style="word-break:break-all; display:block; margin-top:5px; font-size:0.75rem; color:#374151; background:#fff; padding:6px; border-radius:4px; border:1px solid #e5e7eb;">${qrJsonString}</code>`;
+                qrModal.querySelector('.modal-content').appendChild(infoDiv);
+                openModal('qrModal');
+            } catch (error) {
+                console.error("Erreur QR:", error);
+                alert("Erreur génération QR Code");
+            }
+        }
+
+        function toggleFinancialFields() {
+            const type = document.getElementById('employeeType').value;
+            document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
+            document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
+        }
+
+        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
+        function hideAddEmployeeForm() { resetForm(); }
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+            document.getElementById('editEmployeeId').value = '';
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+            currentEditId = null;
+        }
+
+        async function saveEmployee() {
+            const employee = {
+                nom: document.getElementById('employeeNom').value,
+                prenom: document.getElementById('employeePrenom').value,
+                type: document.getElementById('employeeType').value,
+                email: document.getElementById('employeeEmail').value,
+                telephone: document.getElementById('employeeTelephone').value,
+                taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
+                frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
+            };
+            const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
+            const method = currentEditId ? 'PUT' : 'POST';
+            try {
+                await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(employee) });
+                alert(currentEditId ? 'Modifié !' : 'Ajouté !');
+                hideAddEmployeeForm();
+                loadEmployees();
+            } catch { alert('Erreur réseau'); }
+        }
+
+        async function deleteEmployee(id) {
+            if (!confirm('Supprimer ?')) return;
+            try { await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' }); loadEmployees(); }
+            catch { alert('Erreur suppression'); }
+        }
+
+        // Scanner QR
+        async function startCamera() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.getElementById('scanner-video');
+                video.srcObject = videoStream;
+                scanInterval = setInterval(() => scanQRCode(video), 500);
+            } catch (err) { alert('Caméra: ' + err.message); }
+        }
+        function stopCamera() { if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); clearInterval(scanInterval); } }
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code) { handleQRScan(code.data); stopCamera(); }
+        }
+        async function handleQRScan(qrData) {
+            try {
+                const res = await fetch(`${API_URL}/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_code: qrData }) });
+                const result = await safeFetch(`${API_URL}/scan`, { success: false });
+                document.getElementById('scan-result').innerHTML = result.success
+                    ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                    : `<p style="color:red;">Échec pointage</p>`;
+            } catch { alert('Erreur scan'); }
+        }
+
+        // Autres
+        async function loadPointages() {
+            const data = await safeFetch(`${API_URL}/pointages/history`, { success: false, pointages: [] });
+            if (data.success) {
+                document.getElementById('pointagesList').innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
+                        <tbody>${data.pointages.map(p => `
+                            <tr><td>${p.employee_name}</td><td>${p.type}</td>
+                            <td>${new Date(p.timestamp).toLocaleDateString()}</td>
+                            <td>${new Date(p.timestamp).toLocaleTimeString()}</td></tr>
+                        `).join('')}</tbody>
+                    </table>`;
+            }
+        }
+
+        async function loadSalaryData() {
+            const data = await safeFetch(`${API_URL}/salary/history`, { success: false, salaries: [] });
+            if (data.success) {
+                let totalRevenue = 0, totalExpenses = 0;
+                data.salaries.forEach(s => {
+                    if (s.type === 'ecolage') totalRevenue += s.amount;
+                    if (s.type === 'salaire') totalExpenses += s.amount;
+                });
+                document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2) + 'Ar';
+                document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2) + 'Ar';
+                document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + 'Ar';
+            }
+        }
+
+        async function loadStatistics() {
+            const [empData, pointData] = await Promise.all([
+                safeFetch(`${API_URL}/employees`, { success: false, employees: [] }),
+                safeFetch(`${API_URL}/pointages/history`, { success: false, pointages: [] })
+            ]);
+            if (empData.success) {
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const students = empData.employees.filter(e => e.type === 'etudiant').length;
+                document.getElementById('totalEmployees').textContent = employees;
+                document.getElementById('totalStudents').textContent = students;
+            }
+            if (pointData.success && empData.success) {
+                const today = new Date().toISOString().split('T')[0];
+                const todayPointages = pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today);
+                const presence = todayPointages.filter(p => p.type === 'ENTREE').length;
+                const total = empData.employees.length;
+                const rate = total > 0 ? (presence / total * 100).toFixed(0) : 0;
+                document.getElementById('presenceRate').textContent = rate + '%';
+                document.getElementById('absenceRate').textContent = (100 - rate) + '%';
+            }
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+            const messagesDiv = document.getElementById('chatMessages');
+            messagesDiv.innerHTML += `<div class="message message-user">${message}</div>`;
+            input.value = '';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            setTimeout(() => {
+                messagesDiv.innerHTML += `<div class="message message-ai">Je traite : "${message}". (API Gemini non connectée)</div>`;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }, 1000);
+        }
+
+        function logout() { if (confirm('Déconnexion ?')) window.location.href = '/login'; }
+
+        // Fermeture modale au clic extérieur
+        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
