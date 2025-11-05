@@ -463,7 +463,6 @@
             `;
             document.body.appendChild(badge);
 
-            // Circuit SVG
             const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             circuitSVG.setAttribute('width', '100%'); circuitSVG.setAttribute('height', '100%');
             circuitSVG.setAttribute('style', 'position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;');
@@ -478,7 +477,6 @@
             `;
             badge.appendChild(circuitSVG);
 
-            // Infos
             const infoDiv = document.createElement('div');
             infoDiv.style.cssText = 'z-index: 2; padding: 10px;';
             infoDiv.innerHTML = `
@@ -490,7 +488,6 @@
             `;
             badge.appendChild(infoDiv);
 
-            // QR + ESP01S
             const bottomDiv = document.createElement('div');
             bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
             const qrDiv = document.createElement('div');
@@ -507,7 +504,6 @@
             bottomDiv.appendChild(espDiv);
             badge.appendChild(bottomDiv);
 
-            // LED
             const led = document.createElement('div');
             led.style.cssText = `
                 position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
@@ -581,7 +577,7 @@
             exportToExcel(exportData, "Statistiques_RH");
         }
 
-        // === EMPLOYÉS (MODIFIÉ POUR AJOUTER BADGE) ===
+        // === EMPLOYÉS (AVEC BOUTON BADGE) ===
         async function loadEmployees() {
             const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
             const list = document.getElementById('employeesList');
@@ -598,8 +594,9 @@
             `).join('') : '<p style="color:#ef4444">Aucun employé.</p>';
         }
 
-        // === LE RESTE DU CODE EST INCHANGÉ (PARAMÈTRES, SCANNER, ETC.) ===
-        // [Tout le code original que tu as fourni est conservé ici]
+        // === RESTE DU CODE (INCHANGÉ) ===
+        // [Toutes les fonctions originales sont conservées ici]
+
         // === PARAMÈTRES ===
         function loadSettings() {
             const saved = localStorage.getItem('rh_settings');
