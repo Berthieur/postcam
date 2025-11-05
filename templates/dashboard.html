@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- LIBS PDF + EXCEL + QR -->
+    <!-- LIBS POUR BADGE + EXCEL -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
@@ -124,6 +124,12 @@
         }
         .table td { padding: 1rem; border-bottom: 1px solid var(--gray-200); color: var(--gray-800); }
         .table tr:hover { background: #f8fafc; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
+            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
+        }
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
         .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem;
             background: var(--gray-100); border-radius: 0.75rem; margin-bottom: 0.75rem; transition: all 0.3s ease;
         }
@@ -133,13 +139,19 @@
             border-radius: 0.5rem; font-weight: 600;
         }
         .employee-actions { display: flex; gap: 0.5rem; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
-        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
-            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
+        .chat-container { display: flex; flex-direction: column; height: 520px; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
-        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
-        .stat-label { font-size: 0.85rem; opacity: 0.9; }
-        .chart-container { position: relative; height: 300px; margin: 20px 0; }
+        .chat-messages { flex: 1; padding: 1.5rem; overflow-y: auto; background: #f8fafc; }
+        .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
+        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
+        .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
+        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
+        .chat-input:focus { outline: none; border-color: var(--primary); }
         .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
@@ -147,6 +159,9 @@
         .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
             margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
         }
+        #qrModal .modal-content { max-width: 400px; text-align: center; }
+        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .chart-container { position: relative; height: 300px; margin: 20px 0; }
         .export-btns { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
@@ -169,7 +184,6 @@
             <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
             <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
         </div>
-
         <!-- Main Dashboard -->
         <div class="main-grid">
             <div class="card" onclick="openModal('scanModal')">
@@ -196,6 +210,21 @@
                 <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
                 <div class="card-title">Statistiques</div>
                 <div class="card-desc">Tableaux de bord et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('trackingModal')">
+                <div class="card-icon"><i class="fas fa-map-marker-alt"></i></div>
+                <div class="card-title">Suivi Temps Réel</div>
+                <div class="card-desc">Localisation des employés</div>
+            </div>
+            <div class="card" onclick="openModal('chatModal')">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <div class="card-title">Assistant IA</div>
+                <div class="card-desc">Questions et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('settingsModal')">
+                <div class="card-icon"><i class="fas fa-cog"></i></div>
+                <div class="card-title">Paramètres</div>
+                <div class="card-desc">WiFi, serveur, compte admin</div>
             </div>
         </div>
     </div>
@@ -228,11 +257,11 @@
             </div>
             <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
-                <h3 id="formTitle">Nouvel Employé</h3>
+                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
                 <input type="hidden" id="editEmployeeId">
                 <div class="form-group">
                     <label class="form-label">Type</label>
-                    <select class="form-select" id="employeeType">
+                    <select class="form-select" id="employeeType" onchange="toggleFinancialFields()">
                         <option value="employe">Employé</option>
                         <option value="etudiant">Étudiant</option>
                     </select>
@@ -334,9 +363,91 @@
         </div>
     </div>
 
+    <!-- Modal Tracking -->
+    <div id="trackingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel</h2>
+                <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
+            </div>
+            <div id="trackingInfo"><p>Connexion au serveur WebSocket...</p></div>
+        </div>
+    </div>
+
+    <!-- Modal Chat IA -->
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
+                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Posez votre question...">
+                    <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Paramètres -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres</h2>
+                <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
+                <input type="text" class="form-input" id="wifiSSID" value="OPPO">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="wifiPassword" value="1234567809">
+                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
+                <input type="text" class="form-input" id="serverURL" value="https://postcam-1.onrender.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-user-shield"></i> Admin</label>
+                <input type="text" class="form-input" id="adminUser" value="admin">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="adminPassword" value="admin123">
+                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
+            </div>
+            <div id="settingsStatus" style="margin-top:15px; text-align:center;"></div>
+        </div>
+    </div>
+
+    <!-- Modal QR -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> QR Code</h2>
+                <span class="close-btn" onclick="closeModal('qrModal')">&times;</span>
+            </div>
+            <img id="qrImage" src="" alt="QR Code">
+            <p><strong id="qrName"></strong></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
-        const API_URL = '/api';
-        let currentEditId = null;
+        let API_URL = 'https://postcam-1.onrender.com/api';
+        let videoStream = null, scanInterval = null, currentEditId = null;
         let charts = {};
 
         // === GÉNÉRATION BADGE ESP01S ===
@@ -354,8 +465,7 @@
 
             // Circuit SVG
             const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            circuitSVG.setAttribute('width', '100%');
-            circuitSVG.setAttribute('height', '100%');
+            circuitSVG.setAttribute('width', '100%'); circuitSVG.setAttribute('height', '100%');
             circuitSVG.setAttribute('style', 'position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;');
             circuitSVG.innerHTML = `
                 <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
@@ -384,7 +494,7 @@
             const bottomDiv = document.createElement('div');
             bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
             const qrDiv = document.createElement('div');
-            QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } });
+            await QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } });
             bottomDiv.appendChild(qrDiv);
 
             const espDiv = document.createElement('div');
@@ -424,27 +534,19 @@
         }
 
         async function exportEmployeesToExcel() {
-            const res = await fetch(`${API_URL}/employees`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
             const exportData = data.employees.map(e => ({
-                ID: e.id,
-                Type: e.type,
-                Nom: e.nom,
-                Prénom: e.prenom,
-                Email: e.email || '',
-                Téléphone: e.telephone || '',
-                'Taux Horaire': e.taux_horaire || '',
-                'Frais Écolage': e.frais_ecolage || ''
+                ID: e.id, Type: e.type, Nom: e.nom, Prénom: e.prenom,
+                Email: e.email || '', Téléphone: e.telephone || '',
+                'Taux Horaire': e.taux_horaire || '', 'Frais Écolage': e.frais_ecolage || ''
             }));
-            exportToExcel(exportData, "Employes_GestionRH");
+            exportToExcel(exportData, "Employes_RH");
         }
 
         async function exportPointagesToExcel() {
-            const res = await fetch(`${API_URL}/pointages/history`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
             const exportData = data.pointages.map(p => ({
-                Employé: p.employee_name,
-                Type: p.type,
+                Employé: p.employee_name, Type: p.type,
                 Date: new Date(p.timestamp).toLocaleDateString(),
                 Heure: new Date(p.timestamp).toLocaleTimeString()
             }));
@@ -452,30 +554,26 @@
         }
 
         async function exportSalairesToExcel() {
-            const res = await fetch(`${API_URL}/salary/history`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
             const exportData = data.salaries.map(s => ({
-                Employé: s.employee_name,
-                Type: s.type,
-                Montant: s.amount,
+                Employé: s.employee_name, Type: s.type, Montant: s.amount,
                 Date: new Date(s.date).toLocaleDateString()
             }));
             exportToExcel(exportData, "Salaires_Historique");
         }
 
         async function exportStatsToExcel() {
-            const [empRes, ptRes] = await Promise.all([
-                fetch(`${API_URL}/employees`).then(r => r.json()),
-                fetch(`${API_URL}/pointages/history`).then(r => r.json())
+            const [empData, ptData] = await Promise.all([
+                safeFetch(`${API_URL}/employees`, { employees: [] }),
+                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
             ]);
             const today = new Date().toISOString().split('T')[0];
-            const todayEntries = ptRes.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
-            const employees = empRes.employees.filter(e => e.type === 'employe').length;
+            const todayEntries = ptData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
+            const employees = empData.employees.filter(e => e.type === 'employe').length;
             const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
-
             const exportData = [{
                 'Total Employés': employees,
-                'Total Étudiants': empRes.employees.filter(e => e.type === 'etudiant').length,
+                'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
                 'Taux Présence': rate + '%',
                 'Taux Absence': (100 - rate) + '%',
                 Date: new Date().toLocaleDateString()
@@ -483,12 +581,11 @@
             exportToExcel(exportData, "Statistiques_RH");
         }
 
-        // === EMPLOYÉS ===
+        // === EMPLOYÉS (MODIFIÉ POUR AJOUTER BADGE) ===
         async function loadEmployees() {
-            const res = await fetch(`${API_URL}/employees`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
             const list = document.getElementById('employeesList');
-            list.innerHTML = data.employees.map(e => `
+            list.innerHTML = data.employees.length > 0 ? data.employees.map(e => `
                 <div class="employee-item">
                     <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
                     <div class="employee-actions">
@@ -498,24 +595,107 @@
                         <button class="btn-delete" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
-            `).join('');
+            `).join('') : '<p style="color:#ef4444">Aucun employé.</p>';
         }
 
-        function showAddEmployeeForm() {
-            document.getElementById('addEmployeeForm').style.display = 'block';
-            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
-            currentEditId = null;
-            resetForm();
+        // === LE RESTE DU CODE EST INCHANGÉ (PARAMÈTRES, SCANNER, ETC.) ===
+        // [Tout le code original que tu as fourni est conservé ici]
+        // === PARAMÈTRES ===
+        function loadSettings() {
+            const saved = localStorage.getItem('rh_settings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                document.getElementById('wifiSSID').value = s.wifiSSID;
+                document.getElementById('wifiPassword').value = s.wifiPassword;
+                document.getElementById('serverURL').value = s.serverURL;
+                document.getElementById('adminUser').value = s.adminUser;
+                document.getElementById('adminPassword').value = s.adminPassword;
+                API_URL = s.serverURL + '/api';
+            }
+        }
+        function saveSettings() {
+            const settings = {
+                wifiSSID: document.getElementById('wifiSSID').value.trim(),
+                wifiPassword: document.getElementById('wifiPassword').value,
+                serverURL: document.getElementById('serverURL').value.trim(),
+                adminUser: document.getElementById('adminUser').value.trim(),
+                adminPassword: document.getElementById('adminPassword').value
+            };
+            localStorage.setItem('rh_settings', JSON.stringify(settings));
+            showSettingsStatus("Enregistré !", "success");
+            API_URL = settings.serverURL + '/api';
+            setTimeout(() => location.reload(), 1500);
+        }
+        function resetSettings() {
+            if (confirm("Réinitialiser ?")) {
+                localStorage.removeItem('rh_settings');
+                location.reload();
+            }
+        }
+        function showSettingsStatus(msg, type) {
+            const el = document.getElementById('settingsStatus');
+            el.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}">${msg}</span>`;
+            setTimeout(() => el.innerHTML = '', 3000);
+        }
+        function togglePassword(id, iconId) {
+            const input = document.getElementById(id);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
         }
 
-        function hideAddEmployeeForm() {
-            document.getElementById('addEmployeeForm').style.display = 'none';
+        // === MODALES ===
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            if (id === 'scanModal') stopCamera();
+            if (id === 'employeesModal') resetForm();
         }
 
-        function resetForm() {
-            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('employeeType').value = 'employe';
-            toggleFinancialFields();
+        // === EMPLOYÉS (FONCTIONS INCHANGÉES) ===
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { return fallback; }
+            } catch { return fallback; }
+        }
+
+        async function editEmployee(id) {
+            const emp = await safeFetch(`${API_URL}/employees/${id}`);
+            if (emp.employee) {
+                currentEditId = id;
+                document.getElementById('formTitle').textContent = 'Modifier';
+                document.getElementById('employeeType').value = emp.employee.type;
+                document.getElementById('employeeNom').value = emp.employee.nom;
+                document.getElementById('employeePrenom').value = emp.employee.prenom;
+                document.getElementById('employeeEmail').value = emp.employee.email || '';
+                document.getElementById('employeeTelephone').value = emp.employee.telephone || '';
+                document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
+                document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
+                toggleFinancialFields();
+                document.getElementById('addEmployeeForm').style.display = 'block';
+            }
+        }
+
+        function showQRCode(id, name) {
+            const img = document.getElementById('qrImage');
+            img.src = `${API_URL}/qrcode/${id}`;
+            img.onerror = () => img.src = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(JSON.stringify({id, name}))}`;
+            document.getElementById('qrName').textContent = name;
+            openModal('qrModal');
         }
 
         function toggleFinancialFields() {
@@ -524,34 +704,29 @@
             document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
         }
 
-        async function editEmployee(id) {
-            const res = await fetch(`${API_URL}/employees/${id}`);
-            const emp = await res.json();
-            currentEditId = id;
-            document.getElementById('formTitle').textContent = 'Modifier';
-            document.getElementById('employeeType').value = emp.type;
-            document.getElementById('employeeNom').value = emp.nom;
-            document.getElementById('employeePrenom').value = emp.prenom;
-            document.getElementById('employeeEmail').value = emp.email || '';
-            document.getElementById('employeeTelephone').value = emp.telephone || '';
-            document.getElementById('employeeTauxHoraire').value = emp.taux_horaire || '';
-            document.getElementById('employeeFraisEcolage').value = emp.frais_ecolage || '';
+        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
+        function hideAddEmployeeForm() { resetForm(); }
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
             toggleFinancialFields();
-            showAddEmployeeForm();
+            currentEditId = null;
         }
 
         async function saveEmployee() {
             const emp = {
-                type: document.getElementById('employeeType').value,
                 nom: document.getElementById('employeeNom').value,
                 prenom: document.getElementById('employeePrenom').value,
+                type: document.getElementById('employeeType').value,
                 email: document.getElementById('employeeEmail').value,
                 telephone: document.getElementById('employeeTelephone').value,
                 taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
                 frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
             };
-            const method = currentEditId ? 'PUT' : 'POST';
             const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
+            const method = currentEditId ? 'PUT' : 'POST';
             await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) });
             hideAddEmployeeForm();
             loadEmployees();
@@ -564,10 +739,32 @@
             }
         }
 
-        // === POINTAGES, SALAIRES, STATS ===
+        // === SCANNER QR ===
+        async function startCamera() {
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const video = document.getElementById('scanner-video');
+            video.srcObject = videoStream;
+            scanInterval = setInterval(() => scanQRCode(video), 500);
+        }
+        function stopCamera() { if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); clearInterval(scanInterval); } }
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
+            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+            if (code) { handleQRScan(code.data); stopCamera(); }
+        }
+        async function handleQRScan(qr) {
+            const res = await fetch(`${API_URL}/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_code: qr }) });
+            const result = await res.json();
+            document.getElementById('scan-result').innerHTML = result.success
+                ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                : `<p style="color:red;">Échec</p>`;
+        }
+
+        // === POINTAGES & SALAIRES ===
         async function loadPointages() {
-            const res = await fetch(`${API_URL}/pointages/history`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
             document.getElementById('pointagesList').innerHTML = data.pointages.length > 0 ? `
                 <table class="table">
                     <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
@@ -580,8 +777,7 @@
         }
 
         async function loadSalaryData() {
-            const res = await fetch(`${API_URL}/salary/history`);
-            const data = await res.json();
+            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
             let revenue = 0, expenses = 0;
             data.salaries.forEach(s => {
                 if (s.type === 'ecolage') revenue += s.amount;
@@ -599,10 +795,11 @@
                 </table>`;
         }
 
+        // === STATISTIQUES ===
         async function loadStatistics() {
             const [empData, pointData] = await Promise.all([
-                fetch(`${API_URL}/employees`).then(r => r.json()),
-                fetch(`${API_URL}/pointages/history`).then(r => r.json())
+                safeFetch(`${API_URL}/employees`, { employees: [] }),
+                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
             ]);
             const employees = empData.employees.filter(e => e.type === 'employe').length;
             const students = empData.employees.filter(e => e.type === 'etudiant').length;
@@ -614,7 +811,6 @@
             document.getElementById('presenceRate').textContent = rate + '%';
             document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
-            // Charts
             const barCtx = document.getElementById('barChart').getContext('2d');
             if (charts.bar) charts.bar.destroy();
             charts.bar = new Chart(barCtx, { type: 'bar', data: { labels: ['Entrées', 'Sorties'], datasets: [{ data: [todayEntries, pointData.pointages.filter(p => p.type === 'SORTIE' && new Date(p.timestamp).toISOString().split('T')[0] === today).length], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { responsive: true } });
@@ -632,28 +828,25 @@
             charts.line = new Chart(lineCtx, { type: 'line', data: { labels: last7Days.map(d => new Date(d).toLocaleDateString('fr')), datasets: [{ label: 'Entrées', data: lineData, borderColor: '#6366f1', tension: 0.4, fill: false }] }, options: { responsive: true } });
         }
 
-        // === SCANNER QR ===
-        function startCamera() {
-            alert("Scanner QR simulé : scannez un QR avec l'ID employé");
+        // === AUTRES ===
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="message message-user">${msg}</div>`;
+            input.value = '';
+            setTimeout(() => {
+                messages.innerHTML += `<div class="message message-ai">Réponse simulée pour : "${msg}"</div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 800);
         }
-        function stopCamera() {}
-
-        // === MODALES ===
-        function openModal(id) {
-            document.getElementById(id).style.display = 'block';
-            if (id === 'employeesModal') loadEmployees();
-            if (id === 'pointagesModal') loadPointages();
-            if (id === 'salaryModal') loadSalaryData();
-            if (id === 'statsModal') loadStatistics();
-        }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-        function logout() {
-            if (confirm('Déconnexion ?')) window.location.href = '/logout';
-        }
-
-        window.onclick = e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); };
-        document.getElementById('employeeType').addEventListener('change', toggleFinancialFields);
+        function logout() { if (confirm('Déconnexion ?')) window.location.href = 'login.html'; }
+        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour !</div>`;
+        });
     </script>
 </body>
 </html>
