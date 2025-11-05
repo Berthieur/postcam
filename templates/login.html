@@ -12,8 +12,6 @@
             --danger: #ef4444;
             --gray-800: #1f2937;
             --gray-100: #f3f4f6;
-            --glass: rgba(255, 255, 255, 0.15);
-            --glass-border: rgba(255, 255, 255, 0.2);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -27,9 +25,9 @@
             padding: 1rem;
         }
         .login-container {
-            background: var(--glass);
+            background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 2.5rem;
             border-radius: 1.5rem;
             width: 100%;
@@ -67,7 +65,6 @@
             font-size: 1rem;
             transition: all 0.3s ease;
         }
-        .form-input::placeholder { color: rgba(255, 255, 255, 0.6); }
         .form-input:focus {
             outline: none;
             border-color: var(--primary);
@@ -102,22 +99,31 @@
     <div class="login-container">
         <i class="fas fa-building logo"></i>
         <h1>Gestion RH Pro</h1>
-        <form method="POST" action="{{ url_for('login') }}">
+        <form id="loginForm">
             <div class="form-group">
                 <label class="form-label">Utilisateur</label>
-                <input type="text" name="username" class="form-input" placeholder="admin" required>
+                <input type="text" class="form-input" id="username" value="admin" readonly>
             </div>
             <div class="form-group">
                 <label class="form-label">Mot de passe</label>
-                <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+                <input type="password" class="form-input" id="password" value="admin123" readonly>
             </div>
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <p class="error" style="display:block;">{{ messages[0] }}</p>
-                {% endif %}
-            {% endwith %}
+            <p class="error" id="errorMsg">Identifiants incorrects !</p>
             <button type="submit" class="btn">Se connecter</button>
         </form>
     </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            if (user === 'admin' && pass === 'admin123') {
+                window.location.href = 'index.html';
+            } else {
+                document.getElementById('errorMsg').style.display = 'block';
+            }
+        });
+    </script>
 </body>
 </html>
