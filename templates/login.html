@@ -3,95 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion</title>
+    <title>Connexion - Gestion RH Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #6366f1;
+            --danger: #ef4444;
+            --gray-800: #1f2937;
+            --gray-100: #f3f4f6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: white;
+            min-height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
+            justify-content: center;
+            padding: 1rem;
         }
         .login-container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            width: 300px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             text-align: center;
         }
-        h2 {
-            color: #333;
+        .logo {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
         }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
         }
-        button {
+        .form-group {
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .form-input {
             width: 100%;
-            padding: 10px;
-            background-color: #4CAF50;
+            padding: 0.875rem 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
+        }
+        .btn {
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 4px;
+            padding: 0.875rem;
+            border-radius: 0.75rem;
+            width: 100%;
+            font-weight: 600;
+            font-size: 1rem;
             cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
         }
-        button:hover {
-            background-color: #45a049;
+        .btn:hover {
+            background: #4f46e5;
+            transform: translateY(-2px);
         }
         .error {
-            color: red;
-            font-size: 14px;
+            color: var(--danger);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <h2>Connexion</h2>
-        {% if error %}
-            <p class="error">{{ error }}</p>
-        {% endif %}
-        <form id="login-form" method="POST" action="/api/login">
-            <input type="text" name="username" placeholder="Nom d'utilisateur" required>
-            <input type="password" name="password" placeholder="Mot de passe" required>
-            <button type="submit">Se connecter</button>
+        <i class="fas fa-building logo"></i>
+        <h1>Gestion RH Pro</h1>
+        <form id="loginForm">
+            <div class="form-group">
+                <label class="form-label">Utilisateur</label>
+                <input type="text" class="form-input" id="username" value="admin" readonly>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Mot de passe</label>
+                <input type="password" class="form-input" id="password" value="admin123" readonly>
+            </div>
+            <p class="error" id="errorMsg">Identifiants incorrects !</p>
+            <button type="submit" class="btn">Se connecter</button>
         </form>
     </div>
-    <script>
-        document.getElementById('login-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData);
 
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: new URLSearchParams(data).toString()
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    window.location.href = result.redirect_url;
-                } else {
-                    const errorDiv = document.querySelector('.error') || document.createElement('p');
-                    errorDiv.className = 'error';
-                    errorDiv.textContent = result.error || 'Erreur de connexion';
-                    form.prepend(errorDiv);
-                }
-            } catch (error) {
-                console.error('Erreur:', error);
-                const errorDiv = document.querySelector('.error') || document.createElement('p');
-                errorDiv.className = 'error';
-                errorDiv.textContent = 'Erreur réseau';
-                form.prepend(errorDiv);
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            if (user === 'admin' && pass === 'admin123') {
+                                                               window.location.href = 'dashboard.html';
+            } else {
+                document.getElementById('errorMsg').style.display = 'block';
             }
         });
     </script>
