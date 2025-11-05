@@ -651,9 +651,9 @@ async function showQRCode(employeeId, name) {
                     if (s.type === 'ecolage') totalRevenue += s.amount;
                     if (s.type === 'salaire') totalExpenses += s.amount;
                 });
-                document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2) + '€';
-                document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2) + '€';
-                document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + '€';
+                document.getElementById('totalRevenue').textContent = totalRevenue.toFixed(2) + 'Ar';
+                document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2) + 'Ar';
+                document.getElementById('netProfit').textContent = (totalRevenue - totalExpenses).toFixed(2) + 'Ar';
             }
         }
 
