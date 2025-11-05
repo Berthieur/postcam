@@ -479,71 +479,85 @@
             }
         }
 
-       // ✅ NOUVELLE VERSION (CORRIGÉE)
+      // Fonction principale : Génère un QR code complet avec toutes les données de l'employé
 async function showQRCode(employeeId, name) {
     try {
-        // 1️⃣ Récupérer les données complètes de l'employé
-        const empData = await safeFetch(`${API_URL}/employees/${employeeId}`, { success: false });
-        
-        if (!empData.success || !empData.employee) {
-            alert("Impossible de charger les données de l'employé");
-            return;
+        const img = document.getElementById('qrImage');
+        const qrModal = document.getElementById('qrModal');
+        const qrNameEl = document.getElementById('qrName');
+
+        // 1. Nettoyer le modal précédent
+        const oldInfo = qrModal.querySelector('.qr-data-info');
+        if (oldInfo) oldInfo.remove();
+
+        // 2. Afficher le nom immédiatement
+        qrNameEl.textContent = name;
+
+        // 3. Essayer de charger les données complètes depuis le serveur
+        let qrData = { id: employeeId, nom: name.split(' ')[1] || '', prenom: name.split(' ')[0] || '' };
+
+        try {
+            const response = await fetch(`${API_URL}/employees/${employeeId}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.employee) {
+                    const e = data.employee;
+                    qrData = {
+                        id: e.id,
+                        nom: e.nom,
+                        prenom: e.prenom,
+                        type: e.type,
+                        email: e.email || "",
+                        telephone: e.telephone || "",
+                        taux_horaire: e.taux_horaire || null,
+                        frais_ecolage: e.frais_ecolage || null
+                    };
+                }
+            }
+        } catch (fetchError) {
+            console.warn("Serveur indisponible, utilisation du fallback:", fetchError);
         }
 
-        const employee = empData.employee;
-
-        // 2️⃣ Créer l'objet JSON complet pour le QR code
-        const qrData = {
-            id: employee.id,
-            nom: employee.nom,
-            prenom: employee.prenom,
-            type: employee.type,
-            email: employee.email || "",
-            telephone: employee.telephone || "",
-            taux_horaire: employee.taux_horaire || null,
-            frais_ecolage: employee.frais_ecolage || null
-        };
-
-        // 3️⃣ Convertir en JSON string
+        // 4. Générer le JSON complet
         const qrJsonString = JSON.stringify(qrData);
-
-        // 4️⃣ Générer le QR code avec les données complètes
-        const img = document.getElementById('qrImage');
-        const apiUrl = `${API_URL}/qrcode/${employeeId}`; // endpoint serveur (si disponible)
         const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(qrJsonString)}`;
 
-        // Essayer l'API serveur d'abord, sinon fallback
+        // 5. Essayer d'abord l'API serveur (si tu as un endpoint /qrcode)
+        const apiUrl = `${API_URL}/qrcode/${employeeId}`;
         img.src = apiUrl;
-        img.onerror = () => { 
-            img.src = fallbackUrl; 
-            console.log("QR Code généré avec fallback:", qrJsonString);
+
+        // 6. Fallback si l'image serveur échoue
+        img.onerror = () => {
+            console.log("API QR serveur échouée → fallback QRServer");
+            img.src = fallbackUrl;
         };
 
-        // 5️⃣ Afficher les infos dans le modal
-        document.getElementById('qrName').textContent = `${employee.prenom} ${employee.nom}`;
-        
-        // ✅ Ajouter un aperçu des données encodées (optionnel, pour debug)
-        const qrModal = document.getElementById('qrModal');
-        const existingInfo = qrModal.querySelector('.qr-data-info');
-        if (existingInfo) existingInfo.remove();
-        
+        // 7. Ajouter les données encodées (debug + traçabilité)
         const infoDiv = document.createElement('div');
         infoDiv.className = 'qr-data-info';
-        infoDiv.style.cssText = 'margin-top:15px; padding:12px; background:#f0f9ff; border-radius:8px; font-size:0.85rem; color:#1e40af; text-align:left;';
+        infoDiv.style.cssText = `
+            margin-top: 15px; padding: 12px; background: #f0f9ff; 
+            border-radius: 8px; font-size: 0.85rem; color: #1e40af; 
+            border: 1px solid #bfdbfe; text-align: left;
+        `;
         infoDiv.innerHTML = `
-            <strong>📱 Données encodées :</strong><br>
-            <code style="word-break:break-all; display:block; margin-top:5px; font-size:0.75rem; color:#374151;">${qrJsonString}</code>
+            <strong>Données encodées :</strong><br>
+            <code style="word-break: break-all; display: block; margin-top: 5px; 
+                        font-size: 0.75rem; color: #374151; background: #fff; 
+                        padding: 6px; border-radius: 4px; border: 1px solid #e5e7eb;">
+                ${qrJsonString}
+            </code>
         `;
         qrModal.querySelector('.modal-content').appendChild(infoDiv);
 
+        // 8. Ouvrir le modal
         openModal('qrModal');
 
     } catch (error) {
-        console.error("Erreur génération QR Code:", error);
+        console.error("Erreur critique showQRCode:", error);
         alert("Erreur lors de la génération du QR Code");
     }
 }
-
         function toggleFinancialFields() {
             const type = document.getElementById('employeeType').value;
             document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
