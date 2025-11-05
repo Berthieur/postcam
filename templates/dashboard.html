@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion RH Pro - Dashboard</title>
+    <title>Gestion RH Pro - Pointage & Suivi</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- LIBS POUR BADGE PDF -->
+    <!-- LIBS PDF + EXCEL + QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root {
             --primary: #6366f1;
@@ -58,48 +59,32 @@
             transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
         }
         .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
-
-        /* BARRE DE RECHERCHE */
-        .search-container { position: relative; display: flex; align-items: center; }
-        .search-input {
-            padding: 0.75rem 1rem 0.75rem 2.5rem; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 0.75rem;
-            background: rgba(255, 255, 255, 0.1); color: white; font-size: 0.95rem; width: 280px; transition: all 0.3s ease;
-            backdrop-filter: blur(8px);
-        }
-        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3); width: 320px; }
-        .search-icon { position: absolute; left: 0.8rem; color: rgba(255, 255, 255, 0.7); font-size: 1.1rem; pointer-events: none; }
-        .search-results {
-            position: absolute; top: 100%; left: 0; right: 0; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); border-radius: 0.75rem; margin-top: 0.5rem; max-height: 300px; overflow-y: auto;
-            display: none; z-index: 100; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        }
-        .search-result-item { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background 0.2s ease; }
-        .search-result-item:hover { background: rgba(99, 102, 241, 0.2); }
-        .search-result-title { font-weight: 600; color: white; font-size: 0.95rem; }
-        .search-result-subtitle { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); }
-        .no-results { padding: 1rem; text-align: center; color: #ef4444; font-style: italic; }
-
         .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .card {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
-            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden;
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
         }
         .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left; transition: transform 0.4s ease;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
+            transition: transform 0.4s ease;
         }
         .card:hover::before { transform: scaleX(1); }
-        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.3); }
         .card-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
         .card-title { font-size: 1.35rem; font-weight: 600; color: white; margin-bottom: 0.5rem; }
         .card-desc { color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; line-height: 1.5; }
-
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
+            animation: fadeIn 0.3s ease;
         }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
             max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
             padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);
@@ -120,15 +105,16 @@
             cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s ease; display: inline-flex;
             align-items: center; gap: 0.5rem;
         }
-        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
         .btn-secondary { background: var(--gray-600); }
         .btn-secondary:hover { background: var(--gray-800); }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
-        .btn-edit, .btn-qr, .btn-delete, .btn-badge { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; margin: 0 2px; }
+        .btn-edit, .btn-qr, .btn-delete, .btn-badge, .btn-excel { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
         .btn-edit { background: #3b82f6; color: white; }
         .btn-qr { background: var(--success); color: white; }
-        .btn-badge { background: #10b981; color: white; } /* Vert pour badge */
+        .btn-badge { background: #10b981; color: white; }
+        .btn-excel { background: #16a34a; color: white; }
         .btn-delete { background: var(--danger); color: white; }
         .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -147,21 +133,32 @@
             border-radius: 0.5rem; font-weight: 600;
         }
         .employee-actions { display: flex; gap: 0.5rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
+            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
+        }
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
         .chart-container { position: relative; height: 300px; margin: 20px 0; }
-
-        /* ANIMATION LED POUR BADGE */
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        #scanner-video { width: 100%; display: block; }
+        .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
+            margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
+        }
+        .export-btns { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
             100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
         }
-
         @media (max-width: 768px) {
             .header { flex-direction: column; gap: 1rem; text-align: center; }
             .main-grid { grid-template-columns: 1fr; }
             .modal-content { margin: 1rem; padding: 1.5rem; }
-            .search-input { width: 200px; }
-            .search-input:focus { width: 220px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .chart-container { height: 250px; }
         }
     </style>
 </head>
@@ -170,53 +167,76 @@
         <!-- Header -->
         <div class="header">
             <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <div class="search-container">
-                    <input type="text" class="search-input" id="globalSearch" placeholder="Rechercher partout...">
-                    <i class="fas fa-search search-icon"></i>
-                    <div id="searchResults" class="search-results"></div>
-                </div>
-                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
-            </div>
+            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
         </div>
 
-        <!-- Cartes principales -->
+        <!-- Main Dashboard -->
         <div class="main-grid">
+            <div class="card" onclick="openModal('scanModal')">
+                <div class="card-icon"><i class="fas fa-qrcode"></i></div>
+                <div class="card-title">Scanner QR Code</div>
+                <div class="card-desc">Enregistrer les pointages via QR</div>
+            </div>
             <div class="card" onclick="openModal('employeesModal')">
                 <div class="card-icon"><i class="fas fa-users"></i></div>
                 <div class="card-title">Gestion Employés</div>
-                <div class="card-desc">Ajouter, modifier, supprimer</div>
+                <div class="card-desc">Ajouter et gérer les employés</div>
             </div>
             <div class="card" onclick="openModal('pointagesModal')">
                 <div class="card-icon"><i class="fas fa-clock"></i></div>
                 <div class="card-title">Historique Pointages</div>
-                <div class="card-desc">Entrées / Sorties</div>
+                <div class="card-desc">Consulter les pointages</div>
             </div>
             <div class="card" onclick="openModal('salaryModal')">
                 <div class="card-icon"><i class="fas fa-euro-sign"></i></div>
                 <div class="card-title">Gestion Salaires</div>
-                <div class="card-desc">Écolage & Salaires</div>
+                <div class="card-desc">Calculer et gérer les salaires</div>
             </div>
             <div class="card" onclick="openModal('statsModal')">
                 <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
                 <div class="card-title">Statistiques</div>
-                <div class="card-desc">Taux de présence, graphiques</div>
+                <div class="card-desc">Tableaux de bord et analyses</div>
             </div>
         </div>
     </div>
 
-    <!-- === MODALES === -->
-    <!-- Employés -->
+    <!-- Modal Scanner QR -->
+    <div id="scanModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> Scanner QR Code</h2>
+                <span class="close-btn" onclick="closeModal('scanModal')">&times;</span>
+            </div>
+            <div class="video-container">
+                <video id="scanner-video" autoplay></video>
+            </div>
+            <div id="scan-result"></div>
+            <button class="btn" onclick="startCamera()"><i class="fas fa-play"></i> Démarrer Scanner</button>
+            <button class="btn btn-secondary" onclick="stopCamera()"><i class="fas fa-stop"></i> Arrêter</button>
+        </div>
+    </div>
+
+    <!-- Modal Employés -->
     <div id="employeesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-users"></i> Gestion des Employés</h2>
                 <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
             </div>
-            <button class="btn" onclick="showAddEmployeeForm()">Ajouter</button>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportEmployeesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
                 <h3 id="formTitle">Nouvel Employé</h3>
                 <input type="hidden" id="editEmployeeId">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="employeeType">
+                        <option value="employe">Employé</option>
+                        <option value="etudiant">Étudiant</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label class="form-label">Nom</label>
                     <input type="text" class="form-input" id="employeeNom">
@@ -226,71 +246,103 @@
                     <input type="text" class="form-input" id="employeePrenom">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Type</label>
-                    <select class="form-select" id="employeeType">
-                        <option value="employe">Employé</option>
-                        <option value="etudiant">Étudiant</option>
-                    </select>
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="employeeEmail">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Poste/Profession</label>
-                    <input type="text" class="form-input" id="employeeProfession" placeholder="Ex: Software Engineer">
+                    <label class="form-label">Téléphone</label>
+                    <input type="text" class="form-input" id="employeeTelephone">
                 </div>
-                <button class="btn" onclick="saveEmployee()">Enregistrer</button>
-                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()">Annuler</button>
+                <div class="form-group" id="tauxHoraireGroup">
+                    <label class="form-label">Taux Horaire (Ar)</label>
+                    <input type="number" class="form-input" id="employeeTauxHoraire" step="0.01">
+                </div>
+                <div class="form-group" id="fraisEcolageGroup" style="display:none;">
+                    <label class="form-label">Frais Écolage (Ar)</label>
+                    <input type="number" class="form-input" id="employeeFraisEcolage" step="0.01">
+                </div>
+                <button class="btn" onclick="saveEmployee()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()"><i class="fas fa-times"></i> Annuler</button>
             </div>
             <div id="employeesList" style="margin-top:20px;"></div>
         </div>
     </div>
 
-    <!-- Pointages -->
+    <!-- Modal Pointages -->
     <div id="pointagesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-history"></i> Historique Pointages</h2>
+                <h2 class="modal-title"><i class="fas fa-history"></i> Historique des Pointages</h2>
                 <span class="close-btn" onclick="closeModal('pointagesModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportPointagesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
             </div>
             <div id="pointagesList"></div>
         </div>
     </div>
 
-    <!-- Salaires -->
+    <!-- Modal Salaires -->
     <div id="salaryModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Gestion Salaires</h2>
+                <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Gestion des Salaires</h2>
                 <span class="close-btn" onclick="closeModal('salaryModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportSalairesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRevenue">0Ar</div>
+                    <div class="stat-label">Revenus (Écolage)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div class="stat-value" id="totalExpenses">0Ar</div>
+                    <div class="stat-label">Dépenses (Salaires)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value" id="netProfit">0Ar</div>
+                    <div class="stat-label">Bénéfice Net</div>
+                </div>
             </div>
             <div id="salaryHistory"></div>
         </div>
     </div>
 
-    <!-- Statistiques -->
+    <!-- Modal Statistiques -->
     <div id="statsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-chart-line"></i> Statistiques</h2>
                 <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
             </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportStatsToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-value" id="totalEmployees">0</div><div class="stat-label">Employés</div></div>
-                <div class="stat-card"><div class="stat-value" id="presenceRate">0%</div><div class="stat-label">Présence</div></div>
+                <div class="stat-card"><div class="stat-value" id="totalStudents">0</div><div class="stat-label">Étudiants</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><div class="stat-value" id="presenceRate">0%</div><div class="stat-label">Taux Présence</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><div class="stat-value" id="absenceRate">0%</div><div class="stat-label">Taux Absence</div></div>
             </div>
-            <div class="chart-container"><canvas id="barChart"></canvas></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
+                <div class="chart-container"><canvas id="barChart"></canvas></div>
+                <div class="chart-container"><canvas id="pieChart"></canvas></div>
+            </div>
+            <div class="chart-container" style="margin-top:20px;"><canvas id="lineChart"></canvas></div>
         </div>
     </div>
 
     <script>
         const API_URL = '/api';
+        let currentEditId = null;
         let charts = {};
 
         // === GÉNÉRATION BADGE ESP01S ===
-        async function generateBadgePDF(empId, prenom, nom, poste) {
+        async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
             const { jsPDF } = window.jspdf;
-
-            // Créer conteneur badge temporaire
             const badge = document.createElement('div');
-            badge.id = 'temp-badge';
             badge.style.cssText = `
                 position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
                 background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
@@ -300,7 +352,7 @@
             `;
             document.body.appendChild(badge);
 
-            // Circuit imprimé ESP01S (SVG stylisé)
+            // Circuit SVG
             const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             circuitSVG.setAttribute('width', '100%');
             circuitSVG.setAttribute('height', '100%');
@@ -311,36 +363,30 @@
                 <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
                 <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
                 <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
-                <!-- Antenne WiFi ESP01S -->
                 <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
                 <circle cx="235" cy="75" r="2" fill="#00ff00"/>
             `;
             badge.appendChild(circuitSVG);
 
-            // Zone infos
+            // Infos
             const infoDiv = document.createElement('div');
             infoDiv.style.cssText = 'z-index: 2; padding: 10px;';
             infoDiv.innerHTML = `
                 <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
                     ${prenom.toUpperCase()} ${nom.toUpperCase()}
                 </div>
-                <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste || 'Employé'}</div>
+                <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste}</div>
                 <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
             `;
             badge.appendChild(infoDiv);
 
-            // Zone QR + ESP01S
+            // QR + ESP01S
             const bottomDiv = document.createElement('div');
             bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
-            
-            // QR Code réel (avec qrcode.js)
             const qrDiv = document.createElement('div');
-            QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } }, (err) => {
-                if (err) console.error('QR Error:', err);
-            });
+            QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } });
             bottomDiv.appendChild(qrDiv);
 
-            // Boîtier ESP01S
             const espDiv = document.createElement('div');
             espDiv.style.cssText = `
                 width: 100px; height: 40px; background: #111; border-radius: 8px;
@@ -349,10 +395,9 @@
             `;
             espDiv.innerHTML = '<i class="fas fa-microchip"></i> ESP01S';
             bottomDiv.appendChild(espDiv);
-
             badge.appendChild(bottomDiv);
 
-            // LED clignotante
+            // LED
             const led = document.createElement('div');
             led.style.cssText = `
                 position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
@@ -361,72 +406,84 @@
             `;
             badge.appendChild(led);
 
-            // Attendre rendu
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Capturer en image
-            const canvas = await html2canvas(badge, { scale: 3, useCORS: true, backgroundColor: '#0a3d62' });
+            await new Promise(r => setTimeout(r, 500));
+            const canvas = await html2canvas(badge, { scale: 3 });
             const imgData = canvas.toDataURL('image/png');
-
-            // PDF
             const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
             pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
             pdf.save(`${prenom}_${nom}_Badge_ESP01S.pdf`);
-
-            // Nettoyer
             document.body.removeChild(badge);
-            console.log('✅ Badge PDF généré pour', nom);
         }
 
-        // === RECHERCHE GLOBALE ===
-        let searchTimeout;
-        document.getElementById('globalSearch').addEventListener('input', function() {
-            const query = this.value.trim().toLowerCase();
-            const container = document.getElementById('searchResults');
-            if (!query) { container.style.display = 'none'; return; }
-
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                const [emps, pts, sals] = await Promise.all([
-                    fetch(`${API_URL}/employees`).then(r => r.json()),
-                    fetch(`${API_URL}/pointages/history`).then(r => r.json()),
-                    fetch(`${API_URL}/salary/history`).then(r => r.json())
-                ]);
-
-                const results = [];
-                emps.employees?.forEach(e => {
-                    if (`${e.prenom} ${e.nom}`.toLowerCase().includes(query)) {
-                        results.push({ type: 'employe', title: `${e.prenom} ${e.nom}`, action: () => openModal('employeesModal') });
-                    }
-                });
-                pts.pointages?.forEach(p => {
-                    if (p.employee_name.toLowerCase().includes(query)) {
-                        results.push({ type: 'pointage', title: `${p.employee_name} - ${p.type}`, action: () => openModal('pointagesModal') });
-                    }
-                });
-                displayResults(results, container);
-            }, 300);
-        });
-
-        function displayResults(results, container) {
-            container.innerHTML = results.length ? results.map(r => `
-                <div class="search-result-item" onclick="${r.action}(); document.getElementById('globalSearch').value=''; container.style.display='none';">
-                    <div class="search-result-title"><i class="fas fa-${r.type === 'employe' ? 'user' : 'clock'}"></i> ${r.title}</div>
-                </div>
-            `).join('') : '<div class="no-results">Aucun résultat</div>';
-            container.style.display = 'block';
+        // === EXPORT EXCEL ===
+        function exportToExcel(data, filename) {
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Données");
+            XLSX.writeFile(wb, `${filename}.xlsx`);
         }
 
-        // === MODALES & DONNÉES ===
-        function openModal(id) {
-            document.getElementById(id).style.display = 'block';
-            if (id === 'employeesModal') loadEmployees();
-            if (id === 'pointagesModal') loadPointages();
-            if (id === 'salaryModal') loadSalaries();
-            if (id === 'statsModal') loadStats();
+        async function exportEmployeesToExcel() {
+            const res = await fetch(`${API_URL}/employees`);
+            const data = await res.json();
+            const exportData = data.employees.map(e => ({
+                ID: e.id,
+                Type: e.type,
+                Nom: e.nom,
+                Prénom: e.prenom,
+                Email: e.email || '',
+                Téléphone: e.telephone || '',
+                'Taux Horaire': e.taux_horaire || '',
+                'Frais Écolage': e.frais_ecolage || ''
+            }));
+            exportToExcel(exportData, "Employes_GestionRH");
         }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
+        async function exportPointagesToExcel() {
+            const res = await fetch(`${API_URL}/pointages/history`);
+            const data = await res.json();
+            const exportData = data.pointages.map(p => ({
+                Employé: p.employee_name,
+                Type: p.type,
+                Date: new Date(p.timestamp).toLocaleDateString(),
+                Heure: new Date(p.timestamp).toLocaleTimeString()
+            }));
+            exportToExcel(exportData, "Pointages_Historique");
+        }
+
+        async function exportSalairesToExcel() {
+            const res = await fetch(`${API_URL}/salary/history`);
+            const data = await res.json();
+            const exportData = data.salaries.map(s => ({
+                Employé: s.employee_name,
+                Type: s.type,
+                Montant: s.amount,
+                Date: new Date(s.date).toLocaleDateString()
+            }));
+            exportToExcel(exportData, "Salaires_Historique");
+        }
+
+        async function exportStatsToExcel() {
+            const [empRes, ptRes] = await Promise.all([
+                fetch(`${API_URL}/employees`).then(r => r.json()),
+                fetch(`${API_URL}/pointages/history`).then(r => r.json())
+            ]);
+            const today = new Date().toISOString().split('T')[0];
+            const todayEntries = ptRes.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
+            const employees = empRes.employees.filter(e => e.type === 'employe').length;
+            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+
+            const exportData = [{
+                'Total Employés': employees,
+                'Total Étudiants': empRes.employees.filter(e => e.type === 'etudiant').length,
+                'Taux Présence': rate + '%',
+                'Taux Absence': (100 - rate) + '%',
+                Date: new Date().toLocaleDateString()
+            }];
+            exportToExcel(exportData, "Statistiques_RH");
+        }
+
+        // === EMPLOYÉS ===
         async function loadEmployees() {
             const res = await fetch(`${API_URL}/employees`);
             const data = await res.json();
@@ -435,8 +492,9 @@
                 <div class="employee-item">
                     <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
                     <div class="employee-actions">
-                        <button class="btn-edit" onclick="editEmployee('${e.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')"><i class="fas fa-qrcode"></i></button>
                         <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')"><i class="fas fa-id-card"></i></button>
+                        <button class="btn-edit" onclick="editEmployee('${e.id}')"><i class="fas fa-edit"></i></button>
                         <button class="btn-delete" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
@@ -445,31 +503,52 @@
 
         function showAddEmployeeForm() {
             document.getElementById('addEmployeeForm').style.display = 'block';
-            document.getElementById('formTitle').textContent = 'Nouvel Employé';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
             currentEditId = null;
+            resetForm();
         }
-        function hideAddEmployeeForm() { document.getElementById('addEmployeeForm').style.display = 'none'; }
 
-        let currentEditId = null;
+        function hideAddEmployeeForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+        }
+
+        function resetForm() {
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+        }
+
+        function toggleFinancialFields() {
+            const type = document.getElementById('employeeType').value;
+            document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
+            document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
+        }
+
         async function editEmployee(id) {
-            const res = await fetch(`${API_URL}/employees`);
-            const data = await res.json();
-            const emp = data.employees.find(e => e.id === id);
+            const res = await fetch(`${API_URL}/employees/${id}`);
+            const emp = await res.json();
+            currentEditId = id;
+            document.getElementById('formTitle').textContent = 'Modifier';
+            document.getElementById('employeeType').value = emp.type;
             document.getElementById('employeeNom').value = emp.nom;
             document.getElementById('employeePrenom').value = emp.prenom;
-            document.getElementById('employeeType').value = emp.type;
-            document.getElementById('employeeProfession').value = emp.profession || '';
-            document.getElementById('formTitle').textContent = 'Modifier Employé';
-            currentEditId = id;
+            document.getElementById('employeeEmail').value = emp.email || '';
+            document.getElementById('employeeTelephone').value = emp.telephone || '';
+            document.getElementById('employeeTauxHoraire').value = emp.taux_horaire || '';
+            document.getElementById('employeeFraisEcolage').value = emp.frais_ecolage || '';
+            toggleFinancialFields();
             showAddEmployeeForm();
         }
 
         async function saveEmployee() {
             const emp = {
+                type: document.getElementById('employeeType').value,
                 nom: document.getElementById('employeeNom').value,
                 prenom: document.getElementById('employeePrenom').value,
-                type: document.getElementById('employeeType').value,
-                profession: document.getElementById('employeeProfession').value
+                email: document.getElementById('employeeEmail').value,
+                telephone: document.getElementById('employeeTelephone').value,
+                taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
+                frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
             };
             const method = currentEditId ? 'PUT' : 'POST';
             const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
@@ -485,63 +564,96 @@
             }
         }
 
+        // === POINTAGES, SALAIRES, STATS ===
         async function loadPointages() {
             const res = await fetch(`${API_URL}/pointages/history`);
             const data = await res.json();
-            document.getElementById('pointagesList').innerHTML = `
+            document.getElementById('pointagesList').innerHTML = data.pointages.length > 0 ? `
                 <table class="table">
-                    <thead><tr><th>Nom</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
-                    <tbody>${data.pointages.map(p => {
-                        const date = new Date(p.timestamp).toLocaleDateString();
-                        const time = new Date(p.timestamp).toLocaleTimeString();
-                        return `<tr><td>${p.employee_name}</td><td>${p.type}</td><td>${date}</td><td>${time}</td></tr>`;
-                    }).join('')}</tbody>
-                </table>`;
+                    <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
+                    <tbody>${data.pointages.map(p => `
+                        <tr><td>${p.employee_name}</td><td>${p.type}</td>
+                        <td>${new Date(p.timestamp).toLocaleDateString()}</td>
+                        <td>${new Date(p.timestamp).toLocaleTimeString()}</td></tr>
+                    `).join('')}</tbody>
+                </table>` : '<p>Aucun pointage.</p>';
         }
 
-        async function loadSalaries() {
+        async function loadSalaryData() {
             const res = await fetch(`${API_URL}/salary/history`);
             const data = await res.json();
+            let revenue = 0, expenses = 0;
+            data.salaries.forEach(s => {
+                if (s.type === 'ecolage') revenue += s.amount;
+                if (s.type === 'salaire') expenses += s.amount;
+            });
+            document.getElementById('totalRevenue').textContent = revenue.toFixed(2) + 'Ar';
+            document.getElementById('totalExpenses').textContent = expenses.toFixed(2) + 'Ar';
+            document.getElementById('netProfit').textContent = (revenue - expenses).toFixed(2) + 'Ar';
             document.getElementById('salaryHistory').innerHTML = `
                 <table class="table">
-                    <thead><tr><th>Nom</th><th>Type</th><th>Montant</th><th>Date</th></tr></thead>
-                    <tbody>${data.salaries.map(s => {
-                        const date = new Date(s.date).toLocaleDateString();
-                        return `<tr><td>${s.employee_name}</td><td>${s.type}</td><td>${s.amount} Ar</td><td>${date}</td></tr>`;
-                    }).join('')}</tbody>
+                    <thead><tr><th>Employé</th><th>Type</th><th>Montant</th><th>Date</th></tr></thead>
+                    <tbody>${data.salaries.map(s => `
+                        <tr><td>${s.employee_name}</td><td>${s.type}</td><td>${s.amount} Ar</td><td>${new Date(s.date).toLocaleDateString()}</td></tr>
+                    `).join('')}</tbody>
                 </table>`;
         }
 
-        async function loadStats() {
-            const [empRes, ptRes] = await Promise.all([
+        async function loadStatistics() {
+            const [empData, pointData] = await Promise.all([
                 fetch(`${API_URL}/employees`).then(r => r.json()),
                 fetch(`${API_URL}/pointages/history`).then(r => r.json())
             ]);
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = ptRes.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
-            const employees = empRes.employees.filter(e => e.type === 'employe').length;
-            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
-
+            const employees = empData.employees.filter(e => e.type === 'employe').length;
+            const students = empData.employees.filter(e => e.type === 'etudiant').length;
             document.getElementById('totalEmployees').textContent = employees;
+            document.getElementById('totalStudents').textContent = students;
+            const today = new Date().toISOString().split('T')[0];
+            const todayEntries = pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
+            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
             document.getElementById('presenceRate').textContent = rate + '%';
+            document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
-            const ctx = document.getElementById('barChart').getContext('2d');
+            // Charts
+            const barCtx = document.getElementById('barChart').getContext('2d');
             if (charts.bar) charts.bar.destroy();
-            charts.bar = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Présents', 'Absents'],
-                    datasets: [{ data: [todayEntries, employees - todayEntries], backgroundColor: ['#10b981', '#ef4444'] }]
-                },
-                options: { responsive: true }
-            });
+            charts.bar = new Chart(barCtx, { type: 'bar', data: { labels: ['Entrées', 'Sorties'], datasets: [{ data: [todayEntries, pointData.pointages.filter(p => p.type === 'SORTIE' && new Date(p.timestamp).toISOString().split('T')[0] === today).length], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { responsive: true } });
+
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            if (charts.pie) charts.pie.destroy();
+            charts.pie = new Chart(pieCtx, { type: 'doughnut', data: { labels: ['Présents', 'Absents'], datasets: [{ data: [todayEntries, employees - todayEntries], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { responsive: true } });
+
+            const last7Days = Array(7).fill().map((_, i) => {
+                const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0];
+            }).reverse();
+            const lineData = last7Days.map(date => pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === date && p.type === 'ENTREE').length);
+            const lineCtx = document.getElementById('lineChart').getContext('2d');
+            if (charts.line) charts.line.destroy();
+            charts.line = new Chart(lineCtx, { type: 'line', data: { labels: last7Days.map(d => new Date(d).toLocaleDateString('fr')), datasets: [{ label: 'Entrées', data: lineData, borderColor: '#6366f1', tension: 0.4, fill: false }] }, options: { responsive: true } });
         }
+
+        // === SCANNER QR ===
+        function startCamera() {
+            alert("Scanner QR simulé : scannez un QR avec l'ID employé");
+        }
+        function stopCamera() {}
+
+        // === MODALES ===
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
         function logout() {
             if (confirm('Déconnexion ?')) window.location.href = '/logout';
         }
 
         window.onclick = e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); };
+        document.getElementById('employeeType').addEventListener('change', toggleFinancialFields);
     </script>
 </body>
 </html>
