@@ -7,6 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- LIBS POUR BADGE PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <style>
         :root {
             --primary: #6366f1;
@@ -55,58 +59,21 @@
         }
         .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
 
-        /* === BARRE DE RECHERCHE === */
-        .search-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
+        /* BARRE DE RECHERCHE */
+        .search-container { position: relative; display: flex; align-items: center; }
         .search-input {
-            padding: 0.75rem 1rem 0.75rem 2.5rem;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 0.75rem;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 0.95rem;
-            width: 280px;
-            transition: all 0.3s ease;
+            padding: 0.75rem 1rem 0.75rem 2.5rem; border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.1); color: white; font-size: 0.95rem; width: 280px; transition: all 0.3s ease;
             backdrop-filter: blur(8px);
         }
-        .search-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
-            width: 320px;
-        }
-        .search-icon {
-            position: absolute;
-            left: 0.8rem;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 1.1rem;
-            pointer-events: none;
-        }
+        .search-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3); width: 320px; }
+        .search-icon { position: absolute; left: 0.8rem; color: rgba(255, 255, 255, 0.7); font-size: 1.1rem; pointer-events: none; }
         .search-results {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 0.75rem;
-            margin-top: 0.5rem;
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-            z-index: 100;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            position: absolute; top: 100%; left: 0; right: 0; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border); border-radius: 0.75rem; margin-top: 0.5rem; max-height: 300px; overflow-y: auto;
+            display: none; z-index: 100; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
-        .search-result-item {
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
+        .search-result-item { padding: 0.75rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: background 0.2s ease; }
         .search-result-item:hover { background: rgba(99, 102, 241, 0.2); }
         .search-result-title { font-weight: 600; color: white; font-size: 0.95rem; }
         .search-result-subtitle { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); }
@@ -115,12 +82,10 @@
         .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .card {
             background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
-            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative; overflow: hidden;
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden;
         }
         .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
-            transition: transform 0.4s ease;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left; transition: transform 0.4s ease;
         }
         .card:hover::before { transform: scaleX(1); }
         .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
@@ -160,9 +125,10 @@
         .btn-secondary:hover { background: var(--gray-800); }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
-        .btn-edit, .btn-qr, .btn-delete { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
+        .btn-edit, .btn-qr, .btn-delete, .btn-badge { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; margin: 0 2px; }
         .btn-edit { background: #3b82f6; color: white; }
         .btn-qr { background: var(--success); color: white; }
+        .btn-badge { background: #10b981; color: white; } /* Vert pour badge */
         .btn-delete { background: var(--danger); color: white; }
         .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
@@ -182,6 +148,14 @@
         }
         .employee-actions { display: flex; gap: 0.5rem; }
         .chart-container { position: relative; height: 300px; margin: 20px 0; }
+
+        /* ANIMATION LED POUR BADGE */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
+        }
+
         @media (max-width: 768px) {
             .header { flex-direction: column; gap: 1rem; text-align: center; }
             .main-grid { grid-template-columns: 1fr; }
@@ -258,6 +232,10 @@
                         <option value="etudiant">Étudiant</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Poste/Profession</label>
+                    <input type="text" class="form-input" id="employeeProfession" placeholder="Ex: Software Engineer">
+                </div>
                 <button class="btn" onclick="saveEmployee()">Enregistrer</button>
                 <button class="btn btn-secondary" onclick="hideAddEmployeeForm()">Annuler</button>
             </div>
@@ -305,6 +283,100 @@
     <script>
         const API_URL = '/api';
         let charts = {};
+
+        // === GÉNÉRATION BADGE ESP01S ===
+        async function generateBadgePDF(empId, prenom, nom, poste) {
+            const { jsPDF } = window.jspdf;
+
+            // Créer conteneur badge temporaire
+            const badge = document.createElement('div');
+            badge.id = 'temp-badge';
+            badge.style.cssText = `
+                position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
+                background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
+                border-radius: 16px; padding: 20px; color: white; font-family: 'Inter', sans-serif;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 3px solid #00d4ff; overflow: hidden;
+                display: flex; flex-direction: column; justify-content: space-between;
+            `;
+            document.body.appendChild(badge);
+
+            // Circuit imprimé ESP01S (SVG stylisé)
+            const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            circuitSVG.setAttribute('width', '100%');
+            circuitSVG.setAttribute('height', '100%');
+            circuitSVG.setAttribute('style', 'position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;');
+            circuitSVG.innerHTML = `
+                <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+                <path d="M80 120 Q120 90 160 120" stroke="#00d4ff" stroke-width="1" fill="none"/>
+                <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
+                <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
+                <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
+                <!-- Antenne WiFi ESP01S -->
+                <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
+                <circle cx="235" cy="75" r="2" fill="#00ff00"/>
+            `;
+            badge.appendChild(circuitSVG);
+
+            // Zone infos
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = 'z-index: 2; padding: 10px;';
+            infoDiv.innerHTML = `
+                <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                    ${prenom.toUpperCase()} ${nom.toUpperCase()}
+                </div>
+                <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste || 'Employé'}</div>
+                <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
+            `;
+            badge.appendChild(infoDiv);
+
+            // Zone QR + ESP01S
+            const bottomDiv = document.createElement('div');
+            bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
+            
+            // QR Code réel (avec qrcode.js)
+            const qrDiv = document.createElement('div');
+            QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } }, (err) => {
+                if (err) console.error('QR Error:', err);
+            });
+            bottomDiv.appendChild(qrDiv);
+
+            // Boîtier ESP01S
+            const espDiv = document.createElement('div');
+            espDiv.style.cssText = `
+                width: 100px; height: 40px; background: #111; border-radius: 8px;
+                display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0f0;
+                border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            `;
+            espDiv.innerHTML = '<i class="fas fa-microchip"></i> ESP01S';
+            bottomDiv.appendChild(espDiv);
+
+            badge.appendChild(bottomDiv);
+
+            // LED clignotante
+            const led = document.createElement('div');
+            led.style.cssText = `
+                position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
+                background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00;
+                animation: pulse 2s infinite;
+            `;
+            badge.appendChild(led);
+
+            // Attendre rendu
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Capturer en image
+            const canvas = await html2canvas(badge, { scale: 3, useCORS: true, backgroundColor: '#0a3d62' });
+            const imgData = canvas.toDataURL('image/png');
+
+            // PDF
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
+            pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
+            pdf.save(`${prenom}_${nom}_Badge_ESP01S.pdf`);
+
+            // Nettoyer
+            document.body.removeChild(badge);
+            console.log('✅ Badge PDF généré pour', nom);
+        }
 
         // === RECHERCHE GLOBALE ===
         let searchTimeout;
@@ -364,6 +436,7 @@
                     <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
                     <div class="employee-actions">
                         <button class="btn-edit" onclick="editEmployee('${e.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')"><i class="fas fa-id-card"></i></button>
                         <button class="btn-delete" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>
@@ -385,6 +458,7 @@
             document.getElementById('employeeNom').value = emp.nom;
             document.getElementById('employeePrenom').value = emp.prenom;
             document.getElementById('employeeType').value = emp.type;
+            document.getElementById('employeeProfession').value = emp.profession || '';
             document.getElementById('formTitle').textContent = 'Modifier Employé';
             currentEditId = id;
             showAddEmployeeForm();
@@ -394,7 +468,8 @@
             const emp = {
                 nom: document.getElementById('employeeNom').value,
                 prenom: document.getElementById('employeePrenom').value,
-                type: document.getElementById('employeeType').value
+                type: document.getElementById('employeeType').value,
+                profession: document.getElementById('employeeProfession').value
             };
             const method = currentEditId ? 'PUT' : 'POST';
             const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
