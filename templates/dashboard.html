@@ -3,25 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestion RH Pro - Pointage & Suivi</title>
+    <title>Gestion RH Pro - Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary: #8b5cf6;
-            --danger: #ef4444;
-            --success: #10b981;
-            --gray-100: #f3f4f6;
-            --gray-200: #e5e7eb;
-            --gray-300: #d1d5db;
-            --gray-600: #4b5563;
-            --gray-800: #1f2937;
-            --glass: rgba(255, 255, 255, 0.15);
-            --glass-border: rgba(255, 255, 255, 0.2);
+            --primary: #6366f1; --primary-dark: #4f46e5; --secondary: #8b5cf6; --danger: #ef4444;
+            --success: #10b981; --gray-100: #f3f4f6; --gray-200: #e5e7eb; --gray-300: #d1d5db;
+            --gray-600: #4b5563; --gray-800: #1f2937; --glass: rgba(255,255,255,0.15);
+            --glass-border: rgba(255,255,255,0.2);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -33,19 +26,10 @@
         }
         .app-container { max-width: 1500px; margin: 0 auto; padding: 1.5rem; }
         .header {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            padding: 1.5rem 2rem;
-            border-radius: 1.5rem;
-            margin-bottom: 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            position: sticky;
-            top: 1rem;
-            z-index: 100;
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(12px); border: 1px solid var(--glass-border);
+            padding: 1.5rem 2rem; border-radius: 1.5rem; margin-bottom: 2rem; display: flex;
+            justify-content: space-between; align-items: center; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            position: sticky; top: 1rem; z-index: 100;
         }
         .header h1 { color: white; font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
         .header h1 i { color: var(--primary); font-size: 2rem; }
@@ -54,33 +38,30 @@
             border-radius: 0.75rem; cursor: pointer; font-weight: 600; font-size: 0.95rem;
             transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
         }
-        .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .logout-btn:hover { background: #dc2626; transform: translateY(-2px); }
         .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .card {
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
-            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s ease;
             position: relative; overflow: hidden;
         }
         .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
-            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0);
             transition: transform 0.4s ease;
         }
         .card:hover::before { transform: scaleX(1); }
-        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.3); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); }
         .card-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .card-title { font-size: 1.35rem; font-weight: 600; color: white; margin-bottom: 0.5rem; }
-        .card-desc { color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; line-height: 1.5; }
+        .card-desc { color: rgba(255,255,255,0.7); font-size: 0.9rem; line-height: 1.5; }
+
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
-            animation: fadeIn 0.3s ease;
+            background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
         }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
             max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-            animation: slideUp 0.4s ease;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
             padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);
@@ -91,25 +72,29 @@
             display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;
         }
         .close-btn:hover { background: var(--gray-100); color: var(--danger); }
+
         .form-group { margin-bottom: 1.25rem; }
-        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); font-size: 0.95rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); }
         .form-input, .form-select { width: 100%; padding: 0.875rem 1rem; border: 2px solid var(--gray-200);
             border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white;
         }
         .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+
         .btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.75rem;
             cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s ease; display: inline-flex;
             align-items: center; gap: 0.5rem;
         }
-        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
         .btn-secondary { background: var(--gray-600); }
         .btn-secondary:hover { background: var(--gray-800); }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
-        .btn-edit, .btn-qr, .btn-delete { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
-        .btn-edit { background: #3b82f6; color: white; }
-        .btn-qr { background: var(--success); color: white; }
-        .btn-delete { background: var(--danger); color: white; }
+        .btn-excel { background: #10b981; color: white; padding: 0.75rem 1.25rem; border-radius: 0.75rem;
+            border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; display: inline-flex;
+            align-items: center; gap: 0.5rem; margin: 1rem 0; transition: all 0.3s ease;
+        }
+        .btn-excel:hover { background: #059669; transform: translateY(-2px); }
+
         .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
@@ -118,34 +103,22 @@
         }
         .table td { padding: 1rem; border-bottom: 1px solid var(--gray-200); color: var(--gray-800); }
         .table tr:hover { background: #f8fafc; }
+
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
         .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
             border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
         }
         .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
         .stat-label { font-size: 0.85rem; opacity: 0.9; }
-        .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem;
-            background: var(--gray-100); border-radius: 0.75rem; margin-bottom: 0.75rem; transition: all 0.3s ease;
+
+        .presence-list { margin-top: 1.5rem; }
+        .presence-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #f8fafc;
+            border-radius: 0.75rem; margin-bottom: 0.5rem;
         }
-        .employee-item:hover { background: #e2e8f0; transform: translateX(4px); }
-        .employee-name { font-weight: 600; color: var(--gray-800); }
-        .employee-type { font-size: 0.75rem; color: white; background: var(--primary); padding: 0.25rem 0.5rem;
-            border-radius: 0.5rem; font-weight: 600;
-        }
-        .employee-actions { display: flex; gap: 0.5rem; }
-        .chat-container { display: flex; flex-direction: column; height: 520px; background: white; border-radius: 1rem;
-            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        .chat-messages { flex: 1; padding: 1.5rem; overflow-y: auto; background: #f8fafc; }
-        .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
-            animation: fadeInUp 0.3s ease;
-        }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
-        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
-        .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
-        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
-        .chat-input:focus { outline: none; border-color: var(--primary); }
+        .presence-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
+        .presence-name { font-weight: 600; color: var(--gray-800); }
+        .presence-status { font-size: 0.8rem; color: var(--success); font-weight: 600; }
+
         .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
@@ -153,30 +126,16 @@
         .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
             margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
         }
-        #qrModal .modal-content { max-width: 400px; text-align: center; }
-        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
-        .chart-container { position: relative; height: 300px; margin: 20px 0; }
-        .btn-excel {
-            background: #10b981; color: white; border: none; padding: 0.75rem 1.25rem;
-            border-radius: 0.75rem; cursor: pointer; font-weight: 600; font-size: 0.9rem;
-            display: inline-flex; align-items: center; gap: 0.5rem; margin: 1rem 0;
-            transition: all 0.3s ease;
-        }
-        .btn-excel:hover { background: #059669; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
 
-        /* PHOTOS DANS STATISTIQUES */
-        .presence-list { margin-top: 1.5rem; }
-        .presence-item { display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: #f8fafc; border-radius: 0.75rem; margin-bottom: 0.5rem; }
-        .presence-photo { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
-        .presence-name { font-weight: 600; color: var(--gray-800); }
-        .presence-status { font-size: 0.8rem; color: var(--success); font-weight: 600; }
+        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+
+        .chart-container { position: relative; height: 300px; margin: 20px 0; }
 
         @media (max-width: 768px) {
             .header { flex-direction: column; gap: 1rem; text-align: center; }
             .main-grid { grid-template-columns: 1fr; }
             .modal-content { margin: 1rem; padding: 1.5rem; }
             .stats-grid { grid-template-columns: 1fr; }
-            .chart-container { height: 250px; }
         }
     </style>
 </head>
@@ -185,10 +144,12 @@
         <!-- Header -->
         <div class="header">
             <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
-            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+            <form action="{{ url_for('logout') }}" method="POST">
+                <button type="submit" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+            </form>
         </div>
 
-        <!-- Main Dashboard -->
+        <!-- Main Grid -->
         <div class="main-grid">
             <div class="card" onclick="openModal('scanModal')">
                 <div class="card-icon"><i class="fas fa-qrcode"></i></div>
@@ -205,35 +166,16 @@
                 <div class="card-title">Historique Pointages</div>
                 <div class="card-desc">Consulter les pointages</div>
             </div>
-            <div class="card" onclick="openModal('salaryModal')">
-                <div class="card-icon"><i class="fas fa-euro-sign"></i></div>
-                <div class="card-title">Gestion Salaires</div>
-                <div class="card-desc">Calculer et gérer les salaires</div>
-            </div>
             <div class="card" onclick="openModal('statsModal')">
                 <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
                 <div class="card-title">Statistiques</div>
                 <div class="card-desc">Tableaux de bord et analyses</div>
             </div>
-            <div class="card" onclick="openModal('trackingModal')">
-                <div class="card-icon"><i class="fas fa-map-marker-alt"></i></div>
-                <div class="card-title">Suivi Temps Réel</div>
-                <div class="card-desc">Localisation des employés</div>
-            </div>
-            <div class="card" onclick="openModal('chatModal')">
-                <div class="card-icon"><i class="fas fa-robot"></i></div>
-                <div class="card-title">Assistant IA</div>
-                <div class="card-desc">Questions et analyses</div>
-            </div>
-            <div class="card" onclick="openModal('settingsModal')">
-                <div class="card-icon"><i class="fas fa-cog"></i></div>
-                <div class="card-title">Paramètres</div>
-                <div class="card-desc">WiFi, serveur, compte admin</div>
-            </div>
         </div>
     </div>
 
-    <!-- Modal Scanner QR -->
+    <!-- MODALS -->
+    <!-- Scanner QR -->
     <div id="scanModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -244,24 +186,22 @@
                 <video id="scanner-video" autoplay></video>
             </div>
             <div id="scan-result"></div>
-            <button class="btn" onclick="startCamera()"><i class="fas fa-play"></i> Démarrer Scanner</button>
-            <button class="btn btn-secondary" onclick="stopCamera()"><i class="fas fa-stop"></i> Arrêter</button>
+            <button class="btn" onclick="startCamera()">Démarrer Scanner</button>
+            <button class="btn btn-secondary" onclick="stopCamera()">Arrêter</button>
         </div>
     </div>
 
-    <!-- Modal Employés -->
+    <!-- Employés -->
     <div id="employeesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-users"></i> Gestion des Employés</h2>
                 <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
             </div>
-            <button class="btn-excel" onclick="exportEmployeesToExcel()">
-                <i class="fas fa-file-excel"></i> Télécharger en Excel
-            </button>
-            <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
+            <button class="btn-excel" onclick="exportEmployeesToExcel()">Télécharger Excel</button>
+            <button class="btn" onclick="showAddEmployeeForm()">Ajouter</button>
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
-                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
+                <h3 id="formTitle">Nouvel Employé</h3>
                 <input type="hidden" id="editEmployeeId">
                 <div class="form-group">
                     <label class="form-label">Type</label>
@@ -278,14 +218,6 @@
                     <label class="form-label">Prénom</label>
                     <input type="text" class="form-input" id="employeePrenom">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Email</label>
-                    <input type="email" class="form-input" id="employeeEmail">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Téléphone</label>
-                    <input type="text" class="form-input" id="employeeTelephone">
-                </div>
                 <div class="form-group" id="tauxHoraireGroup">
                     <label class="form-label">Taux Horaire (Ar)</label>
                     <input type="number" class="form-input" id="employeeTauxHoraire" step="0.01">
@@ -294,154 +226,64 @@
                     <label class="form-label">Frais Écolage (Ar)</label>
                     <input type="number" class="form-input" id="employeeFraisEcolage" step="0.01">
                 </div>
-                <button class="btn" onclick="saveEmployee()"><i class="fas fa-save"></i> Enregistrer</button>
-                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()"><i class="fas fa-times"></i> Annuler</button>
+                <button class="btn" onclick="saveEmployee()">Enregistrer</button>
+                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()">Annuler</button>
             </div>
             <div id="employeesList" style="margin-top:20px;"></div>
         </div>
     </div>
 
-    <!-- Modal Pointages -->
+    <!-- Pointages -->
     <div id="pointagesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-history"></i> Historique des Pointages</h2>
+                <h2 class="modal-title"><i class="fas fa-history"></i> Historique Pointages</h2>
                 <span class="close-btn" onclick="closeModal('pointagesModal')">&times;</span>
             </div>
-            <button class="btn-excel" onclick="exportPointagesToExcel()">
-                <i class="fas fa-file-excel"></i> Télécharger en Excel
-            </button>
+            <button class="btn-excel" onclick="exportPointagesToExcel()">Télécharger Excel</button>
             <div id="pointagesList"></div>
         </div>
     </div>
 
-    <!-- Modal Salaires -->
-    <div id="salaryModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Gestion des Salaires</h2>
-                <span class="close-btn" onclick="closeModal('salaryModal')">&times;</span>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalRevenue">0Ar</div>
-                    <div class="stat-label">Revenus (Écolage)</div>
-                </div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
-                    <div class="stat-value" id="totalExpenses">0Ar</div>
-                    <div class="stat-label">Dépenses (Salaires)</div>
-                </div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
-                    <div class="stat-value" id="netProfit">0Ar</div>
-                    <div class="stat-label">Bénéfice Net</div>
-                </div>
-            </div>
-            <button class="btn-excel" onclick="exportSalaryToExcel()">
-                <i class="fas fa-file-excel"></i> Télécharger en Excel
-            </button>
-            <div id="salaryHistory"></div>
-        </div>
-    </div>
-
-    <!-- Modal Statistiques (AVEC PHOTOS) -->
+    <!-- Statistiques avec PHOTOS -->
     <div id="statsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-chart-line"></i> Statistiques</h2>
                 <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
             </div>
-            <button class="btn-excel" onclick="exportStatsToExcel()">
-                <i class="fas fa-file-excel"></i> Télécharger en Excel
-            </button>
+            <button class="btn-excel" onclick="exportStatsToExcel()">Télécharger Excel</button>
             <div class="stats-grid">
-                <div class="stat-card"><div class="stat-value" id="totalEmployees">0</div><div class="stat-label">Employés</div></div>
-                <div class="stat-card"><div class="stat-value" id="totalStudents">0</div><div class="stat-label">Étudiants</div></div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><div class="stat-value" id="presenceRate">0%</div><div class="stat-label">Taux Présence</div></div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><div class="stat-value" id="absenceRate">0%</div><div class="stat-label">Taux Absence</div></div>
+                <div class="stat-card"><div class="stat-value">{{ total_employees }}</div><div class="stat-label">Employés</div></div>
+                <div class="stat-card"><div class="stat-value">{{ total_students }}</div><div class="stat-label">Étudiants</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value">{{ presence_rate }}%</div><div class="stat-label">Présence</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div class="stat-value">{{ absence_rate }}%</div><div class="stat-label">Absence</div>
+                </div>
             </div>
-
             <div class="presence-list" id="presenceList">
-                <p>Chargement des présences...</p>
+                {% for emp in present_employees %}
+                <div class="presence-item">
+                    <img src="{{ url_for('static', filename='photos/' + emp.id|string + '.jpg') }}"
+                         alt="{{ emp.prenom }}" class="presence-photo"
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ emp.prenom|urlencode }}+{{ emp.nom|urlencode }}&background=6366f1&color=fff&size=128'">
+                    <div>
+                        <div class="presence-name">{{ emp.prenom }} {{ emp.nom }}</div>
+                        <div class="presence-status">Présent aujourd'hui</div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
                 <div class="chart-container"><canvas id="barChart"></canvas></div>
                 <div class="chart-container"><canvas id="pieChart"></canvas></div>
             </div>
-            <div class="chart-container" style="margin-top:20px;"><canvas id="lineChart"></canvas></div>
         </div>
     </div>
 
-    <!-- Modal Tracking -->
-    <div id="trackingModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel</h2>
-                <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
-            </div>
-            <div id="trackingInfo"><p>Connexion au serveur WebSocket...</p></div>
-        </div>
-    </div>
-
-    <!-- Modal Chat IA -->
-    <div id="chatModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
-                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
-            </div>
-            <div class="chat-container">
-                <div class="chat-messages" id="chatMessages"></div>
-                <div class="chat-input-container">
-                    <input type="text" class="chat-input" id="chatInput" placeholder="Posez votre question...">
-                    <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Envoyer</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Paramètres -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres</h2>
-                <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
-                <input type="text" class="form-input" id="wifiSSID" value="OPPO">
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
-                <div style="position:relative;">
-                    <input type="password" class="form-input" id="wifiPassword" value="1234567809">
-                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
-                </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
-                <input type="text" class="form-input" id="serverURL" value="https://postcam-1.onrender.com">
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-user-shield"></i> Admin</label>
-                <input type="text" class="form-input" id="adminUser" value="admin">
-            </div>
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
-                <div style="position:relative;">
-                    <input type="password" class="form-input" id="adminPassword" value="admin123">
-                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
-                </div>
-            </div>
-            <div style="display:flex; gap:10px; margin-top:20px;">
-                <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
-                <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
-            </div>
-            <div id="settingsStatus" style="margin-top:15px; text-align:center;"></div>
-        </div>
-    </div>
-
-    <!-- Modal QR -->
+    <!-- QR Modal -->
     <div id="qrModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -453,261 +295,24 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
-        let API_URL = 'https://postcam-1.onrender.com/api';
+        const API_URL = "{{ url_for('api_index') }}".replace("/api", "/api");
         let videoStream = null, scanInterval = null, currentEditId = null;
         let charts = {};
-        let currentUser = null;
-
-        // === AUTH & AUTO-LOGOUT ===
-        function checkAuth() {
-            const user = localStorage.getItem('rh_user');
-            if (!user) return logout();
-            try {
-                currentUser = JSON.parse(user);
-                if (!currentUser.token) return logout();
-            } catch { return logout(); }
-        }
-
-        function logout() {
-            localStorage.removeItem('rh_user');
-            localStorage.removeItem('rh_settings');
-            window.location.href = 'login.html';
-        }
-
-        // === FETCH SÉCURISÉ AVEC TOKEN ===
-        async function safeFetch(url, fallback = null) {
-            try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (currentUser) headers['Authorization'] = `Bearer ${currentUser.token}`;
-                const res = await fetch(url, { headers });
-                if (res.status === 401 || res.status === 403) return logout();
-                const text = await res.text();
-                try { return JSON.parse(text); }
-                catch { return fallback; }
-            } catch (e) {
-                console.error("Erreur réseau", e);
-                return fallback;
-            }
-        }
-
-        // === PARAMÈTRES ===
-        function loadSettings() {
-            const saved = localStorage.getItem('rh_settings');
-            if (saved) {
-                const s = JSON.parse(saved);
-                document.getElementById('wifiSSID').value = s.wifiSSID;
-                document.getElementById('wifiPassword').value = s.wifiPassword;
-                document.getElementById('serverURL').value = s.serverURL;
-                document.getElementById('adminUser').value = s.adminUser;
-                document.getElementById('adminPassword').value = s.adminPassword;
-                API_URL = s.serverURL + '/api';
-            }
-        }
-
-        function saveSettings() {
-            const settings = {
-                wifiSSID: document.getElementById('wifiSSID').value.trim(),
-                wifiPassword: document.getElementById('wifiPassword').value,
-                serverURL: document.getElementById('serverURL').value.trim(),
-                adminUser: document.getElementById('adminUser').value.trim(),
-                adminPassword: document.getElementById('adminPassword').value
-            };
-            localStorage.setItem('rh_settings', JSON.stringify(settings));
-            showSettingsStatus("Enregistré !", "success");
-            API_URL = settings.serverURL + '/api';
-            setTimeout(() => location.reload(), 1500);
-        }
-
-        function resetSettings() {
-            if (confirm("Réinitialiser ?")) {
-                localStorage.removeItem('rh_settings');
-                location.reload();
-            }
-        }
-
-        function showSettingsStatus(msg, type) {
-            const el = document.getElementById('settingsStatus');
-            el.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}">${msg}</span>`;
-            setTimeout(() => el.innerHTML = '', 3000);
-        }
-
-        function togglePassword(id, iconId) {
-            const input = document.getElementById(id);
-            const icon = document.getElementById(iconId);
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.replace('fa-eye', 'fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.replace('fa-eye-slash', 'fa-eye');
-            }
-        }
 
         // === MODALES ===
         function openModal(id) {
             document.getElementById(id).style.display = 'block';
             if (id === 'employeesModal') loadEmployees();
             if (id === 'pointagesModal') loadPointages();
-            if (id === 'salaryModal') loadSalaryData();
             if (id === 'statsModal') loadStatistics();
         }
-
         function closeModal(id) {
             document.getElementById(id).style.display = 'none';
             if (id === 'scanModal') stopCamera();
             if (id === 'employeesModal') resetForm();
         }
-
-        // === EXPORT EXCEL ===
-        function exportToExcel(data, filename, sheetName = "Données") {
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            XLSX.writeFile(wb, `${filename}.xlsx`);
-        }
-
-        async function exportEmployeesToExcel() {
-            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
-            const rows = data.employees.map(e => ({
-                Type: e.type === 'employe' ? 'Employé' : 'Étudiant',
-                Nom: e.nom,
-                Prénom: e.prenom,
-                Email: e.email || '-',
-                Téléphone: e.telephone || '-',
-                'Taux Horaire': e.taux_horaire ? e.taux_horaire + ' Ar' : '-',
-                'Frais Écolage': e.frais_ecolage ? e.frais_ecolage + ' Ar' : '-'
-            }));
-            exportToExcel(rows, 'Liste_Employes', 'Employés');
-        }
-
-        async function exportPointagesToExcel() {
-            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
-            const rows = data.pointages.map(p => ({
-                Employé: p.employee_name,
-                Action: p.type,
-                Date: new Date(p.timestamp).toLocaleDateString('fr-FR'),
-                Heure: new Date(p.timestamp).toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})
-            }));
-            exportToExcel(rows, 'Historique_Pointages', 'Pointages');
-        }
-
-        async function exportSalaryToExcel() {
-            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
-            const rows = data.salaries.map(s => ({
-                Employé: s.employee_name || 'Inconnu',
-                Type: s.type === 'salaire' ? 'Salaire' : 'Écolage',
-                Montant: s.amount.toFixed(2) + ' Ar',
-                Date: new Date(s.timestamp).toLocaleDateString('fr-FR')
-            }));
-            exportToExcel(rows, 'Paiements_Salaires', 'Salaires');
-        }
-
-        async function exportStatsToExcel() {
-            const [empData, pointData] = await Promise.all([
-                safeFetch(`${API_URL}/employees`, { employees: [] }),
-                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
-            ]);
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = pointData.pointages.filter(p =>
-                new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
-            ).length;
-            const employees = empData.employees.filter(e => e.type === 'employe').length;
-            const students = empData.employees.filter(e => e.type === 'etudiant').length;
-            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
-            const rows = [
-                { Indicateur: 'Total Employés', Valeur: employees },
-                { Indicateur: 'Total Étudiants', Valeur: students },
-                { Indicateur: 'Présents Aujourd\'hui', Valeur: todayEntries },
-                { Indicateur: 'Taux Présence (%)', Valeur: rate + '%' },
-                { Indicateur: 'Taux Absence (%)', Valeur: (100 - rate) + '%' },
-                { Indicateur: 'Date Export', Valeur: new Date().toLocaleDateString('fr-FR') }
-            ];
-            exportToExcel(rows, 'Statistiques_RH', 'Résumé');
-        }
-
-        // === EMPLOYÉS ===
-        async function loadEmployees() {
-            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
-            const list = document.getElementById('employeesList');
-            list.innerHTML = data.employees.length > 0 ? data.employees.map(e => `
-                <div class="employee-item">
-                    <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
-                    <div class="employee-actions">
-                        <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')"><i class="fas fa-qrcode"></i></button>
-                        <button class="btn-edit" onclick="editEmployee('${e.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn-delete" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `).join('') : '<p style="color:#ef4444">Aucun employé.</p>';
-        }
-
-        async function editEmployee(id) {
-            const emp = await safeFetch(`${API_URL}/employees/${id}`);
-            if (emp.employee) {
-                currentEditId = id;
-                document.getElementById('formTitle').textContent = 'Modifier';
-                document.getElementById('employeeType').value = emp.employee.type;
-                document.getElementById('employeeNom').value = emp.employee.nom;
-                document.getElementById('employeePrenom').value = emp.employee.prenom;
-                document.getElementById('employeeEmail').value = emp.employee.email || '';
-                document.getElementById('employeeTelephone').value = emp.employee.telephone || '';
-                document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
-                document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
-                toggleFinancialFields();
-                document.getElementById('addEmployeeForm').style.display = 'block';
-            }
-        }
-
-        function showQRCode(id, name) {
-            const img = document.getElementById('qrImage');
-            img.src = `${API_URL}/qrcode/${id}`;
-            img.onerror = () => img.src = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(JSON.stringify({id, name}))}`;
-            document.getElementById('qrName').textContent = name;
-            openModal('qrModal');
-        }
-
-        function toggleFinancialFields() {
-            const type = document.getElementById('employeeType').value;
-            document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
-            document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
-        }
-
-        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
-        function hideAddEmployeeForm() { resetForm(); }
-        function resetForm() {
-            document.getElementById('addEmployeeForm').style.display = 'none';
-            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
-            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('employeeType').value = 'employe';
-            toggleFinancialFields();
-            currentEditId = null;
-        }
-
-        async function saveEmployee() {
-            const emp = {
-                nom: document.getElementById('employeeNom').value,
-                prenom: document.getElementById('employeePrenom').value,
-                type: document.getElementById('employeeType').value,
-                email: document.getElementById('employeeEmail').value,
-                telephone: document.getElementById('employeeTelephone').value,
-                taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
-                frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
-            };
-            const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
-            const method = currentEditId ? 'PUT' : 'POST';
-            await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` }, body: JSON.stringify(emp) });
-            hideAddEmployeeForm();
-            loadEmployees();
-        }
-
-        async function deleteEmployee(id) {
-            if (confirm('Supprimer ?')) {
-                await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${currentUser.token}` } });
-                loadEmployees();
-            }
-        }
+        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
 
         // === SCANNER QR ===
         async function startCamera() {
@@ -716,14 +321,10 @@
             video.srcObject = videoStream;
             scanInterval = setInterval(() => scanQRCode(video), 500);
         }
-
         function stopCamera() {
-            if (videoStream) {
-                videoStream.getTracks().forEach(t => t.stop());
-                clearInterval(scanInterval);
-            }
+            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+            clearInterval(scanInterval);
         }
-
         function scanQRCode(video) {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -731,23 +332,80 @@
             const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
             if (code) { handleQRScan(code.data); stopCamera(); }
         }
-
         async function handleQRScan(qr) {
             const res = await fetch(`${API_URL}/scan`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentUser.token}` },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qr_code: qr })
             });
             const result = await res.json();
             document.getElementById('scan-result').innerHTML = result.success
-                ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                ? `<div class="status-card"><h3>${result.message}</h3></div>`
                 : `<p style="color:red;">Échec</p>`;
         }
 
-        // === POINTAGES & SALAIRES ===
+        // === EMPLOYÉS ===
+        async function loadEmployees() {
+            const res = await fetch(`${API_URL}/employees`);
+            const data = await res.json();
+            const list = document.getElementById('employeesList');
+            list.innerHTML = data.employees.map(e => `
+                <div class="employee-item">
+                    <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
+                    <div class="employee-actions">
+                        <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')">QR</button>
+                        <button class="btn-edit" onclick="editEmployee('${e.id}')">Edit</button>
+                        <button class="btn-delete" onclick="deleteEmployee('${e.id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        function showQRCode(id, name) {
+            document.getElementById('qrImage').src = `${API_URL}/qrcode/${id}`;
+            document.getElementById('qrName').textContent = name;
+            openModal('qrModal');
+        }
+        function toggleFinancialFields() {
+            const type = document.getElementById('employeeType').value;
+            document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
+            document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
+        }
+        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
+        function hideAddEmployeeForm() { resetForm(); }
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            document.getElementById('formTitle').textContent = 'Nouvel Employé';
+            ['employeeNom','employeePrenom','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+            currentEditId = null;
+        }
+        async function saveEmployee() {
+            const emp = {
+                nom: document.getElementById('employeeNom').value,
+                prenom: document.getElementById('employeePrenom').value,
+                type: document.getElementById('employeeType').value,
+                taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
+                frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
+            };
+            const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
+            const method = currentEditId ? 'PUT' : 'POST';
+            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) });
+            hideAddEmployeeForm();
+            loadEmployees();
+        }
+        async function deleteEmployee(id) {
+            if (confirm('Supprimer ?')) {
+                await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
+                loadEmployees();
+            }
+        }
+
+        // === POINTAGES ===
         async function loadPointages() {
-            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
-            document.getElementById('pointagesList').innerHTML = data.pointages.length > 0 ? `
+            const res = await fetch(`${API_URL}/pointages/history`);
+            const data = await res.json();
+            document.getElementById('pointagesList').innerHTML = `
                 <table class="table">
                     <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
                     <tbody>${data.pointages.map(p => `
@@ -755,60 +413,11 @@
                         <td>${new Date(p.timestamp).toLocaleDateString()}</td>
                         <td>${new Date(p.timestamp).toLocaleTimeString()}</td></tr>
                     `).join('')}</tbody>
-                </table>` : '<p>Aucun pointage.</p>';
+                </table>`;
         }
 
-        async function loadSalaryData() {
-            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
-            let revenue = 0, expenses = 0;
-            data.salaries.forEach(s => {
-                if (s.type === 'ecolage') revenue += s.amount;
-                if (s.type === 'salaire') expenses += s.amount;
-            });
-            document.getElementById('totalRevenue').textContent = revenue.toFixed(2) + 'Ar';
-            document.getElementById('totalExpenses').textContent = expenses.toFixed(2) + 'Ar';
-            document.getElementById('netProfit').textContent = (revenue - expenses).toFixed(2) + 'Ar';
-        }
-
-        // === STATISTIQUES AVEC PHOTOS ===
-        async function loadStatistics() {
-            const [empData, pointData] = await Promise.all([
-                safeFetch(`${API_URL}/employees`, { employees: [] }),
-                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
-            ]);
-
-            const employees = empData.employees.filter(e => e.type === 'employe');
-            const students = empData.employees.filter(e => e.type === 'etudiant').length;
-            document.getElementById('totalEmployees').textContent = employees.length;
-            document.getElementById('totalStudents').textContent = students;
-
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = pointData.pointages
-                .filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE')
-                .map(p => p.employee_id);
-
-            const presentEmployees = employees.filter(e => todayEntries.includes(e.id));
-            const rate = employees.length > 0 ? Math.round((presentEmployees.length / employees.length) * 100) : 0;
-            document.getElementById('presenceRate').textContent = rate + '%';
-            document.getElementById('absenceRate').textContent = (100 - rate) + '%';
-
-            const list = document.getElementById('presenceList');
-            if (presentEmployees.length === 0) {
-                list.innerHTML = '<p style="color:#ef4444">Aucun employé présent aujourd\'hui.</p>';
-            } else {
-                list.innerHTML = presentEmployees.map(e => `
-                    <div class="presence-item">
-                        <img src="${API_URL}/photo/${e.id}" alt="${e.prenom}" class="presence-photo"
-                             onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(e.prenom + ' ' + e.nom)}&background=6366f1&color=fff&size=128'">
-                        <div>
-                            <div class="presence-name">${e.prenom} ${e.nom}</div>
-                            <div class="presence-status">Présent aujourd'hui</div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            // === GRAPHIQUES (simplifiés) ===
+        // === STATISTIQUES ===
+        function loadStatistics() {
             const ctxBar = document.getElementById('barChart').getContext('2d');
             if (charts.bar) charts.bar.destroy();
             charts.bar = new Chart(ctxBar, {
@@ -817,35 +426,52 @@
                     labels: ['Employés', 'Étudiants'],
                     datasets: [{
                         label: 'Nombre',
-                        data: [employees.length, students],
+                        data: [{{ total_employees }}, {{ total_students }}],
                         backgroundColor: ['#6366f1', '#8b5cf6']
                     }]
                 }
             });
         }
 
-        // === AUTRES ===
-        function sendMessage() {
-            const input = document.getElementById('chatInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-            const messages = document.getElementById('chatMessages');
-            messages.innerHTML += `<div class="message message-user">${msg}</div>`;
-            input.value = '';
-            setTimeout(() => {
-                messages.innerHTML += `<div class="message message-ai">Réponse simulée pour : "${msg}"</div>`;
-                messages.scrollTop = messages.scrollHeight;
-            }, 800);
+        // === EXPORT EXCEL ===
+        function exportToExcel(data, filename) {
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Données");
+            XLSX.writeFile(wb, `${filename}.xlsx`);
         }
-
-        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
+        function exportEmployeesToExcel() {
+            fetch(`${API_URL}/employees`).then(r => r.json()).then(data => {
+                const rows = data.employees.map(e => ({
+                    Type: e.type, Nom: e.nom, Prénom: e.prenom,
+                    'Taux Horaire': e.taux_horaire || '-', 'Frais Écolage': e.frais_ecolage || '-'
+                }));
+                exportToExcel(rows, 'Employes');
+            });
+        }
+        function exportPointagesToExcel() {
+            fetch(`${API_URL}/pointages/history`).then(r => r.json()).then(data => {
+                const rows = data.pointages.map(p => ({
+                    Employé: p.employee_name, Action: p.type,
+                    Date: new Date(p.timestamp).toLocaleDateString(),
+                    Heure: new Date(p.timestamp).toLocaleTimeString()
+                }));
+                exportToExcel(rows, 'Pointages');
+            });
+        }
+        function exportStatsToExcel() {
+            const rows = [
+                { Indicateur: 'Employés', Valeur: {{ total_employees }} },
+                { Indicateur: 'Étudiants', Valeur: {{ total_students }} },
+                { Indicateur: 'Présents', Valeur: {{ present_employees|length }} },
+                { Indicateur: 'Taux Présence', Valeur: '{{ presence_rate }}%' }
+            ];
+            exportToExcel(rows, 'Stats_RH');
+        }
 
         // === INIT ===
         document.addEventListener('DOMContentLoaded', () => {
-            loadSettings();
-            checkAuth();
-            setInterval(checkAuth, 30000); // Vérifie toutes les 30s
-            document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour ! Posez-moi une question.</div>`;
+            loadStatistics();
         });
     </script>
 </body>
