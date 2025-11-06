@@ -1,971 +1,1278 @@
-import os
-import logging
-from flask import Flask, jsonify, request, render_template, session, redirect, url_for
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit
-from datetime import datetime
-import uuid
-import math
-from collections import defaultdict
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion RH Pro - Pointage & Suivi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #8b5cf6;
+            --danger: #ef4444;
+            --success: #10b981;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-800: #1f2937;
+            --glass: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            background-attachment: fixed;
+        }
+        .app-container { max-width: 1500px; margin: 0 auto; padding: 1.5rem; }
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            padding: 1.5rem 2rem;
+            border-radius: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            position: sticky;
+            top: 1rem;
+            z-index: 100;
+        }
+        .header h1 { color: white; font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; }
+        .header h1 i { color: var(--primary); font-size: 2rem; }
+        .logout-btn {
+            background: var(--danger); color: white; border: none; padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .card {
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative; overflow: hidden;
+        }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary)); transform: scaleX(0); transform-origin: left;
+            transition: transform 0.4s ease;
+        }
+        .card:hover::before { transform: scaleX(1); }
+        .card:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 20px 40px rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.3); }
+        .card-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .card-title { font-size: 1.35rem; font-weight: 600; color: white; margin-bottom: 0.5rem; }
+        .card-desc { color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; line-height: 1.5; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; overflow-y: auto;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
+            max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            animation: slideUp 0.4s ease;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
+            padding-bottom: 1rem; border-bottom: 1px solid var(--gray-200);
+        }
+        .modal-title { font-size: 1.6rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 0.75rem; }
+        .modal-title i { color: var(--primary); }
+        .close-btn { font-size: 2rem; cursor: pointer; color: var(--gray-600); width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.3s ease;
+        }
+        .close-btn:hover { background: var(--gray-100); color: var(--danger); }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); font-size: 0.95rem; }
+        .form-input, .form-select { width: 100%; padding: 0.875rem 1rem; border: 2px solid var(--gray-200);
+            border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white;
+        }
+        .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
+        .btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.75rem;
+            cursor: pointer; font-weight: 600; font-size: 0.95rem; transition: all 0.3s ease; display: inline-flex;
+            align-items: center; gap: 0.5rem;
+        }
+        .btn:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .btn-secondary { background: var(--gray-600); }
+        .btn-secondary:hover { background: var(--gray-800); }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-edit, .btn-qr, .btn-delete, .btn-badge, .btn-excel { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.3s ease; }
+        .btn-edit { background: #3b82f6; color: white; }
+        .btn-edit:hover { background: #2563eb; transform: translateY(-2px); }
+        .btn-qr { background: var(--success); color: white; }
+        .btn-qr:hover { background: #059669; transform: translateY(-2px); }
+        .btn-badge { background: #10b981; color: white; }
+        .btn-badge:hover { background: #059669; transform: translateY(-2px); }
+        .btn-excel { background: #16a34a; color: white; }
+        .btn-excel:hover { background: #15803d; transform: translateY(-2px); }
+        .btn-delete { background: var(--danger); color: white; }
+        .btn-delete:hover { background: #dc2626; transform: translateY(-2px); }
+        .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .table th { background: var(--gray-100); padding: 1rem; text-align: left; font-weight: 600; color: var(--gray-800);
+            font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .table td { padding: 1rem; border-bottom: 1px solid var(--gray-200); color: var(--gray-800); }
+        .table tr:hover { background: #f8fafc; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+        .stat-card { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1.5rem;
+            border-radius: 1rem; text-align: center; box-shadow: 0 8px 20px rgba(99,102,241,0.2);
+        }
+        .stat-value { font-size: 2.2rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .stat-label { font-size: 0.85rem; opacity: 0.9; }
+        .employee-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem;
+            background: var(--gray-100); border-radius: 0.75rem; margin-bottom: 0.75rem; transition: all 0.3s ease;
+        }
+        .employee-item:hover { background: #e2e8f0; transform: translateX(4px); }
+        .employee-name { font-weight: 600; color: var(--gray-800); }
+        .employee-type { font-size: 0.75rem; color: white; background: var(--primary); padding: 0.25rem 0.5rem;
+            border-radius: 0.5rem; font-weight: 600;
+        }
+        .employee-actions { display: flex; gap: 0.5rem; }
+        .chat-container { display: flex; flex-direction: column; height: 520px; background: white; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .chat-messages { flex: 1; padding: 1.5rem; overflow-y: auto; background: #f8fafc; }
+        .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
+            animation: fadeInUp 0.3s ease;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
+        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
+        .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
+        .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
+        .chat-input:focus { outline: none; border-color: var(--primary); }
+        .video-container { position: relative; width: 100%; max-width: 640px; margin: 1.5rem auto; border-radius: 1rem;
+            overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        #scanner-video { width: 100%; display: block; }
+        .status-card { background: var(--success); color: white; padding: 1.25rem; border-radius: 1rem; text-align: center;
+            margin-top: 1rem; box-shadow: 0 4px 12px rgba(16,185,129,0.2);
+        }
+        #qrModal .modal-content { max-width: 400px; text-align: center; }
+        #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .chart-container { position: relative; height: 300px; margin: 20px 0; }
+        .export-btns { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); z-index: 9999; display: none;
+            justify-content: center; align-items: center;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
+        }
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 1rem; text-align: center; }
+            .main-grid { grid-template-columns: 1fr; }
+            .modal-content { margin: 1rem; padding: 1.5rem; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .chart-container { height: 250px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
 
-# === Configuration Flask ===
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
-CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)  # Activer les journaux SocketIO
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
+            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
+        </div>
+        <!-- Main Dashboard -->
+        <div class="main-grid">
+            <div class="card" onclick="openModal('scanModal')">
+                <div class="card-icon"><i class="fas fa-qrcode"></i></div>
+                <div class="card-title">Scanner QR Code</div>
+                <div class="card-desc">Enregistrer les pointages via QR</div>
+            </div>
+            <div class="card" onclick="openModal('employeesModal')">
+                <div class="card-icon"><i class="fas fa-users"></i></div>
+                <div class="card-title">Gestion Employés</div>
+                <div class="card-desc">Ajouter et gérer les employés</div>
+            </div>
+            <div class="card" onclick="openModal('pointagesModal')">
+                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                <div class="card-title">Historique Pointages</div>
+                <div class="card-desc">Consulter les pointages</div>
+            </div>
+            <div class="card" onclick="openModal('salaryModal')">
+                <div class="card-icon"><i class="fas fa-euro-sign"></i></div>
+                <div class="card-title">Gestion Salaires</div>
+                <div class="card-desc">Calculer et gérer les salaires</div>
+            </div>
+            <div class="card" onclick="openModal('statsModal')">
+                <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
+                <div class="card-title">Statistiques</div>
+                <div class="card-desc">Tableaux de bord et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('trackingModal')">
+                <div class="card-icon"><i class="fas fa-map-marker-alt"></i></div>
+                <div class="card-title">Suivi Temps Réel</div>
+                <div class="card-desc">Localisation des employés</div>
+            </div>
+            <div class="card" onclick="openModal('chatModal')">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <div class="card-title">Assistant IA</div>
+                <div class="card-desc">Questions et analyses</div>
+            </div>
+            <div class="card" onclick="openModal('settingsModal')">
+                <div class="card-icon"><i class="fas fa-cog"></i></div>
+                <div class="card-title">Paramètres</div>
+                <div class="card-desc">WiFi, serveur, compte admin</div>
+            </div>
+        </div>
+    </div>
 
-# === Logger ===
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+    <!-- Modal Scanner QR -->
+    <div id="scanModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> Scanner QR Code</h2>
+                <span class="close-btn" onclick="closeModal('scanModal')">&times;</span>
+            </div>
+            <div class="video-container">
+                <video id="scanner-video" autoplay></video>
+            </div>
+            <div id="scan-result"></div>
+            <button class="btn" onclick="startCamera()"><i class="fas fa-play"></i> Démarrer Scanner</button>
+            <button class="btn btn-secondary" onclick="stopCamera()"><i class="fas fa-stop"></i> Arrêter</button>
+        </div>
+    </div>
 
-# === DB imports ===
-try:
-    from database import init_db, get_db, verify_schema, DB_DRIVER
-    logger.info("✅ database.py importé")
-except Exception as e:
-    logger.error(f"❌ Échec import database.py : {e}")
-    raise
+    <!-- Modal Employés -->
+    <div id="employeesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-users"></i> Gestion des Employés</h2>
+                <span class="close-btn" onclick="closeModal('employeesModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportEmployeesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
+            <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
+                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
+                <input type="hidden" id="editEmployeeId">
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="employeeType" onchange="toggleFinancialFields()">
+                        <option value="employe">Employé</option>
+                        <option value="etudiant">Étudiant</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nom</label>
+                    <input type="text" class="form-input" id="employeeNom">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Prénom</label>
+                    <input type="text" class="form-input" id="employeePrenom">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="employeeEmail">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Téléphone</label>
+                    <input type="text" class="form-input" id="employeeTelephone">
+                </div>
+                <div class="form-group" id="tauxHoraireGroup">
+                    <label class="form-label">Taux Horaire (Ar)</label>
+                    <input type="number" class="form-input" id="employeeTauxHoraire" step="0.01">
+                </div>
+                <div class="form-group" id="fraisEcolageGroup" style="display:none;">
+                    <label class="form-label">Frais Écolage (Ar)</label>
+                    <input type="number" class="form-input" id="employeeFraisEcolage" step="0.01">
+                </div>
+                <button class="btn" onclick="saveEmployee()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="hideAddEmployeeForm()"><i class="fas fa-times"></i> Annuler</button>
+            </div>
+            <div id="employeesList" style="margin-top:20px;"></div>
+        </div>
+    </div>
 
-# === Placeholder SQL (Postgres = %s, SQLite = ?) ===
-PLACEHOLDER = "?" if DB_DRIVER == "sqlite" else "%s"
+    <!-- Modal Pointages -->
+    <div id="pointagesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-history"></i> Historique des Pointages</h2>
+                <span class="close-btn" onclick="closeModal('pointagesModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportPointagesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <div id="pointagesList"></div>
+        </div>
+    </div>
 
-# --- Initialisation DB ---
-try:
-    init_db()
-    verify_schema()
-    logger.info("✅ Base initialisée et schéma vérifié")
-except Exception as e:
-    logger.error(f"❌ Échec init_db/verify_schema : {e}")
-    raise
+    <!-- Modal Salaires -->
+    <div id="salaryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-money-bill-wave"></i> Gestion des Salaires</h2>
+                <span class="close-btn" onclick="closeModal('salaryModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportSalairesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRevenue">0Ar</div>
+                    <div class="stat-label">Revenus (Écolage)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                    <div class="stat-value" id="totalExpenses">0Ar</div>
+                    <div class="stat-label">Dépenses (Salaires)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value" id="netProfit">0Ar</div>
+                    <div class="stat-label">Bénéfice Net</div>
+                </div>
+            </div>
+            <div id="salaryHistory"></div>
+        </div>
+    </div>
 
-# === Filtres Jinja2 ===
-@app.template_filter("timestamp_to_datetime")
-def timestamp_to_datetime_filter(timestamp):
-    try:
-        return datetime.fromtimestamp(int(timestamp) / 1000).strftime("%d/%m/%Y")
-    except:
-        return "-"
+    <!-- Modal Statistiques -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-chart-line"></i> Statistiques</h2>
+                <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
+            </div>
+            <div class="export-btns">
+                <button class="btn btn-excel" onclick="exportStatsToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="totalEmployees">0</div><div class="stat-label">Employés</div></div>
+                <div class="stat-card"><div class="stat-value" id="totalStudents">0</div><div class="stat-label">Étudiants</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><div class="stat-value" id="presenceRate">0%</div><div class="stat-label">Taux Présence</div></div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><div class="stat-value" id="absenceRate">0%</div><div class="stat-label">Taux Absence</div></div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
+                <div class="chart-container"><canvas id="barChart"></canvas></div>
+                <div class="chart-container"><canvas id="pieChart"></canvas></div>
+            </div>
+            <div class="chart-container" style="margin-top:20px;"><canvas id="lineChart"></canvas></div>
+        </div>
+    </div>
 
-@app.template_filter("timestamp_to_datetime_full")
-def timestamp_to_datetime_full_filter(timestamp):
-    try:
-        dt = datetime.fromtimestamp(int(timestamp) / 1000)
-        return dt.strftime("%d/%m/%Y à %H:%M")
-    except:
-        return "-"
+    <!-- Modal Tracking -->
+    <div id="trackingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel</h2>
+                <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
+            </div>
+            <div id="trackingInfo"><p>Connexion au serveur WebSocket...</p></div>
+        </div>
+    </div>
 
-# === Routes Web ===
-@app.route("/")
-@app.route("/login")
-def login_page():
-    logger.info("📄 Page de connexion")
-    return render_template("login.html")
+    <!-- Modal Chat IA -->
+    <div id="chatModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-robot"></i> Assistant IA</h2>
+                <span class="close-btn" onclick="closeModal('chatModal')">&times;</span>
+            </div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Posez votre question...">
+                    <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Envoyer</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-@app.route("/logout")
-def logout():
-    session.pop("logged_in", None)
-    logger.info("✅ Déconnexion")
-    return redirect(url_for("login_page"))
+    <!-- Modal Paramètres -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-cog"></i> Paramètres</h2>
+                <span class="close-btn" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-wifi"></i> WiFi SSID</label>
+                <input type="text" class="form-input" id="wifiSSID" value="OPPO">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="wifiPassword" value="1234567809">
+                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-server"></i> URL Serveur</label>
+                <input type="text" class="form-input" id="serverURL" value="https://postcam-1.onrender.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-user-shield"></i> Admin</label>
+                <input type="text" class="form-input" id="adminUser" value="admin">
+            </div>
+            <div class="form-group">
+                <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
+                <div style="position:relative;">
+                    <input type="password" class="form-input" id="adminPassword" value="admin123">
+                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn" onclick="saveSettings()"><i class="fas fa-save"></i> Enregistrer</button>
+                <button class="btn btn-secondary" onclick="resetSettings()"><i class="fas fa-undo"></i> Réinitialiser</button>
+            </div>
+            <div id="settingsStatus" style="margin-top:15px; text-align:center;"></div>
+        </div>
+    </div>
 
-# === API Login ===
-@app.route("/api/login", methods=["POST"])
-def login():
-    data = request.get_json(silent=True) or request.form
-    if not data:
-        return jsonify({"success": False, "message": "Données manquantes"}), 400
+    <!-- Modal QR -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-qrcode"></i> QR Code</h2>
+                <span class="close-btn" onclick="closeModal('qrModal')">&times;</span>
+            </div>
+            <img id="qrImage" src="" alt="QR Code">
+            <p><strong id="qrName"></strong></p>
+        </div>
+    </div>
 
-    username = data.get("username")
-    password = data.get("password")
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        let API_URL = 'https://postcam-1.onrender.com/api';
+        let videoStream = null, scanInterval = null, currentEditId = null;
+        let charts = {};
 
-    if username == "admin" and password == "1234":
-        session["logged_in"] = True
-        return jsonify({
-            "success": True,
-            "token": "fake-jwt-token-123",
-            "role": "admin",
-            "redirect_url": url_for("dashboard")
-        })
+        // === UTILITAIRES ===
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
 
-    return jsonify({"success": False, "message": "Identifiants invalides"}), 401
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
 
-# === GET employés ===
-@app.route("/api/employees", methods=["GET"])
-def get_all_employees():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM employees ORDER BY nom, prenom")
-        rows = cursor.fetchall()
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { return fallback; }
+            } catch (e) {
+                console.error(`Erreur fetch ${url}:`, e);
+                return fallback;
+            }
+        }
 
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
-        conn.close()
-        return jsonify({"success": True, "employees": employees})
-    except Exception as e:
-        logger.error(f"❌ get_all_employees: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === POST ajouter employé ===
-@app.route("/api/employees", methods=["POST"])
-def add_employee():
-    record = request.get_json(silent=True)
-    required = ["nom", "prenom", "type"]
-    for field in required:
-        if not record or field not in record:
-            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
-
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-
-        new_id = str(uuid.uuid4())
-        created_at = int(datetime.now().timestamp() * 1000)
-
-        cursor.execute(f"""
-            INSERT INTO employees (
-                id, nom, prenom, type, is_active, created_at,
-                email, telephone, taux_horaire, frais_ecolage,
-                profession, date_naissance, lieu_naissance
-            )
-            VALUES (
-                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
-                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER},
-                {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}
-            )
-        """, [
-            new_id, record["nom"], record["prenom"], record["type"],
-            record.get("is_active", 1), created_at,
-            record.get("email"), record.get("telephone"), record.get("taux_horaire"),
-            record.get("frais_ecolage"), record.get("profession"),
-            record.get("date_naissance"), record.get("lieu_naissance")
-        ])
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({
-            "success": True,
-            "message": "Employé ajouté avec succès",
-            "id": new_id
-        }), 201
-
-    except Exception as e:
-        logger.error(f"❌ add_employee: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === POST ajouter salaire ===
-@app.route("/api/salary", methods=["POST"])
-def add_salary():
-    data = request.get_json(silent=True)
-    logger.info(f"📥 Données reçues: {data}")
-
-    if not data:
-        logger.error("❌ Requête vide")
-        return jsonify({"success": False, "message": "Requête vide"}), 400
-
-    # ✅ CORRECTION : Accepter les deux formats (camelCase ET snake_case)
-    employee_id = data.get("employeeId") or data.get("employee_id")
-    employee_name = data.get("employeeName") or data.get("employee_name")
-    amount = data.get("amount")
-    record_type = data.get("type")
-    hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
-
-    # Validation des champs requis
-    if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
-        logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
-
-    if not amount:
-        logger.error(f"❌ amount manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: amount"}), 400
-
-    if not record_type:
-        logger.error(f"❌ type manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
-
-    # Validation du montant
-    try:
-        amount = float(amount)
-        if amount <= 0:
-            logger.error(f"❌ Montant invalide: {amount}")
-            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
-    except (ValueError, TypeError):
-        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
-        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Nettoyer le nom
-        employee_name = employee_name.strip()
-
-        # Si employee_id fourni, vérifier qu'il existe
-        if employee_id:
-            cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
-            employee = cur.fetchone()
-
-            if not employee:
-                logger.warning(f"⚠️ Employé {employee_id} non trouvé")
-        else:
-            # Chercher l'employé par nom
-            cur.execute(f"""
-                SELECT id FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
-                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name, employee_name))
+        // === GÉNÉRATION BADGE ESP01S (CORRIGÉ) ===
+        async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
+            console.log('🎫 Génération badge pour:', prenom, nom, empId);
+            showLoading();
             
-            employee = cur.fetchone()
-            
-            if employee:
-                employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-                logger.info(f"✅ Employé trouvé par nom: {employee_id}")
-            else:
-                # Créer un nouvel employé si introuvable
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
-                emp_name_parts = employee_name.split(" ", 1)
-                prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
-                nom = emp_name_parts[1] if len(emp_name_parts) > 1 else employee_name
+            try {
+                const { jsPDF } = window.jspdf;
                 
-                employee_id = str(uuid.uuid4())
+                // Créer le badge HTML
+                const badge = document.createElement('div');
+                badge.style.cssText = `
+                    position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
+                    background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
+                    border-radius: 16px; padding: 20px; color: white; font-family: 'Inter', sans-serif;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 3px solid #00d4ff; overflow: hidden;
+                    display: flex; flex-direction: column; justify-content: space-between;
+                `;
+                document.body.appendChild(badge);
+
+                // SVG Circuit
+                const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                circuitSVG.setAttribute('width', '100%'); 
+                circuitSVG.setAttribute('height', '100%');
+                circuitSVG.setAttribute('style', 'position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;');
+                circuitSVG.innerHTML = `
+                    <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+                    <path d="M80 120 Q120 90 160 120" stroke="#00d4ff" stroke-width="1" fill="none"/>
+                    <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
+                    <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
+                    <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
+                    <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
+                    <circle cx="235" cy="75" r="2" fill="#00ff00"/>
+                `;
+                badge.appendChild(circuitSVG);
+
+                // Info employé
+                const infoDiv = document.createElement('div');
+                infoDiv.style.cssText = 'z-index: 2; padding: 10px;';
+                infoDiv.innerHTML = `
+                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${prenom.toUpperCase()} ${nom.toUpperCase()}
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste}</div>
+                    <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
+                `;
+                badge.appendChild(infoDiv);
+
+                // Bottom: QR + ESP
+                const bottomDiv = document.createElement('div');
+                bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
                 
-                cur.execute(f"""
-                    INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-                """, [employee_id, nom, prenom, "employe", 1, int(datetime.now().timestamp() * 1000)])
+                // QR Code
+                const qrCanvas = document.createElement('canvas');
+                await QRCode.toCanvas(qrCanvas, empId, { 
+                    width: 80, 
+                    margin: 1, 
+                    color: { dark: '#000000', light: '#FFFFFF' } 
+                });
+                bottomDiv.appendChild(qrCanvas);
+
+                // ESP01S badge
+                const espDiv = document.createElement('div');
+                espDiv.style.cssText = `
+                    width: 100px; height: 40px; background: #111; border-radius: 8px;
+                    display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0f0;
+                    border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                `;
+                espDiv.innerHTML = '<i class="fas fa-microchip" style="margin-right:4px;"></i> ESP01S';
+                bottomDiv.appendChild(espDiv);
+                badge.appendChild(bottomDiv);
+
+                // LED verte
+                const led = document.createElement('div');
+                led.style.cssText = `
+                    position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
+                    background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00;
+                    animation: pulse 2s infinite;
+                `;
+                badge.appendChild(led);
+
+                // Attendre le rendu
+                await new Promise(r => setTimeout(r, 500));
                 
-                logger.info(f"✅ Nouvel employé créé: {employee_id}")
-
-        # Préparer les données
-        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
-        period = data.get("period") or datetime.now().strftime("%Y-%m")
-        salary_id = data.get("id") or str(uuid.uuid4())
-
-        # ✅ CORRECTION : Vérifier si l'enregistrement existe déjà
-        cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
-        existing = cur.fetchone()
-
-        if existing:
-            logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
-            
-            # UPDATE au lieu de INSERT
-            cur.execute(f"""
-                UPDATE salaries 
-                SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
-                    amount = {PLACEHOLDER}, hours_worked = {PLACEHOLDER}, 
-                    type = {PLACEHOLDER}, period = {PLACEHOLDER}, date = {PLACEHOLDER}
-                WHERE id = {PLACEHOLDER}
-            """, [
-                employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date, salary_id
-            ])
-            
-            action = "mis à jour"
-        else:
-            # INSERT normal
-            cur.execute(f"""
-                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                salary_id, employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date
-            ])
-            
-            action = "créé"
-
-        conn.commit()
-        logger.info(f"✅ Salaire {action}: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
-
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"Salaire {action} avec succès", 
-            "id": salary_id,
-            "employeeId": employee_id,
-            "action": action
-        }), 201 if action == "créé" else 200
-
-    except Exception as e:
-        logger.error(f"❌ add_salary: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-# === PUT modifier employé ===
-@app.route("/api/employees/<id>", methods=["PUT"])
-def update_employee(id):
-    record = request.get_json(silent=True)
-    if not record:
-        return jsonify({"success": False, "message": "Requête vide"}), 400
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute(f"""
-            UPDATE employees
-            SET nom = {PLACEHOLDER}, prenom = {PLACEHOLDER}, type = {PLACEHOLDER}, is_active = {PLACEHOLDER},
-                email = {PLACEHOLDER}, telephone = {PLACEHOLDER},
-                taux_horaire = {PLACEHOLDER}, frais_ecolage = {PLACEHOLDER},
-                profession = {PLACEHOLDER}, date_naissance = {PLACEHOLDER}, lieu_naissance = {PLACEHOLDER}
-            WHERE id = {PLACEHOLDER}
-        """, [
-            record.get("nom"), record.get("prenom"), record.get("type"), record.get("is_active", 1),
-            record.get("email"), record.get("telephone"),
-            record.get("taux_horaire"), record.get("frais_ecolage"),
-            record.get("profession"), record.get("date_naissance"), record.get("lieu_naissance"),
-            id
-        ])
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "message": "Employé modifié"}), 200
-    except Exception as e:
-        logger.error(f"❌ update_employee: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === DELETE supprimer employé ===
-@app.route("/api/employees/<id>", methods=["DELETE"])
-def delete_employee(id):
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute(f"DELETE FROM salaries WHERE employee_id = {PLACEHOLDER}", [id])
-        cur.execute(f"DELETE FROM employees WHERE id = {PLACEHOLDER}", [id])
-
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "message": "Employé supprimé"}), 200
-    except Exception as e:
-        logger.error(f"❌ delete_employee: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === GET historique salaires ===
-@app.route("/api/salary/history", methods=["GET"])
-def get_salary_history():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(f"""
-            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
-                   s.type, s.period, s.date,
-                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
-                   e.date_naissance, e.lieu_naissance
-            FROM salaries s
-            LEFT JOIN employees e ON e.id = s.employee_id
-            WHERE s.employee_id IS NOT NULL 
-              AND s.employee_name IS NOT NULL 
-              AND s.employee_name != ''
-              AND s.amount > 0
-            ORDER BY s.date DESC
-        """)
-        rows = cur.fetchall()
-
-        salaries = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
-        for record in salaries:
-            if record.get("hours_worked") is None:
-                record["hours_worked"] = 0.0
-            if record.get("period") is None:
-                record["period"] = ""
-
-        cur.close()
-        conn.close()
-        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
-        return jsonify({"success": True, "salaries": salaries}), 200
-
-    except Exception as e:
-        logger.error(f"❌ get_salary_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === Dashboard ===
-@app.route("/dashboard")
-def dashboard():
-    if not session.get("logged_in"):
-        return redirect(url_for("login_page"))
-
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(f"""
-            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
-                   s.type AS payment_type, s.period, s.date,
-                   e.nom, e.prenom, e.type, 
-                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
-                   e.date_naissance, e.lieu_naissance
-            FROM salaries s
-            LEFT JOIN employees e ON e.id = s.employee_id
-            ORDER BY s.date DESC
-        """)
-        rows = cursor.fetchall()
-
-        payments = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
-        conn.close()
-        return render_template("dashboard.html", payments=payments)
-    except Exception as e:
-        logger.error(f"❌ dashboard: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# ========== CORRECTIONS POUR VOS FONCTIONS PYTHON ==========
-
-# ========== MODIFICATIONS DES FONCTIONS POINTAGE ==========
-
-# 1️⃣ Fonction add_pointage() MODIFIÉE (automatise is_active)
-
-@app.route("/api/pointages", methods=["POST"])
-def add_pointage():
-    data = request.get_json(silent=True)
-    logger.info(f"📥 Données pointage reçues: {data}")
-    
-    if not data:
-        return jsonify({"success": False, "message": "Requête vide"}), 400
-    
-    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
-    for field in required:
-        if field not in data or not data[field]:
-            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        emp_id = data.get("employeeId")
-        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
-        employee = cur.fetchone()
-        
-        if not employee:
-            cur.close()
-            conn.close()
-            return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
-        
-        # Extraire nom et prénom selon le driver
-        if DB_DRIVER == "sqlite":
-            emp_nom = employee[1]
-            emp_prenom = employee[2]
-        else:
-            emp_nom = employee['nom']
-            emp_prenom = employee['prenom']
-        
-        pointage_id = str(uuid.uuid4())
-        pointage_type = data.get("type").upper()
-        
-        # Mapper "arrivee" -> "ENTREE" et "depart" -> "SORTIE"
-        if pointage_type.lower() == "arrivee":
-            pointage_type = "ENTREE"
-        elif pointage_type.lower() == "depart":
-            pointage_type = "SORTIE"
-        
-        # ✅ DÉTERMINER is_active SELON LE TYPE DE POINTAGE
-        new_is_active = 1 if pointage_type == "ENTREE" else 0
-        
-        # ✅ METTRE À JOUR is_active DANS employees
-        cur.execute(f"""
-            UPDATE employees 
-            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
-            WHERE id = {PLACEHOLDER}
-        """, [new_is_active, int(data.get("timestamp")), emp_id])
-        
-        logger.info(f"✅ is_active mis à jour: {emp_prenom} {emp_nom} -> {new_is_active} ({pointage_type})")
-        
-        # Enregistrer le pointage
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id,
-            emp_id,
-            data.get("employeeName"),
-            pointage_type,
-            int(data.get("timestamp")),
-            data.get("date")
-        ])
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Émettre vers ESP32
-        timestamp = int(data.get("timestamp"))
-        dt = datetime.fromtimestamp(timestamp / 1000)
-        date_formatted = dt.strftime("%d/%m/%y")
-        time_formatted = dt.strftime("%H:%M:%S")
-        
-        socketio.emit('pointage_event', {
-            'nom': emp_nom,
-            'prenom': emp_prenom,
-            'type': pointage_type,
-            'date': date_formatted,
-            'time': time_formatted,
-            'timestamp': timestamp,
-            'is_active': new_is_active
-        }, namespace='/api/rssi-data')
-        
-        logger.info(f"📡 Événement pointage émis vers ESP32: {emp_prenom} {emp_nom} - {pointage_type}")
-        
-        return jsonify({
-            "success": True,
-            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
-            "pointageId": pointage_id,
-            "is_active": new_is_active
-        }), 201
-        
-    except Exception as e:
-        logger.error(f"❌ add_pointage: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === GET historique pointages ===
-@app.route("/api/pointages/history", methods=["GET"])
-def get_pointage_history():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute(f"""
-            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date,
-                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
-                   e.date_naissance, e.lieu_naissance
-            FROM pointages p
-            LEFT JOIN employees e ON e.id = p.employee_id
-            ORDER BY p.timestamp DESC
-        """)
-        rows = cur.fetchall()
-
-        pointages = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "pointages": pointages}), 200
-    except Exception as e:
-        logger.error(f"❌ get_pointage_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-# 2️⃣ Fonction scan_qr_code() MODIFIÉE (automatise is_active)
-
-@app.route("/api/scan", methods=["POST"])
-def scan_qr_code():
-    data = request.get_json(silent=True)
-    logger.info(f"📸 Scan reçu : {data}")
-    
-    if not data or "qr_code" not in data:
-        return jsonify({"success": False, "message": "QR code manquant"}), 400
-    
-    qr_code = data["qr_code"].strip()
-    if not qr_code:
-        return jsonify({"success": False, "message": "QR code vide"}), 400
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
-        employee = cur.fetchone()
-        
-        if not employee:
-            logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
-            cur.close()
-            conn.close()
-            return jsonify({"success": False, "message": "Employé non trouvé"}), 404
-        
-        emp_id, nom, prenom, is_active = employee
-        now = int(datetime.now().timestamp() * 1000)
-        today = datetime.now().strftime("%Y-%m-%d")
-        
-        # ✅ DÉTERMINER LE TYPE DE POINTAGE SELON is_active ACTUEL
-        if is_active == 0:
-            pointage_type = "ENTREE"
-            new_is_active = 1
-            message = f"{prenom} {nom} est entré (activé)."
-        else:
-            pointage_type = "SORTIE"
-            new_is_active = 0
-            message = f"{prenom} {nom} est sorti (désactivé)."
-        
-        # ✅ METTRE À JOUR is_active
-        cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}", 
-                    [new_is_active, now, emp_id])
-        
-        # Enregistrer le pointage
-        pointage_id = str(uuid.uuid4())
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id,
-            emp_id,
-            f"{prenom} {nom}",
-            pointage_type,
-            now,
-            today
-        ])
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Émettre vers ESP32
-        dt = datetime.fromtimestamp(now / 1000)
-        date_formatted = dt.strftime("%d/%m/%y")
-        time_formatted = dt.strftime("%H:%M:%S")
-        
-        socketio.emit('pointage_event', {
-            'nom': nom,
-            'prenom': prenom,
-            'type': pointage_type,
-            'date': date_formatted,
-            'time': time_formatted,
-            'timestamp': now,
-            'is_active': new_is_active
-        }, namespace='/api/rssi-data')
-        
-        logger.info(f"📡 Événement pointage émis vers ESP32: {prenom} {nom} - {pointage_type}")
-        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom} (is_active={new_is_active})")
-        
-        return jsonify({
-            "success": True,
-            "action": pointage_type,
-            "message": message,
-            "employeeId": emp_id,
-            "timestamp": now,
-            "date": today,
-            "is_active": new_is_active
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"❌ scan_qr_code: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-
-# 3️⃣ NOUVELLE FONCTION : Synchroniser is_active avec le dernier pointage
-
-@app.route("/api/pointages/sync-active", methods=["POST"])
-def sync_active_status():
-    """
-    Synchronise is_active de tous les employés avec leur dernier pointage.
-    Utile pour corriger les incohérences.
-    """
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Récupérer tous les employés
-        cur.execute(f"SELECT id, nom, prenom FROM employees")
-        employees = cur.fetchall()
-        
-        updated_count = 0
-        
-        for emp in employees:
-            emp_id = emp[0] if DB_DRIVER == "sqlite" else emp['id']
-            
-            # Trouver le dernier pointage
-            cur.execute(f"""
-                SELECT type FROM pointages 
-                WHERE employee_id = {PLACEHOLDER}
-                ORDER BY timestamp DESC 
-                LIMIT 1
-            """, (emp_id,))
-            
-            last_pointage = cur.fetchone()
-            
-            if last_pointage:
-                last_type = last_pointage[0] if DB_DRIVER == "sqlite" else last_pointage['type']
+                // Convertir en canvas
+                const canvas = await html2canvas(badge, { scale: 3, backgroundColor: null });
+                const imgData = canvas.toDataURL('image/png');
                 
-                # Déterminer is_active
-                should_be_active = 1 if last_type == "ENTREE" else 0
+                // Créer PDF
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
+                pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
+                pdf.save(`Badge_${prenom}_${nom}_ESP01S.pdf`);
                 
-                # Mettre à jour
-                cur.execute(f"""
-                    UPDATE employees 
-                    SET is_active = {PLACEHOLDER}
-                    WHERE id = {PLACEHOLDER}
-                """, [should_be_active, emp_id])
+                // Nettoyer
+                document.body.removeChild(badge);
                 
-                updated_count += 1
-                logger.info(f"✅ {emp[2]} {emp[1]}: is_active={should_be_active} (dernier: {last_type})")
+                console.log('✅ Badge généré avec succès');
+                alert('Badge généré avec succès !');
+                
+            } catch (error) {
+                console.error('❌ Erreur génération badge:', error);
+                alert('Erreur lors de la génération du badge: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === ÉDITION EMPLOYÉ (CORRIGÉ) ===
+        async function editEmployee(id) {
+            console.log('✏️ Édition employé:', id);
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_URL}/employees`);
+                const data = await response.json();
+                
+                if (!data.success || !data.employees) {
+                    throw new Error('Impossible de récupérer les employés');
+                }
+                
+                const emp = data.employees.find(e => e.id === id);
+                
+                if (!emp) {
+                    throw new Error('Employé non trouvé');
+                }
+                
+                // Remplir le formulaire
+                currentEditId = id;
+                document.getElementById('formTitle').textContent = 'Modifier Employé';
+                document.getElementById('employeeType').value = emp.type || 'employe';
+                document.getElementById('employeeNom').value = emp.nom || '';
+                document.getElementById('employeePrenom').value = emp.prenom || '';
+                document.getElementById('employeeEmail').value = emp.email || '';
+                document.getElementById('employeeTelephone').value = emp.telephone || '';
+                document.getElementById('employeeTauxHoraire').value = emp.taux_horaire || '';
+                document.getElementById('employeeFraisEcolage').value = emp.frais_ecolage || '';
+                
+                toggleFinancialFields();
+                document.getElementById('addEmployeeForm').style.display = 'block';
+                
+                // Scroll vers le formulaire
+                document.getElementById('addEmployeeForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                console.log('✅ Formulaire d\'édition chargé');
+                
+            } catch (error) {
+                console.error('❌ Erreur édition:', error);
+                alert('Erreur lors du chargement de l\'employé: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === QR CODE ===
+        function showQRCode(id, name) {
+            console.log('📸 Affichage QR pour:', name, id);
+            const img = document.getElementById('qrImage');
+            img.src = `${API_URL}/qrcode/${id}`;
+            img.onerror = () => {
+                console.log('⚠️ Fallback QR API');
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(id)}`;
+            };
+            document.getElementById('qrName').textContent = name;
+            openModal('qrModal');
+        }
+
+        // === SUPPRESSION ===
+        async function deleteEmployee(id) {
+            if (!confirm('Voulez-vous vraiment supprimer cet employé ?')) return;
+            
+            showLoading();
+            try {
+                const response = await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Employé supprimé avec succès');
+                    loadEmployees();
+                } else {
+                    throw new Error(data.message || 'Erreur de suppression');
+                }
+            } catch (error) {
+                console.error('❌ Erreur suppression:', error);
+                alert('Erreur: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === CHARGEMENT EMPLOYÉS ===
+        async function loadEmployees() {
+            console.log('📥 Chargement employés...');
+            showLoading();
+            
+            try {
+                const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
+                const list = document.getElementById('employeesList');
+                
+                if (!data || !data.employees || data.employees.length === 0) {
+                    list.innerHTML = '<p style="color:#ef4444; text-align:center;">Aucun employé enregistré.</p>';
+                    return;
+                }
+                
+                list.innerHTML = data.employees.map(e => `
+                    <div class="employee-item">
+                        <div>
+                            <div class="employee-name">${e.prenom} ${e.nom}</div>
+                            <span class="employee-type">${e.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
+                        </div>
+                        <div class="employee-actions">
+                            <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')" title="QR Code">
+                                <i class="fas fa-qrcode"></i>
+                            </button>
+                            <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')" title="Générer Badge">
+                                <i class="fas fa-id-card"></i>
+                            </button>
+                            <button class="btn-edit" onclick="editEmployee('${e.id}')" title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-delete" onclick="deleteEmployee('${e.id}')" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                console.log(`✅ ${data.employees.length} employés chargés`);
+                
+            } catch (error) {
+                console.error('❌ Erreur chargement employés:', error);
+                document.getElementById('employeesList').innerHTML = 
+                    '<p style="color:#ef4444;">Erreur de chargement. Vérifiez la connexion au serveur.</p>';
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === TOGGLE CHAMPS FINANCIERS ===
+        function toggleFinancialFields() {
+            const type = document.getElementById('employeeType').value;
+            document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
+            document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
+        }
+
+        // === FORMULAIRE EMPLOYÉ ===
+        function showAddEmployeeForm() { 
+            resetForm(); 
+            document.getElementById('addEmployeeForm').style.display = 'block'; 
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+        }
         
-        conn.commit()
-        cur.close()
-        conn.close()
+        function hideAddEmployeeForm() { 
+            resetForm(); 
+        }
         
-        return jsonify({
-            "success": True,
-            "message": f"{updated_count} employés synchronisés",
-            "updated_count": updated_count
-        }), 200
+        function resetForm() {
+            document.getElementById('addEmployeeForm').style.display = 'none';
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage']
+                .forEach(id => document.getElementById(id).value = '');
+            document.getElementById('employeeType').value = 'employe';
+            toggleFinancialFields();
+            currentEditId = null;
+        }
+
+        async function saveEmployee() {
+            const nom = document.getElementById('employeeNom').value.trim();
+            const prenom = document.getElementById('employeePrenom').value.trim();
+            
+            if (!nom || !prenom) {
+                alert('Nom et prénom sont requis');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const emp = {
+                    nom,
+                    prenom,
+                    type: document.getElementById('employeeType').value,
+                    email: document.getElementById('employeeEmail').value.trim() || null,
+                    telephone: document.getElementById('employeeTelephone').value.trim() || null,
+                    taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
+                    frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
+                };
+                
+                const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
+                const method = currentEditId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, { 
+                    method, 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(emp) 
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(currentEditId ? 'Employé modifié avec succès' : 'Employé ajouté avec succès');
+                    hideAddEmployeeForm();
+                    loadEmployees();
+                } else {
+                    throw new Error(data.message || 'Erreur d\'enregistrement');
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur saveEmployee:', error);
+                alert('Erreur: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === SCANNER QR ===
+        async function startCamera() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.getElementById('scanner-video');
+                video.srcObject = videoStream;
+                scanInterval = setInterval(() => scanQRCode(video), 500);
+                console.log('📷 Caméra démarrée');
+            } catch (error) {
+                console.error('❌ Erreur caméra:', error);
+                alert('Impossible d\'accéder à la caméra');
+            }
+        }
         
-    except Exception as e:
-        logger.error(f"❌ sync_active_status: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-# === WebSocket pour RSSI ===
-@socketio.on('connect', namespace='/api/rssi-data')
-def handle_rssi_connect():
-    logger.info("📡 Client WebSocket connecté à /api/rssi-data")
-
-@socketio.on('disconnect', namespace='/api/rssi-data')
-def handle_rssi_disconnect():
-    logger.info("📡 Client WebSocket déconnecté de /api/rssi-data")
-
-# 👇 Correction ici : on écoute 'rssi_data' (et non 'message')
-@socketio.on('rssi_data', namespace='/api/rssi-data')
-def handle_rssi_data(data):
-    logger.info(f"📡 RSSI reçu via WebSocket: {data}")
-
-    try:
-        anchor_id = data.get("anchor_id")
-        anchor_x = data.get("anchor_x")
-        anchor_y = data.get("anchor_y")
-        badges = data.get("badges", [])
-
-        logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        for badge in badges:
-            ssid = badge.get("ssid")
-            mac = badge.get("mac")
-            rssi = badge.get("rssi")
-
-            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
-                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
-                continue
-
-            employee_name = ssid.strip()
-
-            cur.execute(f"""
-                SELECT id, nom, prenom FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name,))
-
-            employee = cur.fetchone()
-            if not employee:
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé")
-                continue
-
-            employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-            logger.info(f"✅ Employé trouvé: {employee_id}")
-
-            cur.execute(f"""
-                INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
-                int(datetime.now().timestamp() * 1000)
-            ])
-
-        conn.commit()
-        calculate_and_broadcast_positions(cur)
-        conn.commit()
-
-        cur.close()
-        conn.close()
-
-        # ✅ Réponse positive à l’ESP32
-        emit('ack', {'success': True, 'message': f'{len(badges)} mesures traitées'}, namespace='/api/rssi-data')
-
-    except Exception as e:
-        logger.error(f"❌ Erreur WebSocket RSSI: {e}", exc_info=True)
-        emit('error', {'success': False, 'message': str(e)}, namespace='/api/rssi-data')
-
-# === Calcul et diffusion des positions ===
-def calculate_and_broadcast_positions(cursor):
-    threshold = int((datetime.now().timestamp() - 5) * 1000)
-
-    cursor.execute(f"""
-        SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
-        FROM rssi_measurements
-        WHERE timestamp > {PLACEHOLDER}
-    """, (threshold,))
-
-    measurements = cursor.fetchall()
-
-    if not measurements:
-        logger.info("Aucune mesure récente pour triangulation")
-        return
-
-    employee_data = defaultdict(list)
-    for row in measurements:
-        emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
-        anchor_id = row[1] if DB_DRIVER == "sqlite" else row['anchor_id']
-        anchor_x = row[2] if DB_DRIVER == "sqlite" else row['anchor_x']
-        anchor_y = row[3] if DB_DRIVER == "sqlite" else row['anchor_y']
-        rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
-
-        distance = rssi_to_distance(rssi)
-        employee_data[emp_id].append({
-            'anchor_id': anchor_id,
-            'x': anchor_x,
-            'y': anchor_y,
-            'distance': distance
-        })
-
-    for emp_id, anchors in employee_data.items():
-        if len(anchors) >= 3:
-            pos_x, pos_y = trilateration(anchors)
-
-            cursor.execute(f"""
-                UPDATE employees
-                SET last_position_x = {PLACEHOLDER}, last_position_y = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
-                WHERE id = {PLACEHOLDER}
-            """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
-
-            logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
-
-    cursor.execute(f"""
-        SELECT id, nom, prenom, type, is_active, created_at,
-               email, telephone, taux_horaire, frais_ecolage,
-               profession, date_naissance, lieu_naissance,
-               last_position_x, last_position_y, last_seen
-        FROM employees 
-        WHERE is_active = 1
-        ORDER BY nom, prenom
-    """)
-    rows = cursor.fetchall()
-
-    employees = (
-        [dict(row) for row in rows] if DB_DRIVER == "postgres"
-        else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-    )
-
-    logger.info(f"📤 Diffusion positions à {len(employees)} employés actifs")
-    for emp in employees:
-        if emp.get('last_position_x') is not None:
-            logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
-
-    socketio.emit('positions', {'success': True, 'employees': employees}, namespace='/api/employees/active')
-
-def rssi_to_distance(rssi, tx_power=-59, n=2.0):
-    """Convertit un RSSI en distance estimée (mètres)."""
-    if rssi == 0:
-        return -1.0
-    ratio = (tx_power - rssi) / (10 * n)
-    return round(math.pow(10, ratio), 2)
-
-
-def trilateration(anchors):
-    """Calcule la position (x, y) à partir de 3 ancres RSSI."""
-    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
-    logger.info("📡 Ancres utilisées pour la triangulation :")
-    for i, a in enumerate(anchors):
-        logger.info(f"  {i+1}. Ancre #{a['anchor_id']} ({a['x']}, {a['y']}) d={a['distance']:.2f}m")
-
-    (x1, y1, r1), (x2, y2, r2), (x3, y3, r3) = \
-        (anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']), \
-        (anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']), \
-        (anchors[2]['x'], anchors[2]['y'], anchors[2]['distance'])
-
-    A = 2*(x2 - x1)
-    B = 2*(y2 - y1)
-    C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
-    D = 2*(x3 - x2)
-    E = 2*(y3 - y2)
-    F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
-
-    denom = (A*E - B*D)
-    if denom == 0:
-        logger.warning("⚠️ Triangulation impossible (points alignés)")
-        return (x1, y1)
-
-    x = (C*E - B*F) / denom
-    y = (A*F - C*D) / denom
-    return round(x, 2), round(y, 2)
-# === GET employés actifs ===
-@app.route("/api/employees/active", methods=["GET"])
-def get_active_employees():
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(f"""
-            SELECT id, nom, prenom, type, is_active, created_at,
-                   email, telephone, taux_horaire, frais_ecolage,
-                   profession, date_naissance, lieu_naissance,
-                   last_position_x, last_position_y, last_seen
-            FROM employees 
-            WHERE is_active = 1
-            ORDER BY nom, prenom
-        """)
-        rows = cursor.fetchall()
-
-        employees = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-        )
-
-        conn.close()
-        logger.info(f"📤 {len(employees)} employés actifs renvoyés")
-        for emp in employees:
-            if emp.get('last_position_x') is not None:
-                logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
+        function stopCamera() { 
+            if (videoStream) { 
+                videoStream.getTracks().forEach(t => t.stop()); 
+                clearInterval(scanInterval); 
+                console.log('📷 Caméra arrêtée');
+            } 
+        }
         
-        return jsonify({"success": True, "employees": employees}), 200
-    except Exception as e:
-        logger.error(f"❌ get_active_employees: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        function scanQRCode(video) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); 
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+            if (code) { 
+                handleQRScan(code.data); 
+                stopCamera(); 
+            }
+        }
+        
+        async function handleQRScan(qr) {
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/scan`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ qr_code: qr }) 
+                });
+                const result = await res.json();
+                
+                document.getElementById('scan-result').innerHTML = result.success
+                    ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                    : `<p style="color:red;">Échec du scan: ${result.message}</p>`;
+            } catch (error) {
+                console.error('❌ Erreur scan:', error);
+                document.getElementById('scan-result').innerHTML = 
+                    `<p style="color:red;">Erreur: ${error.message}</p>`;
+            } finally {
+                hideLoading();
+            }
+        }
 
-# === POST activer via QR ===
-@app.route("/api/activate-qr", methods=["POST"])
-def activate_via_qr():
-    data = request.get_json(silent=True) or request.form
-    if not data:
-        return jsonify({"success": False, "message": "Données manquantes"}), 400
+        // === POINTAGES ===
+        async function loadPointages() {
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
+                const list = document.getElementById('pointagesList');
+                
+                if (!data.pointages || data.pointages.length === 0) {
+                    list.innerHTML = '<p>Aucun pointage enregistré.</p>';
+                    return;
+                }
+                
+                list.innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
+                        <tbody>${data.pointages.map(p => `
+                            <tr>
+                                <td>${p.employee_name || 'N/A'}</td>
+                                <td><span style="color: ${p.type === 'ENTREE' ? '#10b981' : '#ef4444'}">${p.type}</span></td>
+                                <td>${new Date(p.timestamp).toLocaleDateString('fr-FR')}</td>
+                                <td>${new Date(p.timestamp).toLocaleTimeString('fr-FR')}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>`;
+                    
+            } catch (error) {
+                console.error('❌ Erreur pointages:', error);
+            } finally {
+                hideLoading();
+            }
+        }
 
-    emp_id = data.get("employee_id")
-    badge_id = data.get("badge_id")
-    identifier = emp_id or badge_id
-    if not identifier:
-        return jsonify({"success": False, "message": "employee_id ou badge_id requis"}), 400
+        // === SALAIRES ===
+        async function loadSalaryData() {
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
+                let revenue = 0, expenses = 0;
+                
+                data.salaries.forEach(s => {
+                    if (s.type === 'ecolage') revenue += parseFloat(s.amount) || 0;
+                    if (s.type === 'salaire') expenses += parseFloat(s.amount) || 0;
+                });
+                
+                document.getElementById('totalRevenue').textContent = revenue.toFixed(2) + ' Ar';
+                document.getElementById('totalExpenses').textContent = expenses.toFixed(2) + ' Ar';
+                document.getElementById('netProfit').textContent = (revenue - expenses).toFixed(2) + ' Ar';
+                
+                document.getElementById('salaryHistory').innerHTML = data.salaries.length > 0 ? `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Montant</th><th>Date</th></tr></thead>
+                        <tbody>${data.salaries.map(s => `
+                            <tr>
+                                <td>${s.employee_name || 'N/A'}</td>
+                                <td>${s.type}</td>
+                                <td>${parseFloat(s.amount).toFixed(2)} Ar</td>
+                                <td>${new Date(s.date).toLocaleDateString('fr-FR')}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>` : '<p>Aucun enregistrement.</p>';
+                    
+            } catch (error) {
+                console.error('❌ Erreur salaires:', error);
+            } finally {
+                hideLoading();
+            }
+        }
 
-    try:
-        conn = get_db()
-        cur = conn.cursor()
+        // === STATISTIQUES ===
+        async function loadStatistics() {
+            showLoading();
+            try {
+                const [empData, pointData] = await Promise.all([
+                    safeFetch(`${API_URL}/employees`, { employees: [] }),
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                ]);
+                
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const students = empData.employees.filter(e => e.type === 'etudiant').length;
+                
+                document.getElementById('totalEmployees').textContent = employees;
+                document.getElementById('totalStudents').textContent = students;
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayEntries = pointData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                ).length;
+                
+                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+                document.getElementById('presenceRate').textContent = rate + '%';
+                document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
-        try:
-            cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
-        except Exception as e:
-            logger.warning(f"🔁 update is_active failed: {e}, trying 'active' column")
-            cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
+                // Charts
+                const todayExits = pointData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'SORTIE'
+                ).length;
 
-        if cur.rowcount == 0:
-            cur.execute(f"SELECT employee_id FROM rssi_data WHERE badge_id = {PLACEHOLDER} LIMIT 1", [identifier])
-            row = cur.fetchone()
-            if row:
-                emp_id_from_badge = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
-                cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                            [1, int(datetime.now().timestamp() * 1000), emp_id_from_badge])
+                // Bar Chart
+                const barCtx = document.getElementById('barChart').getContext('2d');
+                if (charts.bar) charts.bar.destroy();
+                charts.bar = new Chart(barCtx, { 
+                    type: 'bar', 
+                    data: { 
+                        labels: ['Entrées', 'Sorties'], 
+                        datasets: [{ 
+                            label: 'Aujourd\'hui',
+                            data: [todayEntries, todayExits], 
+                            backgroundColor: ['#10b981', '#ef4444'] 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
 
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "message": "Employé activé"}), 200
+                // Pie Chart
+                const pieCtx = document.getElementById('pieChart').getContext('2d');
+                if (charts.pie) charts.pie.destroy();
+                charts.pie = new Chart(pieCtx, { 
+                    type: 'doughnut', 
+                    data: { 
+                        labels: ['Présents', 'Absents'], 
+                        datasets: [{ 
+                            data: [todayEntries, employees - todayEntries], 
+                            backgroundColor: ['#10b981', '#ef4444'] 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
 
-    except Exception as e:
-        logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
+                // Line Chart (7 derniers jours)
+                const last7Days = Array(7).fill().map((_, i) => {
+                    const d = new Date(); 
+                    d.setDate(d.getDate() - i); 
+                    return d.toISOString().split('T')[0];
+                }).reverse();
+                
+                const lineData = last7Days.map(date => 
+                    pointData.pointages.filter(p => 
+                        new Date(p.timestamp).toISOString().split('T')[0] === date && p.type === 'ENTREE'
+                    ).length
+                );
+                
+                const lineCtx = document.getElementById('lineChart').getContext('2d');
+                if (charts.line) charts.line.destroy();
+                charts.line = new Chart(lineCtx, { 
+                    type: 'line', 
+                    data: { 
+                        labels: last7Days.map(d => new Date(d).toLocaleDateString('fr-FR')), 
+                        datasets: [{ 
+                            label: 'Entrées (7 derniers jours)', 
+                            data: lineData, 
+                            borderColor: '#6366f1', 
+                            tension: 0.4, 
+                            fill: false 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
+                
+            } catch (error) {
+                console.error('❌ Erreur statistiques:', error);
+            } finally {
+                hideLoading();
+            }
+        }
 
-# === Route temporaire pour déboguer les requêtes HTTP erronées ===
-@app.route("/api/rssi-data", methods=["GET", "POST"])
-def receive_rssi_data_http():
-    logger.warning("⚠️ Requête HTTP reçue sur /api/rssi-data (WebSocket attendu)")
-    return jsonify({"success": False, "message": "Utilisez WebSocket (wss://) pour /api/rssi-data"}), 400
+        // === EXPORT EXCEL ===
+        function exportToExcel(data, filename) {
+            try {
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Données");
+                XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+                console.log('✅ Export Excel:', filename);
+            } catch (error) {
+                console.error('❌ Erreur export:', error);
+                alert('Erreur lors de l\'export');
+            }
+        }
 
-# --- Démarrage ---
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))  # Port 8000 pour Koyeb
-    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)  # allow_unsafe pour SocketIO
+        async function exportEmployeesToExcel() {
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
+                const exportData = data.employees.map(e => ({
+                    ID: e.id,
+                    Type: e.type === 'employe' ? 'Employé' : 'Étudiant',
+                    Nom: e.nom,
+                    Prénom: e.prenom,
+                    Email: e.email || '',
+                    Téléphone: e.telephone || '',
+                    'Taux Horaire': e.taux_horaire || '',
+                    'Frais Écolage': e.frais_ecolage || ''
+                }));
+                exportToExcel(exportData, "Employes_RH");
+            } catch (error) {
+                console.error('❌ Erreur export employés:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function exportPointagesToExcel() {
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
+                const exportData = data.pointages.map(p => ({
+                    Employé: p.employee_name || 'N/A',
+                    Type: p.type,
+                    Date: new Date(p.timestamp).toLocaleDateString('fr-FR'),
+                    Heure: new Date(p.timestamp).toLocaleTimeString('fr-FR')
+                }));
+                exportToExcel(exportData, "Pointages_Historique");
+            } catch (error) {
+                console.error('❌ Erreur export pointages:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function exportSalairesToExcel() {
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
+                const exportData = data.salaries.map(s => ({
+                    Employé: s.employee_name || 'N/A',
+                    Type: s.type,
+                    Montant: parseFloat(s.amount).toFixed(2) + ' Ar',
+                    Date: new Date(s.date).toLocaleDateString('fr-FR')
+                }));
+                exportToExcel(exportData, "Salaires_Historique");
+            } catch (error) {
+                console.error('❌ Erreur export salaires:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function exportStatsToExcel() {
+            showLoading();
+            try {
+                const [empData, ptData] = await Promise.all([
+                    safeFetch(`${API_URL}/employees`, { employees: [] }),
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                ]);
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayEntries = ptData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                ).length;
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+                
+                const exportData = [{
+                    'Total Employés': employees,
+                    'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
+                    'Taux Présence': rate + '%',
+                    'Taux Absence': (100 - rate) + '%',
+                    Date: new Date().toLocaleDateString('fr-FR')
+                }];
+                exportToExcel(exportData, "Statistiques_RH");
+            } catch (error) {
+                console.error('❌ Erreur export stats:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === CHAT IA ===
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="message message-user">${msg}</div>`;
+            input.value = '';
+            messages.scrollTop = messages.scrollHeight;
+            
+            setTimeout(() => {
+                messages.innerHTML += `<div class="message message-ai">Réponse simulée pour : "${msg}"</div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 800);
+        }
+
+        // === PARAMÈTRES ===
+        function loadSettings() {
+            const saved = localStorage.getItem('rh_settings');
+            if (saved) {
+                try {
+                    const s = JSON.parse(saved);
+                    document.getElementById('wifiSSID').value = s.wifiSSID || 'OPPO';
+                    document.getElementById('wifiPassword').value = s.wifiPassword || '1234567809';
+                    document.getElementById('serverURL').value = s.serverURL || 'https://postcam-1.onrender.com';
+                    document.getElementById('adminUser').value = s.adminUser || 'admin';
+                    document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
+                    API_URL = s.serverURL + '/api';
+                    console.log('⚙️ Paramètres chargés');
+                } catch (error) {
+                    console.error('❌ Erreur chargement paramètres:', error);
+                }
+            }
+        }
+        
+        function saveSettings() {
+            const settings = {
+                wifiSSID: document.getElementById('wifiSSID').value.trim(),
+                wifiPassword: document.getElementById('wifiPassword').value,
+                serverURL: document.getElementById('serverURL').value.trim(),
+                adminUser: document.getElementById('adminUser').value.trim(),
+                adminPassword: document.getElementById('adminPassword').value
+            };
+            
+            localStorage.setItem('rh_settings', JSON.stringify(settings));
+            showSettingsStatus("Paramètres enregistrés avec succès !", "success");
+            API_URL = settings.serverURL + '/api';
+            
+            setTimeout(() => {
+                if (confirm('Recharger la page pour appliquer les changements ?')) {
+                    location.reload();
+                }
+            }, 1500);
+        }
+        
+        function resetSettings() {
+            if (confirm("Réinitialiser tous les paramètres aux valeurs par défaut ?")) {
+                localStorage.removeItem('rh_settings');
+                showSettingsStatus("Paramètres réinitialisés", "success");
+                setTimeout(() => location.reload(), 1500);
+            }
+        }
+        
+        function showSettingsStatus(msg, type) {
+            const el = document.getElementById('settingsStatus');
+            el.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}; font-weight: 600;">${msg}</span>`;
+            setTimeout(() => el.innerHTML = '', 3000);
+        }
+        
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        // === MODALES ===
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            console.log('📂 Ouverture modal:', id);
+            
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
+        }
+        
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            console.log('📁 Fermeture modal:', id);
+            
+            if (id === 'scanModal') stopCamera();
+            if (id === 'employeesModal') resetForm();
+        }
+
+        // === DÉCONNEXION ===
+        function logout() { 
+            if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+                window.location.href = 'login.html'; 
+            }
+        }
+
+        // === ÉVÉNEMENTS GLOBAUX ===
+        window.onclick = e => { 
+            if (e.target.classList.contains('modal')) {
+                const modalId = e.target.id;
+                closeModal(modalId);
+            }
+        };
+
+        // Touche Entrée pour le chat
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+            
+            // Message de bienvenue du chat
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="message message-ai">
+                    Bonjour ! Je suis votre assistant RH. Comment puis-je vous aider aujourd'hui ?
+                </div>
+            `;
+            
+            console.log('✅ Application RH Pro initialisée');
+            console.log('🔗 API URL:', API_URL);
+        });
+    </script>
+</body>
+</html>
