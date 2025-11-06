@@ -481,114 +481,266 @@
             }
         }
 
-        // === GÉNÉRATION BADGE ESP01S ===
+        // === GÉNÉRATION BADGE MODERNE TYPE CIRCUIT IMPRIMÉ ===
         async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
             console.log('🎫 Génération badge pour:', prenom, nom, empId);
             showLoading();
             
             try {
-                // Vérifier que jsPDF est chargé
                 if (!window.jspdf || !window.jspdf.jsPDF) {
                     throw new Error('jsPDF non chargé');
                 }
                 
                 const { jsPDF } = window.jspdf;
                 
-                // Créer le badge HTML
+                // Créer le badge style carte à puce
                 const badge = document.createElement('div');
                 badge.style.cssText = `
-                    position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
-                    background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
-                    border-radius: 16px; padding: 20px; color: white; font-family: 'Inter', sans-serif;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 3px solid #00d4ff; overflow: hidden;
-                    display: flex; flex-direction: column; justify-content: space-between;
+                    position: absolute; left: -9999px; top: 0; 
+                    width: 340px; height: 210px;
+                    background: linear-gradient(135deg, #0d4d3d 0%, #1a5a4a 50%, #0d4d3d 100%);
+                    border-radius: 15px; 
+                    padding: 0;
+                    color: white; 
+                    font-family: 'Arial', sans-serif;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                    border: 2px solid rgba(255, 255, 255, 0.1);
+                    overflow: hidden;
+                    position: relative;
                 `;
                 document.body.appendChild(badge);
 
-                // SVG Circuit
-                const circuitSVG = `<svg width="100%" height="100%" style="position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;">
-                    <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-                    <path d="M80 120 Q120 90 160 120" stroke="#00d4ff" stroke-width="1" fill="none"/>
-                    <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
-                    <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
-                    <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
-                    <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
-                    <circle cx="235" cy="75" r="2" fill="#00ff00"/>
-                </svg>`;
-                badge.innerHTML = circuitSVG;
+                // Circuit board pattern SVG
+                const circuitPattern = `
+                    <svg width="340" height="210" style="position: absolute; top: 0; left: 0; opacity: 0.3;">
+                        <!-- Pistes de circuit -->
+                        <line x1="50" y1="30" x2="150" y2="30" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="150" y1="30" x2="150" y2="80" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="200" y1="50" x2="300" y2="50" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="250" y1="50" x2="250" y2="100" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="250" y1="100" x2="320" y2="100" stroke="#00d4ff" stroke-width="1.5"/>
+                        
+                        <line x1="50" y1="150" x2="120" y2="150" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="120" y1="150" x2="120" y2="180" stroke="#00d4ff" stroke-width="1.5"/>
+                        <line x1="180" y1="160" x2="280" y2="160" stroke="#00d4ff" stroke-width="1.5"/>
+                        
+                        <!-- Vias (points de connexion) -->
+                        <circle cx="50" cy="30" r="3" fill="#00d4ff"/>
+                        <circle cx="150" cy="30" r="3" fill="#00d4ff"/>
+                        <circle cx="150" cy="80" r="3" fill="#00d4ff"/>
+                        <circle cx="200" cy="50" r="3" fill="#00d4ff"/>
+                        <circle cx="250" cy="50" r="3" fill="#00d4ff"/>
+                        <circle cx="250" cy="100" r="3" fill="#00d4ff"/>
+                        <circle cx="320" cy="100" r="3" fill="#00d4ff"/>
+                        
+                        <circle cx="50" cy="150" r="3" fill="#00d4ff"/>
+                        <circle cx="120" cy="150" r="3" fill="#00d4ff"/>
+                        <circle cx="120" cy="180" r="3" fill="#00d4ff"/>
+                        <circle cx="180" cy="160" r="3" fill="#00d4ff"/>
+                        <circle cx="280" cy="160" r="3" fill="#00d4ff"/>
+                        
+                        <!-- Composants -->
+                        <rect x="140" y="70" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
+                        <rect x="240" y="90" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
+                        <rect x="110" y="170" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
+                        
+                        <!-- Pads dorés -->
+                        <circle cx="290" cy="180" r="4" fill="#ffd700"/>
+                        <circle cx="300" cy="180" r="4" fill="#ffd700"/>
+                        <circle cx="310" cy="180" r="4" fill="#ffd700"/>
+                        <circle cx="320" cy="180" r="4" fill="#ffd700"/>
+                        <circle cx="290" cy="190" r="4" fill="#ffd700"/>
+                        <circle cx="300" cy="190" r="4" fill="#ffd700"/>
+                        <circle cx="310" cy="190" r="4" fill="#ffd700"/>
+                        <circle cx="320" cy="190" r="4" fill="#ffd700"/>
+                    </svg>
+                `;
+                badge.innerHTML = circuitPattern;
 
-                // Info employé
-                const infoDiv = document.createElement('div');
-                infoDiv.style.cssText = 'z-index: 2; padding: 10px; position: relative;';
-                infoDiv.innerHTML = `
-                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                        ${prenom.toUpperCase()} ${nom.toUpperCase()}
+                // Container principal
+                const mainContainer = document.createElement('div');
+                mainContainer.style.cssText = `
+                    position: relative;
+                    z-index: 2;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    padding: 20px;
+                `;
+                badge.appendChild(mainContainer);
+
+                // Section gauche avec QR code
+                const leftSection = document.createElement('div');
+                leftSection.style.cssText = `
+                    flex: 0 0 120px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                mainContainer.appendChild(leftSection);
+
+                // QR Code container avec bordure blanche
+                const qrContainer = document.createElement('div');
+                qrContainer.id = 'badgeQR';
+                qrContainer.style.cssText = `
+                    background: white;
+                    padding: 8px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                `;
+                leftSection.appendChild(qrContainer);
+
+                // Section droite avec ESP01S et infos
+                const rightSection = document.createElement('div');
+                rightSection.style.cssText = `
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    padding-left: 20px;
+                `;
+                mainContainer.appendChild(rightSection);
+
+                // Top: Icône puce + ESP01S
+                const topSection = document.createElement('div');
+                topSection.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                `;
+                topSection.innerHTML = `
+                    <div style="
+                        width: 50px;
+                        height: 50px;
+                        background: rgba(0,0,0,0.3);
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border: 2px solid #00d4ff;
+                        box-shadow: 0 0 15px rgba(0,212,255,0.3);
+                    ">
+                        <svg width="35" height="35" viewBox="0 0 24 24" fill="#00d4ff">
+                            <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
+                            <rect x="6" y="9" width="12" height="1" fill="#00d4ff"/>
+                            <rect x="6" y="14" width="12" height="1" fill="#00d4ff"/>
+                        </svg>
                     </div>
-                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste}</div>
-                    <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
+                    <div style="
+                        background: rgba(0,0,0,0.5);
+                        padding: 5px 12px;
+                        border-radius: 5px;
+                        border: 1px solid #00d4ff;
+                        font-size: 11px;
+                        color: #00ff00;
+                        font-weight: bold;
+                        letter-spacing: 1px;
+                        font-family: 'Courier New', monospace;
+                    ">ESP01S</div>
                 `;
-                badge.appendChild(infoDiv);
+                rightSection.appendChild(topSection);
 
-                // Bottom: QR + ESP
-                const bottomDiv = document.createElement('div');
-                bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px; position: relative;';
+                // Middle: Infos employé
+                const infoSection = document.createElement('div');
+                infoSection.style.cssText = `
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                `;
+                infoSection.innerHTML = `
+                    <div style="
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: white;
+                        text-transform: uppercase;
+                        margin-bottom: 5px;
+                        letter-spacing: 0.5px;
+                        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                    ">${prenom} ${nom}</div>
+                    <div style="
+                        font-size: 11px;
+                        color: #00d4ff;
+                        text-transform: uppercase;
+                        font-weight: 600;
+                        letter-spacing: 1px;
+                    ">${poste}</div>
+                `;
+                rightSection.appendChild(infoSection);
+
+                // Bottom: LED indicateur + ID
+                const bottomSection = document.createElement('div');
+                bottomSection.style.cssText = `
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-end;
+                `;
+                bottomSection.innerHTML = `
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <div style="
+                            width: 10px;
+                            height: 10px;
+                            background: #00ff00;
+                            border-radius: 50%;
+                            box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+                        "></div>
+                        <div style="
+                            font-size: 8px;
+                            color: rgba(255,255,255,0.6);
+                            font-family: 'Courier New', monospace;
+                        ">ACTIVE</div>
+                    </div>
+                    <div style="
+                        font-size: 9px;
+                        color: rgba(255,255,255,0.5);
+                        font-family: 'Courier New', monospace;
+                    ">ID: ${empId.slice(-8)}</div>
+                `;
+                rightSection.appendChild(bottomSection);
+
+                // Générer QR Code au format JSON
+                const qrData = JSON.stringify({
+                    id: empId,
+                    name: `${prenom} ${nom}`
+                });
                 
-                // QR Code avec QRCode.js
-                const qrDiv = document.createElement('div');
-                qrDiv.id = 'tempQR';
-                qrDiv.style.cssText = 'background: white; padding: 5px; border-radius: 5px;';
-                bottomDiv.appendChild(qrDiv);
-
-                // ESP01S badge
-                const espDiv = document.createElement('div');
-                espDiv.style.cssText = `
-                    width: 100px; height: 40px; background: #111; border-radius: 8px;
-                    display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0f0;
-                    border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                `;
-                espDiv.innerHTML = '<i class="fas fa-microchip" style="margin-right:4px;"></i> ESP01S';
-                bottomDiv.appendChild(espDiv);
-                badge.appendChild(bottomDiv);
-
-                // LED verte
-                const led = document.createElement('div');
-                led.style.cssText = `
-                    position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
-                    background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00;
-                    animation: pulse 2s infinite; z-index: 3;
-                `;
-                badge.appendChild(led);
-
-                // Générer QR Code
                 if (window.QRCode) {
-                    new QRCode(qrDiv, {
-                        text: empId,
-                        width: 70,
-                        height: 70,
+                    new QRCode(qrContainer, {
+                        text: qrData,
+                        width: 90,
+                        height: 90,
                         colorDark: "#000000",
-                        colorLight: "#ffffff"
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
                     });
+                    console.log('✅ QR Badge généré:', qrData);
                 }
 
                 // Attendre le rendu
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 1000));
                 
-                // Convertir en canvas avec html2canvas
+                // Convertir en canvas
                 if (!window.html2canvas) {
                     throw new Error('html2canvas non chargé');
                 }
                 
                 const canvas = await html2canvas(badge, { 
-                    scale: 3, 
+                    scale: 4,
                     backgroundColor: null,
-                    logging: false 
+                    logging: false,
+                    useCORS: true
                 });
                 const imgData = canvas.toDataURL('image/png');
                 
-                // Créer PDF
-                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
-                pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
-                pdf.save(`Badge_${prenom}_${nom}_ESP01S.pdf`);
+                // Créer PDF format carte de crédit (85.6 x 53.98 mm)
+                const pdf = new jsPDF({ 
+                    orientation: 'landscape', 
+                    unit: 'mm', 
+                    format: [85.6, 53.98] 
+                });
+                pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98);
+                pdf.save(`Badge_${prenom}_${nom}.pdf`);
                 
                 // Nettoyer
                 document.body.removeChild(badge);
@@ -650,7 +802,7 @@
             }
         }
 
-        // === QR CODE ===
+        // === QR CODE (CORRIGÉ POUR ANDROID) ===
         function showQRCode(id, name) {
             console.log('📸 Affichage QR pour:', name, id);
             
@@ -661,27 +813,33 @@
             container.innerHTML = '';
             img.style.display = 'none';
             
+            // ✅ FORMAT JSON POUR ANDROID (comme dans le code Java)
+            const qrData = JSON.stringify({
+                id: id,
+                name: name
+            });
+            
             // Essayer de générer avec QRCode.js
             if (window.QRCode) {
                 try {
                     new QRCode(container, {
-                        text: id,
+                        text: qrData,
                         width: 300,
                         height: 300,
                         colorDark: "#000000",
                         colorLight: "#ffffff"
                     });
-                    console.log('✅ QR généré avec QRCode.js');
+                    console.log('✅ QR généré avec QRCode.js:', qrData);
                 } catch (error) {
                     console.error('❌ Erreur QRCode.js:', error);
                     // Fallback sur API externe
-                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`;
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
                     img.style.display = 'block';
                     container.style.display = 'none';
                 }
             } else {
                 // Fallback sur API externe
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`;
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
                 img.style.display = 'block';
             }
             
@@ -1271,49 +1429,12 @@
             if (id === 'employeesModal') resetForm();
         }
 
-       // === DÉCONNEXION SÉCURISÉE (Flask + Session) ===
-function logout() {
-    if (confirm('Vouzer-vous vraiment vous déconnecter ?')) {
-        // 1. Appelle le serveur pour détruire la session
-        fetch(`${API_URL}/logout`, { 
-            method: 'GET',
-            credentials: 'include'  // Important pour envoyer les cookies de session
-        })
-        .then(() => {
-            // 2. Nettoie le localStorage (au cas où)
-            localStorage.clear();
-            // 3. Redirige vers login
-            window.location.href = '/login';
-        })
-        .catch(err => {
-            console.error("Erreur logout:", err);
-            // Même si le serveur est down, on force la déconnexion côté client
-            localStorage.clear();
-            window.location.href = '/login';
-        });
-    }
-}
-        // === VÉRIFICATION AUTO AU CHARGEMENT ===
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-    loadSettings();
-    initTracking();
-});
-
-async function checkAuth() {
-    try {
-        const res = await fetch(`${API_URL}/employees`, { credentials: 'include' });
-        if (!res.ok) {
-            if (res.status === 401 || res.status === 403) {
-                alert('Session expirée. Veuillez vous reconnecter.');
-                window.location.href = '/login';
+        // === DÉCONNEXION ===
+        function logout() { 
+            if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+                window.location.href = 'login.html'; 
             }
         }
-    } catch (err) {
-        console.warn("Serveur injoignable, redirection vers login");
-        window.location.href = '/login';
-    }
-}
 
         // === ÉVÉNEMENTS GLOBAUX ===
         window.onclick = e => { 
