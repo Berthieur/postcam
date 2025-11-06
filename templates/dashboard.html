@@ -1271,12 +1271,49 @@
             if (id === 'employeesModal') resetForm();
         }
 
-        // === DÉCONNEXION ===
-        function logout() { 
-            if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
-                window.location.href = 'login.html'; 
+       // === DÉCONNEXION SÉCURISÉE (Flask + Session) ===
+function logout() {
+    if (confirm('Vouzer-vous vraiment vous déconnecter ?')) {
+        // 1. Appelle le serveur pour détruire la session
+        fetch(`${API_URL}/logout`, { 
+            method: 'GET',
+            credentials: 'include'  // Important pour envoyer les cookies de session
+        })
+        .then(() => {
+            // 2. Nettoie le localStorage (au cas où)
+            localStorage.clear();
+            // 3. Redirige vers login
+            window.location.href = '/login';
+        })
+        .catch(err => {
+            console.error("Erreur logout:", err);
+            // Même si le serveur est down, on force la déconnexion côté client
+            localStorage.clear();
+            window.location.href = '/login';
+        });
+    }
+}
+        // === VÉRIFICATION AUTO AU CHARGEMENT ===
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuth();
+    loadSettings();
+    initTracking();
+});
+
+async function checkAuth() {
+    try {
+        const res = await fetch(`${API_URL}/employees`, { credentials: 'include' });
+        if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                alert('Session expirée. Veuillez vous reconnecter.');
+                window.location.href = '/login';
             }
         }
+    } catch (err) {
+        console.warn("Serveur injoignable, redirection vers login");
+        window.location.href = '/login';
+    }
+}
 
         // === ÉVÉNEMENTS GLOBAUX ===
         window.onclick = e => { 
