@@ -6,11 +6,12 @@
     <title>Gestion RH Pro - Pointage & Suivi</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --primary: #6366f1;
@@ -23,8 +24,6 @@
             --gray-300: #d1d5db;
             --gray-600: #4b5563;
             --gray-800: #1f2937;
-            --glass: rgba(255, 255, 255, 0.15);
-            --glass-border: rgba(255, 255, 255, 0.2);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -38,7 +37,7 @@
         .header {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 1.5rem 2rem;
             border-radius: 1.5rem;
             margin-bottom: 2rem;
@@ -60,7 +59,7 @@
         .logout-btn:hover { background: #dc2626; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
         .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .card {
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2);
             padding: 1.75rem; border-radius: 1.25rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative; overflow: hidden;
         }
@@ -97,7 +96,7 @@
         .form-group { margin-bottom: 1.25rem; }
         .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--gray-800); font-size: 0.95rem; }
         .form-input, .form-select { width: 100%; padding: 0.875rem 1rem; border: 2px solid var(--gray-200);
-            border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white;
+            border-radius: 0.75rem; font-size: 1rem; transition: all 0.3s ease; background: white; color: var(--gray-800);
         }
         .form-input:focus, .form-select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
         .btn { background: var(--primary); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.75rem;
@@ -109,12 +108,17 @@
         .btn-secondary:hover { background: var(--gray-800); }
         .btn-danger { background: var(--danger); }
         .btn-danger:hover { background: #dc2626; }
-        .btn-edit, .btn-qr, .btn-delete, .btn-badge, .btn-excel { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; }
+        .btn-edit, .btn-qr, .btn-delete, .btn-badge, .btn-excel { padding: 0.5rem 0.75rem; font-size: 0.8rem; border-radius: 0.5rem; border: none; cursor: pointer; transition: all 0.3s ease; }
         .btn-edit { background: #3b82f6; color: white; }
+        .btn-edit:hover { background: #2563eb; transform: translateY(-2px); }
         .btn-qr { background: var(--success); color: white; }
+        .btn-qr:hover { background: #059669; transform: translateY(-2px); }
         .btn-badge { background: #10b981; color: white; }
+        .btn-badge:hover { background: #059669; transform: translateY(-2px); }
         .btn-excel { background: #16a34a; color: white; }
+        .btn-excel:hover { background: #15803d; transform: translateY(-2px); }
         .btn-delete { background: var(--danger); color: white; }
+        .btn-delete:hover { background: #dc2626; transform: translateY(-2px); }
         .table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; background: white; border-radius: 1rem;
             overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
@@ -147,7 +151,7 @@
         }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
-        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; }
+        .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; color: var(--gray-800); }
         .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
         .chat-input { flex: 1; padding: 0.75rem 1rem; border: 2px solid var(--gray-200); border-radius: 0.75rem; font-size: 1rem; }
         .chat-input:focus { outline: none; border-color: var(--primary); }
@@ -162,6 +166,18 @@
         #qrImage { max-width: 100%; height: auto; margin: 1rem 0; border-radius: 1rem; box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
         .chart-container { position: relative; height: 300px; margin: 20px 0; }
         .export-btns { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); z-index: 9999; display: none;
+            justify-content: center; align-items: center;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%; width: 50px; height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
@@ -177,13 +193,15 @@
     </style>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="app-container">
-        <!-- Header -->
         <div class="header">
             <h1><i class="fas fa-building"></i> Gestion RH Pro</h1>
             <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Déconnexion</button>
         </div>
-        <!-- Main Dashboard -->
         <div class="main-grid">
             <div class="card" onclick="openModal('scanModal')">
                 <div class="card-icon"><i class="fas fa-qrcode"></i></div>
@@ -228,7 +246,7 @@
         </div>
     </div>
 
-    <!-- Modal Scanner QR -->
+    <!-- Modals (Scanner, Employés, Pointages, etc.) -->
     <div id="scanModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -244,7 +262,6 @@
         </div>
     </div>
 
-    <!-- Modal Employés -->
     <div id="employeesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -256,7 +273,7 @@
             </div>
             <button class="btn" onclick="showAddEmployeeForm()"><i class="fas fa-plus"></i> Ajouter un employé</button>
             <div id="addEmployeeForm" style="display:none; margin-top:20px; background:#f9fafb; padding:20px; border-radius:10px;">
-                <h3 id="formTitle">Nouvel Employé/Étudiant</h3>
+                <h3 id="formTitle" style="color: var(--gray-800); margin-bottom: 1rem;">Nouvel Employé/Étudiant</h3>
                 <input type="hidden" id="editEmployeeId">
                 <div class="form-group">
                     <label class="form-label">Type</label>
@@ -296,7 +313,6 @@
         </div>
     </div>
 
-    <!-- Modal Pointages -->
     <div id="pointagesModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -310,7 +326,6 @@
         </div>
     </div>
 
-    <!-- Modal Salaires -->
     <div id="salaryModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -318,7 +333,7 @@
                 <span class="close-btn" onclick="closeModal('salaryModal')">&times;</span>
             </div>
             <div class="export-btns">
-                <button class="btn btn-excel" onclick="exportSalairesTo812Excel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
+                <button class="btn btn-excel" onclick="exportSalairesToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -338,7 +353,6 @@
         </div>
     </div>
 
-    <!-- Modal Statistiques -->
     <div id="statsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -362,18 +376,16 @@
         </div>
     </div>
 
-    <!-- Modal Tracking -->
     <div id="trackingModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel</h2>
                 <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
             </div>
-            <div id="trackingInfo"><p>Connexion au serveur WebSocket...</p></div>
+            <div id="trackingInfo"><p style="color: var(--gray-800);">Connexion au serveur WebSocket...</p></div>
         </div>
     </div>
 
-    <!-- Modal Chat IA -->
     <div id="chatModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -390,7 +402,6 @@
         </div>
     </div>
 
-    <!-- Modal Paramètres -->
     <div id="settingsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -405,7 +416,7 @@
                 <label class="form-label"><i class="fas fa-key"></i> Mot de passe WiFi</label>
                 <div style="position:relative;">
                     <input type="password" class="form-input" id="wifiPassword" value="1234567809">
-                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
+                    <i class="fas fa-eye" id="toggleWifiPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color: var(--gray-600);" onclick="togglePassword('wifiPassword', 'toggleWifiPass')"></i>
                 </div>
             </div>
             <div class="form-group">
@@ -420,7 +431,7 @@
                 <label class="form-label"><i class="fas fa-lock"></i> Mot de passe Admin</label>
                 <div style="position:relative;">
                     <input type="password" class="form-input" id="adminPassword" value="admin123">
-                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer;" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
+                    <i class="fas fa-eye" id="toggleAdminPass" style="position:absolute; right:12px; top:14px; cursor:pointer; color: var(--gray-600);" onclick="togglePassword('adminPassword', 'toggleAdminPass')"></i>
                 </div>
             </div>
             <div style="display:flex; gap:10px; margin-top:20px;">
@@ -431,374 +442,769 @@
         </div>
     </div>
 
-    <!-- Modal QR -->
     <div id="qrModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title"><i class="fas fa-qrcode"></i> QR Code</h2>
                 <span class="close-btn" onclick="closeModal('qrModal')">&times;</span>
             </div>
-            <img id="qrImage" src="" alt="QR Code">
-            <p><strong id="qrName"></strong></p>
+            <div id="qrCodeContainer"></div>
+            <img id="qrImage" src="" alt="QR Code" style="display:none;">
+            <p style="margin-top: 1rem;"><strong id="qrName" style="color: var(--gray-800);"></strong></p>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
         let API_URL = 'https://postcam-1.onrender.com/api';
         let videoStream = null, scanInterval = null, currentEditId = null;
         let charts = {};
 
-        // === FONCTIONS DÉFINIES AVANT loadEmployees() ===
-
-        // GÉNÉRATION BADGE ESP01S
-        async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
-            const { jsPDF } = window.jspdf;
-            const badge = document.createElement('div');
-            badge.style.cssText = `
-                position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
-                background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
-                border-radius: 16px; padding: 20px; color: white; font-family: 'Inter', sans-serif;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 3px solid #00d4ff; overflow: hidden;
-                display: flex; flex-direction: column; justify-content: space-between;
-            `;
-            document.body.appendChild(badge);
-
-            const circuitSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            circuitSVG.setAttribute('width', '100%'); circuitSVG.setAttribute('height', '100%');
-            circuitSVG.setAttribute('style', 'position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;');
-            circuitSVG.innerHTML = `
-                <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
-                <path d="M80 120 Q120 90 160 120" stroke="#00d4ff" stroke-width="1" fill="none"/>
-                <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
-                <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
-                <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
-                <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
-                <circle cx="235" cy="75" r="2" fill="#00ff00"/>
-            `;
-            badge.appendChild(circuitSVG);
-
-            const infoDiv = document.createElement('div');
-            infoDiv.style.cssText = 'z-index: 2; padding: 10px;';
-            infoDiv.innerHTML = `
-                <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
-                    ${prenom.toUpperCase()} ${nom.toUpperCase()}
-                </div>
-                <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste}</div>
-                <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
-            `;
-            badge.appendChild(infoDiv);
-
-            const bottomDiv = document.createElement('div');
-            bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px;';
-            const qrDiv = document.createElement('div');
-            await QRCode.toCanvas(qrDiv, empId, { width: 80, margin: 1, color: { dark: '#000', light: '#FFF' } });
-            bottomDiv.appendChild(qrDiv);
-
-            const espDiv = document.createElement('div');
-            espDiv.style.cssText = `
-                width: 100px; height: 40px; background: #111; border-radius: 8px;
-                display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0f0;
-                border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            `;
-            espDiv.innerHTML = '<i class="fas fa-microchip"></i> ESP01S';
-            bottomDiv.appendChild(espDiv);
-            badge.appendChild(bottomDiv);
-
-            const led = document.createElement('div');
-            led.style.cssText = `
-                position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
-                background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00;
-                animation: pulse 2s infinite;
-            `;
-            badge.appendChild(led);
-
-            await new Promise(r => setTimeout(r, 500));
-            const canvas = await html2canvas(badge, { scale: 3 });
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
-            pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
-            pdf.save(`${prenom}_${nom}_Badge_ESP01S.pdf`);
-            document.body.removeChild(badge);
+        // === UTILITAIRES ===
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
         }
 
-        // ÉDITION EMPLOYÉ
-        async function editEmployee(id) {
-            const emp = await safeFetch(`${API_URL}/employees/${id}`);
-            if (emp.employee) {
-                currentEditId = id;
-                document.getElementById('formTitle').textContent = 'Modifier';
-                document.getElementById('employeeType').value = emp.employee.type;
-                document.getElementById('employeeNom').value = emp.employee.nom;
-                document.getElementById('employeePrenom').value = emp.employee.prenom;
-                document.getElementById('employeeEmail').value = emp.employee.email || '';
-                document.getElementById('employeeTelephone').value = emp.employee.telephone || '';
-                document.getElementById('employeeTauxHoraire').value = emp.employee.taux_horaire || '';
-                document.getElementById('employeeFraisEcolage').value = emp.employee.frais_ecolage || '';
-                toggleFinancialFields();
-                document.getElementById('addEmployeeForm').style.display = 'block';
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        async function safeFetch(url, fallback = null) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const text = await res.text();
+                try { return JSON.parse(text); }
+                catch { return fallback; }
+            } catch (e) {
+                console.error(`Erreur fetch ${url}:`, e);
+                return fallback;
             }
         }
 
-        // QR CODE
+        // === GÉNÉRATION BADGE ESP01S ===
+        async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
+            console.log('🎫 Génération badge pour:', prenom, nom, empId);
+            showLoading();
+            
+            try {
+                // Vérifier que jsPDF est chargé
+                if (!window.jspdf || !window.jspdf.jsPDF) {
+                    throw new Error('jsPDF non chargé');
+                }
+                
+                const { jsPDF } = window.jspdf;
+                
+                // Créer le badge HTML
+                const badge = document.createElement('div');
+                badge.style.cssText = `
+                    position: absolute; left: -9999px; top: 0; width: 400px; height: 250px;
+                    background: linear-gradient(135deg, #0a3d62 0%, #1e3a8a 100%);
+                    border-radius: 16px; padding: 20px; color: white; font-family: 'Inter', sans-serif;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 3px solid #00d4ff; overflow: hidden;
+                    display: flex; flex-direction: column; justify-content: space-between;
+                `;
+                document.body.appendChild(badge);
+
+                // SVG Circuit
+                const circuitSVG = `<svg width="100%" height="100%" style="position: absolute; top: 0; left: 0; opacity: 0.1; pointer-events: none;">
+                    <path d="M50 100 Q100 60 150 100 T200 100" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+                    <path d="M80 120 Q120 90 160 120" stroke="#00d4ff" stroke-width="1" fill="none"/>
+                    <circle cx="100" cy="140" r="6" fill="#00d4ff"/>
+                    <rect x="180" y="110" width="30" height="20" rx="3" fill="#00d4ff" opacity="0.3"/>
+                    <path d="M190 115 L195 115 M190 120 L195 120 M190 125 L195 125" stroke="#fff" stroke-width="1.5"/>
+                    <path d="M220 80 L230 70 L240 80" stroke="#00ff00" stroke-width="2" fill="none"/>
+                    <circle cx="235" cy="75" r="2" fill="#00ff00"/>
+                </svg>`;
+                badge.innerHTML = circuitSVG;
+
+                // Info employé
+                const infoDiv = document.createElement('div');
+                infoDiv.style.cssText = 'z-index: 2; padding: 10px; position: relative;';
+                infoDiv.innerHTML = `
+                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                        ${prenom.toUpperCase()} ${nom.toUpperCase()}
+                    </div>
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">${poste}</div>
+                    <div style="font-size: 10px; opacity: 0.7;">ID: ${empId.slice(-8)}</div>
+                `;
+                badge.appendChild(infoDiv);
+
+                // Bottom: QR + ESP
+                const bottomDiv = document.createElement('div');
+                bottomDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; z-index: 2; margin-top: 20px; position: relative;';
+                
+                // QR Code avec QRCode.js
+                const qrDiv = document.createElement('div');
+                qrDiv.id = 'tempQR';
+                qrDiv.style.cssText = 'background: white; padding: 5px; border-radius: 5px;';
+                bottomDiv.appendChild(qrDiv);
+
+                // ESP01S badge
+                const espDiv = document.createElement('div');
+                espDiv.style.cssText = `
+                    width: 100px; height: 40px; background: #111; border-radius: 8px;
+                    display: flex; align-items: center; justify-content: center; font-size: 9px; color: #0f0;
+                    border: 1px solid #333; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                `;
+                espDiv.innerHTML = '<i class="fas fa-microchip" style="margin-right:4px;"></i> ESP01S';
+                bottomDiv.appendChild(espDiv);
+                badge.appendChild(bottomDiv);
+
+                // LED verte
+                const led = document.createElement('div');
+                led.style.cssText = `
+                    position: absolute; bottom: 15px; right: 15px; width: 12px; height: 12px;
+                    background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00;
+                    animation: pulse 2s infinite; z-index: 3;
+                `;
+                badge.appendChild(led);
+
+                // Générer QR Code
+                if (window.QRCode) {
+                    new QRCode(qrDiv, {
+                        text: empId,
+                        width: 70,
+                        height: 70,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff"
+                    });
+                }
+
+                // Attendre le rendu
+                await new Promise(r => setTimeout(r, 800));
+                
+                // Convertir en canvas avec html2canvas
+                if (!window.html2canvas) {
+                    throw new Error('html2canvas non chargé');
+                }
+                
+                const canvas = await html2canvas(badge, { 
+                    scale: 3, 
+                    backgroundColor: null,
+                    logging: false 
+                });
+                const imgData = canvas.toDataURL('image/png');
+                
+                // Créer PDF
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [86, 54] });
+                pdf.addImage(imgData, 'PNG', 0, 0, 86, 54);
+                pdf.save(`Badge_${prenom}_${nom}_ESP01S.pdf`);
+                
+                // Nettoyer
+                document.body.removeChild(badge);
+                
+                console.log('✅ Badge généré avec succès');
+                alert('Badge généré avec succès !');
+                
+            } catch (error) {
+                console.error('❌ Erreur génération badge:', error);
+                alert('Erreur lors de la génération du badge: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === ÉDITION EMPLOYÉ ===
+        async function editEmployee(id) {
+            console.log('✏️ Édition employé:', id);
+            showLoading();
+            
+            try {
+                const response = await fetch(`${API_URL}/employees`);
+                const data = await response.json();
+                
+                if (!data.success || !data.employees) {
+                    throw new Error('Impossible de récupérer les employés');
+                }
+                
+                const emp = data.employees.find(e => e.id === id);
+                
+                if (!emp) {
+                    throw new Error('Employé non trouvé');
+                }
+                
+                // Remplir le formulaire
+                currentEditId = id;
+                document.getElementById('formTitle').textContent = 'Modifier Employé';
+                document.getElementById('employeeType').value = emp.type || 'employe';
+                document.getElementById('employeeNom').value = emp.nom || '';
+                document.getElementById('employeePrenom').value = emp.prenom || '';
+                document.getElementById('employeeEmail').value = emp.email || '';
+                document.getElementById('employeeTelephone').value = emp.telephone || '';
+                document.getElementById('employeeTauxHoraire').value = emp.taux_horaire || '';
+                document.getElementById('employeeFraisEcolage').value = emp.frais_ecolage || '';
+                
+                toggleFinancialFields();
+                document.getElementById('addEmployeeForm').style.display = 'block';
+                
+                // Scroll vers le formulaire
+                document.getElementById('addEmployeeForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                console.log('✅ Formulaire d\'édition chargé');
+                
+            } catch (error) {
+                console.error('❌ Erreur édition:', error);
+                alert('Erreur lors du chargement de l\'employé: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // === QR CODE ===
         function showQRCode(id, name) {
+            console.log('📸 Affichage QR pour:', name, id);
+            
+            const container = document.getElementById('qrCodeContainer');
             const img = document.getElementById('qrImage');
-            img.src = `${API_URL}/qrcode/${id}`;
-            img.onerror = () => img.src = `https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(JSON.stringify({id, name}))}`;
+            
+            // Nettoyer le conteneur
+            container.innerHTML = '';
+            img.style.display = 'none';
+            
+            // Essayer de générer avec QRCode.js
+            if (window.QRCode) {
+                try {
+                    new QRCode(container, {
+                        text: id,
+                        width: 300,
+                        height: 300,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff"
+                    });
+                    console.log('✅ QR généré avec QRCode.js');
+                } catch (error) {
+                    console.error('❌ Erreur QRCode.js:', error);
+                    // Fallback sur API externe
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`;
+                    img.style.display = 'block';
+                    container.style.display = 'none';
+                }
+            } else {
+                // Fallback sur API externe
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`;
+                img.style.display = 'block';
+            }
+            
             document.getElementById('qrName').textContent = name;
             openModal('qrModal');
         }
 
-        // SUPPRESSION
+        // === SUPPRESSION ===
         async function deleteEmployee(id) {
-            if (confirm('Supprimer ?')) {
-                await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
-                loadEmployees();
+            if (!confirm('Voulez-vous vraiment supprimer cet employé ?')) return;
+            
+            showLoading();
+            try {
+                const response = await fetch(`${API_URL}/employees/${id}`, { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Employé supprimé avec succès');
+                    loadEmployees();
+                } else {
+                    throw new Error(data.message || 'Erreur de suppression');
+                }
+            } catch (error) {
+                console.error('❌ Erreur suppression:', error);
+                alert('Erreur: ' + error.message);
+            } finally {
+                hideLoading();
             }
         }
 
-        // === EMPLOYÉS (MAINTENANT SÛR) ===
+        // === CHARGEMENT EMPLOYÉS ===
         async function loadEmployees() {
-            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
-            const list = document.getElementById('employeesList');
-            list.innerHTML = data.employees.length > 0 ? data.employees.map(e => `
-                <div class="employee-item">
-                    <div><div class="employee-name">${e.prenom} ${e.nom}</div><span class="employee-type">${e.type}</span></div>
-                    <div class="employee-actions">
-                        <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')"><i class="fas fa-qrcode"></i></button>
-                        <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')"><i class="fas fa-id-card"></i></button>
-                        <button class="btn-edit" onclick="editEmployee('${e.id}')"><i class="fas fa-edit"></i></button>
-                        <button class="btn-delete" onclick="deleteEmployee('${e.id}')"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `).join('') : '<p style="color:#ef4444">Aucun employé.</p>';
-        }
-
-        // === AUTRES FONCTIONS ===
-        async function safeFetch(url, fallback = null) {
+            console.log('📥 Chargement employés...');
+            showLoading();
+            
             try {
-                const res = await fetch(url);
-                const text = await res.text();
-                try { return JSON.parse(text); }
-                catch { return fallback; }
-            } catch { return fallback; }
+                const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
+                const list = document.getElementById('employeesList');
+                
+                if (!data || !data.employees || data.employees.length === 0) {
+                    list.innerHTML = '<p style="color:#ef4444; text-align:center;">Aucun employé enregistré.</p>';
+                    return;
+                }
+                
+                list.innerHTML = data.employees.map(e => `
+                    <div class="employee-item">
+                        <div>
+                            <div class="employee-name">${e.prenom} ${e.nom}</div>
+                            <span class="employee-type">${e.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
+                        </div>
+                        <div class="employee-actions">
+                            <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')" title="QR Code">
+                                <i class="fas fa-qrcode"></i>
+                            </button>
+                            <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')" title="Générer Badge">
+                                <i class="fas fa-id-card"></i>
+                            </button>
+                            <button class="btn-edit" onclick="editEmployee('${e.id}')" title="Modifier">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-delete" onclick="deleteEmployee('${e.id}')" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                console.log(`✅ ${data.employees.length} employés chargés`);
+                
+            } catch (error) {
+                console.error('❌ Erreur chargement employés:', error);
+                document.getElementById('employeesList').innerHTML = 
+                    '<p style="color:#ef4444;">Erreur de chargement. Vérifiez la connexion au serveur.</p>';
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === TOGGLE CHAMPS FINANCIERS ===
         function toggleFinancialFields() {
             const type = document.getElementById('employeeType').value;
             document.getElementById('tauxHoraireGroup').style.display = type === 'employe' ? 'block' : 'none';
             document.getElementById('fraisEcolageGroup').style.display = type === 'etudiant' ? 'block' : 'none';
         }
 
-        function showAddEmployeeForm() { resetForm(); document.getElementById('addEmployeeForm').style.display = 'block'; }
-        function hideAddEmployeeForm() { resetForm(); }
+        // === FORMULAIRE EMPLOYÉ ===
+        function showAddEmployeeForm() { 
+            resetForm(); 
+            document.getElementById('addEmployeeForm').style.display = 'block'; 
+            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
+        }
+        
+        function hideAddEmployeeForm() { 
+            resetForm(); 
+        }
+        
         function resetForm() {
             document.getElementById('addEmployeeForm').style.display = 'none';
-            document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
-            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage'].forEach(id => document.getElementById(id).value = '');
+            ['employeeNom','employeePrenom','employeeEmail','employeeTelephone','employeeTauxHoraire','employeeFraisEcolage']
+                .forEach(id => document.getElementById(id).value = '');
             document.getElementById('employeeType').value = 'employe';
             toggleFinancialFields();
             currentEditId = null;
         }
 
         async function saveEmployee() {
-            const emp = {
-                nom: document.getElementById('employeeNom').value,
-                prenom: document.getElementById('employeePrenom').value,
-                type: document.getElementById('employeeType').value,
-                email: document.getElementById('employeeEmail').value,
-                telephone: document.getElementById('employeeTelephone').value,
-                taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
-                frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
-            };
-            const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
-            const method = currentEditId ? 'PUT' : 'POST';
-            await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(emp) });
-            hideAddEmployeeForm();
-            loadEmployees();
+            const nom = document.getElementById('employeeNom').value.trim();
+            const prenom = document.getElementById('employeePrenom').value.trim();
+            
+            if (!nom || !prenom) {
+                alert('Nom et prénom sont requis');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const emp = {
+                    nom,
+                    prenom,
+                    type: document.getElementById('employeeType').value,
+                    email: document.getElementById('employeeEmail').value.trim() || null,
+                    telephone: document.getElementById('employeeTelephone').value.trim() || null,
+                    taux_horaire: parseFloat(document.getElementById('employeeTauxHoraire').value) || null,
+                    frais_ecolage: parseFloat(document.getElementById('employeeFraisEcolage').value) || null
+                };
+                
+                const url = currentEditId ? `${API_URL}/employees/${currentEditId}` : `${API_URL}/employees`;
+                const method = currentEditId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, { 
+                    method, 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(emp) 
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(currentEditId ? 'Employé modifié avec succès' : 'Employé ajouté avec succès');
+                    hideAddEmployeeForm();
+                    loadEmployees();
+                } else {
+                    throw new Error(data.message || 'Erreur d\'enregistrement');
+                }
+                
+            } catch (error) {
+                console.error('❌ Erreur saveEmployee:', error);
+                alert('Erreur: ' + error.message);
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === SCANNER QR ===
         async function startCamera() {
-            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            const video = document.getElementById('scanner-video');
-            video.srcObject = videoStream;
-            scanInterval = setInterval(() => scanQRCode(video), 500);
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.getElementById('scanner-video');
+                video.srcObject = videoStream;
+                scanInterval = setInterval(() => scanQRCode(video), 500);
+                console.log('📷 Caméra démarrée');
+            } catch (error) {
+                console.error('❌ Erreur caméra:', error);
+                alert('Impossible d\'accéder à la caméra');
+            }
         }
-        function stopCamera() { if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); clearInterval(scanInterval); } }
+        
+        function stopCamera() { 
+            if (videoStream) { 
+                videoStream.getTracks().forEach(t => t.stop()); 
+                clearInterval(scanInterval); 
+                console.log('📷 Caméra arrêtée');
+            } 
+        }
+        
         function scanQRCode(video) {
+            if (!window.jsQR) {
+                console.error('jsQR non chargé');
+                return;
+            }
+            
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
-            const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
-            if (code) { handleQRScan(code.data); stopCamera(); }
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d'); 
+            ctx.drawImage(video, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+            if (code) { 
+                handleQRScan(code.data); 
+                stopCamera(); 
+            }
         }
+        
         async function handleQRScan(qr) {
-            const res = await fetch(`${API_URL}/scan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qr_code: qr }) });
-            const result = await res.json();
-            document.getElementById('scan-result').innerHTML = result.success
-                ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
-                : `<p style="color:red;">Échec</p>`;
+            showLoading();
+            try {
+                const res = await fetch(`${API_URL}/scan`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ qr_code: qr }) 
+                });
+                const result = await res.json();
+                
+                document.getElementById('scan-result').innerHTML = result.success
+                    ? `<div class="status-card"><h3>${result.message}</h3><p>${result.action} enregistré(e)</p></div>`
+                    : `<p style="color:red;">Échec du scan: ${result.message}</p>`;
+            } catch (error) {
+                console.error('❌ Erreur scan:', error);
+                document.getElementById('scan-result').innerHTML = 
+                    `<p style="color:red;">Erreur: ${error.message}</p>`;
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === POINTAGES ===
         async function loadPointages() {
-            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
-            document.getElementById('pointagesList').innerHTML = data.pointages.length > 0 ? `
-                <table class="table">
-                    <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
-                    <tbody>${data.pointages.map(p => `
-                        <tr><td>${p.employee_name}</td><td>${p.type}</td>
-                        <td>${new Date(p.timestamp).toLocaleDateString()}</td>
-                        <td>${new Date(p.timestamp).toLocaleTimeString()}</td></tr>
-                    `).join('')}</tbody>
-                </table>` : '<p>Aucun pointage.</p>';
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
+                const list = document.getElementById('pointagesList');
+                
+                if (!data.pointages || data.pointages.length === 0) {
+                    list.innerHTML = '<p style="color: var(--gray-800);">Aucun pointage enregistré.</p>';
+                    return;
+                }
+                
+                list.innerHTML = `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Date</th><th>Heure</th></tr></thead>
+                        <tbody>${data.pointages.map(p => `
+                            <tr>
+                                <td>${p.employee_name || 'N/A'}</td>
+                                <td><span style="color: ${p.type === 'ENTREE' ? '#10b981' : '#ef4444'}; font-weight: 600;">${p.type}</span></td>
+                                <td>${new Date(p.timestamp).toLocaleDateString('fr-FR')}</td>
+                                <td>${new Date(p.timestamp).toLocaleTimeString('fr-FR')}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>`;
+                    
+            } catch (error) {
+                console.error('❌ Erreur pointages:', error);
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === SALAIRES ===
         async function loadSalaryData() {
-            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
-            let revenue = 0, expenses = 0;
-            data.salaries.forEach(s => {
-                if (s.type === 'ecolage') revenue += s.amount;
-                if (s.type === 'salaire') expenses += s.amount;
-            });
-            document.getElementById('totalRevenue').textContent = revenue.toFixed(2) + 'Ar';
-            document.getElementById('totalExpenses').textContent = expenses.toFixed(2) + 'Ar';
-            document.getElementById('netProfit').textContent = (revenue - expenses).toFixed(2) + 'Ar';
-            document.getElementById('salaryHistory').innerHTML = `
-                <table class="table">
-                    <thead><tr><th>Employé</th><th>Type</th><th>Montant</th><th>Date</th></tr></thead>
-                    <tbody>${data.salaries.map(s => `
-                        <tr><td>${s.employee_name}</td><td>${s.type}</td><td>${s.amount} Ar</td><td>${new Date(s.date).toLocaleDateString()}</td></tr>
-                    `).join('')}</tbody>
-                </table>`;
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
+                let revenue = 0, expenses = 0;
+                
+                data.salaries.forEach(s => {
+                    if (s.type === 'ecolage') revenue += parseFloat(s.amount) || 0;
+                    if (s.type === 'salaire') expenses += parseFloat(s.amount) || 0;
+                });
+                
+                document.getElementById('totalRevenue').textContent = revenue.toFixed(2) + ' Ar';
+                document.getElementById('totalExpenses').textContent = expenses.toFixed(2) + ' Ar';
+                document.getElementById('netProfit').textContent = (revenue - expenses).toFixed(2) + ' Ar';
+                
+                document.getElementById('salaryHistory').innerHTML = data.salaries.length > 0 ? `
+                    <table class="table">
+                        <thead><tr><th>Employé</th><th>Type</th><th>Montant</th><th>Date</th></tr></thead>
+                        <tbody>${data.salaries.map(s => `
+                            <tr>
+                                <td>${s.employee_name || 'N/A'}</td>
+                                <td>${s.type}</td>
+                                <td>${parseFloat(s.amount).toFixed(2)} Ar</td>
+                                <td>${new Date(s.date).toLocaleDateString('fr-FR')}</td>
+                            </tr>
+                        `).join('')}</tbody>
+                    </table>` : '<p style="color: var(--gray-800);">Aucun enregistrement.</p>';
+                    
+            } catch (error) {
+                console.error('❌ Erreur salaires:', error);
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === STATISTIQUES ===
         async function loadStatistics() {
-            const [empData, pointData] = await Promise.all([
-                safeFetch(`${API_URL}/employees`, { employees: [] }),
-                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
-            ]);
-            const employees = empData.employees.filter(e => e.type === 'employe').length;
-            const students = empData.employees.filter(e => e.type === 'etudiant').length;
-            document.getElementById('totalEmployees').textContent = employees;
-            document.getElementById('totalStudents').textContent = students;
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
-            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
-            document.getElementById('presenceRate').textContent = rate + '%';
-            document.getElementById('absenceRate').textContent = (100 - rate) + '%';
+            showLoading();
+            try {
+                const [empData, pointData] = await Promise.all([
+                    safeFetch(`${API_URL}/employees`, { employees: [] }),
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                ]);
+                
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const students = empData.employees.filter(e => e.type === 'etudiant').length;
+                
+                document.getElementById('totalEmployees').textContent = employees;
+                document.getElementById('totalStudents').textContent = students;
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayEntries = pointData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                ).length;
+                
+                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+                document.getElementById('presenceRate').textContent = rate + '%';
+                document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
-            const barCtx = document.getElementById('barChart').getContext('2d');
-            if (charts.bar) charts.bar.destroy();
-            charts.bar = new Chart(barCtx, { type: 'bar', data: { labels: ['Entrées', 'Sorties'], datasets: [{ data: [todayEntries, pointData.pointages.filter(p => p.type === 'SORTIE' && new Date(p.timestamp).toISOString().split('T')[0] === today).length], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { responsive: true } });
+                const todayExits = pointData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'SORTIE'
+                ).length;
 
-            const pieCtx = document.getElementById('pieChart').getContext('2d');
-            if (charts.pie) charts.pie.destroy();
-            charts.pie = new Chart(pieCtx, { type: 'doughnut', data: { labels: ['Présents', 'Absents'], datasets: [{ data: [todayEntries, employees - todayEntries], backgroundColor: ['#10b981', '#ef4444'] }] }, options: { responsive: true } });
+                // Bar Chart
+                const barCtx = document.getElementById('barChart').getContext('2d');
+                if (charts.bar) charts.bar.destroy();
+                charts.bar = new Chart(barCtx, { 
+                    type: 'bar', 
+                    data: { 
+                        labels: ['Entrées', 'Sorties'], 
+                        datasets: [{ 
+                            label: 'Aujourd\'hui',
+                            data: [todayEntries, todayExits], 
+                            backgroundColor: ['#10b981', '#ef4444'] 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
 
-            const last7Days = Array(7).fill().map((_, i) => {
-                const d = new Date(); d.setDate(d.getDate() - i); return d.toISOString().split('T')[0];
-            }).reverse();
-            const lineData = last7Days.map(date => pointData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === date && p.type === 'ENTREE').length);
-            const lineCtx = document.getElementById('lineChart').getContext('2d');
-            if (charts.line) charts.line.destroy();
-            charts.line = new Chart(lineCtx, { type: 'line', data: { labels: last7Days.map(d => new Date(d).toLocaleDateString('fr')), datasets: [{ label: 'Entrées', data: lineData, borderColor: '#6366f1', tension: 0.4, fill: false }] }, options: { responsive: true } });
+                // Pie Chart
+                const pieCtx = document.getElementById('pieChart').getContext('2d');
+                if (charts.pie) charts.pie.destroy();
+                charts.pie = new Chart(pieCtx, { 
+                    type: 'doughnut', 
+                    data: { 
+                        labels: ['Présents', 'Absents'], 
+                        datasets: [{ 
+                            data: [todayEntries, employees - todayEntries], 
+                            backgroundColor: ['#10b981', '#ef4444'] 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
+
+                // Line Chart
+                const last7Days = Array(7).fill().map((_, i) => {
+                    const d = new Date(); 
+                    d.setDate(d.getDate() - i); 
+                    return d.toISOString().split('T')[0];
+                }).reverse();
+                
+                const lineData = last7Days.map(date => 
+                    pointData.pointages.filter(p => 
+                        new Date(p.timestamp).toISOString().split('T')[0] === date && p.type === 'ENTREE'
+                    ).length
+                );
+                
+                const lineCtx = document.getElementById('lineChart').getContext('2d');
+                if (charts.line) charts.line.destroy();
+                charts.line = new Chart(lineCtx, { 
+                    type: 'line', 
+                    data: { 
+                        labels: last7Days.map(d => new Date(d).toLocaleDateString('fr-FR')), 
+                        datasets: [{ 
+                            label: 'Entrées (7 derniers jours)', 
+                            data: lineData, 
+                            borderColor: '#6366f1', 
+                            tension: 0.4, 
+                            fill: false 
+                        }] 
+                    }, 
+                    options: { responsive: true, maintainAspectRatio: true } 
+                });
+                
+            } catch (error) {
+                console.error('❌ Erreur statistiques:', error);
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === EXPORT EXCEL ===
         function exportToExcel(data, filename) {
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Données");
-            XLSX.writeFile(wb, `${filename}.xlsx`);
+            try {
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Données");
+                XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+                console.log('✅ Export Excel:', filename);
+            } catch (error) {
+                console.error('❌ Erreur export:', error);
+                alert('Erreur lors de l\'export');
+            }
         }
 
         async function exportEmployeesToExcel() {
-            const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
-            const exportData = data.employees.map(e => ({
-                ID: e.id, Type: e.type, Nom: e.nom, Prénom: e.prenom,
-                Email: e.email || '', Téléphone: e.telephone || '',
-                'Taux Horaire': e.taux_horaire || '', 'Frais Écolage': e.frais_ecolage || ''
-            }));
-            exportToExcel(exportData, "Employes_RH");
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
+                const exportData = data.employees.map(e => ({
+                    ID: e.id,
+                    Type: e.type === 'employe' ? 'Employé' : 'Étudiant',
+                    Nom: e.nom,
+                    Prénom: e.prenom,
+                    Email: e.email || '',
+                    Téléphone: e.telephone || '',
+                    'Taux Horaire': e.taux_horaire || '',
+                    'Frais Écolage': e.frais_ecolage || ''
+                }));
+                exportToExcel(exportData, "Employes_RH");
+            } catch (error) {
+                console.error('❌ Erreur export employés:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
         }
 
         async function exportPointagesToExcel() {
-            const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
-            const exportData = data.pointages.map(p => ({
-                Employé: p.employee_name, Type: p.type,
-                Date: new Date(p.timestamp).toLocaleDateString(),
-                Heure: new Date(p.timestamp).toLocaleTimeString()
-            }));
-            exportToExcel(exportData, "Pointages_Historique");
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
+                const exportData = data.pointages.map(p => ({
+                    Employé: p.employee_name || 'N/A',
+                    Type: p.type,
+                    Date: new Date(p.timestamp).toLocaleDateString('fr-FR'),
+                    Heure: new Date(p.timestamp).toLocaleTimeString('fr-FR')
+                }));
+                exportToExcel(exportData, "Pointages_Historique");
+            } catch (error) {
+                console.error('❌ Erreur export pointages:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
         }
 
         async function exportSalairesToExcel() {
-            const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
-            const exportData = data.salaries.map(s => ({
-                Employé: s.employee_name, Type: s.type, Montant: s.amount,
-                Date: new Date(s.date).toLocaleDateString()
-            }));
-            exportToExcel(exportData, "Salaires_Historique");
+            showLoading();
+            try {
+                const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
+                const exportData = data.salaries.map(s => ({
+                    Employé: s.employee_name || 'N/A',
+                    Type: s.type,
+                    Montant: parseFloat(s.amount).toFixed(2) + ' Ar',
+                    Date: new Date(s.date).toLocaleDateString('fr-FR')
+                }));
+                exportToExcel(exportData, "Salaires_Historique");
+            } catch (error) {
+                console.error('❌ Erreur export salaires:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
         }
 
         async function exportStatsToExcel() {
-            const [empData, ptData] = await Promise.all([
-                safeFetch(`${API_URL}/employees`, { employees: [] }),
-                safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
-            ]);
-            const today = new Date().toISOString().split('T')[0];
-            const todayEntries = ptData.pointages.filter(p => new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE').length;
-            const employees = empData.employees.filter(e => e.type === 'employe').length;
-            const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
-            const exportData = [{
-                'Total Employés': employees,
-                'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
-                'Taux Présence': rate + '%',
-                'Taux Absence': (100 - rate) + '%',
-                Date: new Date().toLocaleDateString()
-            }];
-            exportToExcel(exportData, "Statistiques_RH");
+            showLoading();
+            try {
+                const [empData, ptData] = await Promise.all([
+                    safeFetch(`${API_URL}/employees`, { employees: [] }),
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                ]);
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayEntries = ptData.pointages.filter(p => 
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                ).length;
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+                
+                const exportData = [{
+                    'Total Employés': employees,
+                    'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
+                    'Taux Présence': rate + '%',
+                    'Taux Absence': (100 - rate) + '%',
+                    Date: new Date().toLocaleDateString('fr-FR')
+                }];
+                exportToExcel(exportData, "Statistiques_RH");
+            } catch (error) {
+                console.error('❌ Erreur export stats:', error);
+                alert('Erreur lors de l\'export');
+            } finally {
+                hideLoading();
+            }
         }
 
+        // === CHAT IA ===
         function sendMessage() {
             const input = document.getElementById('chatInput');
             const msg = input.value.trim();
             if (!msg) return;
+            
             const messages = document.getElementById('chatMessages');
             messages.innerHTML += `<div class="message message-user">${msg}</div>`;
             input.value = '';
+            messages.scrollTop = messages.scrollHeight;
+            
             setTimeout(() => {
                 messages.innerHTML += `<div class="message message-ai">Réponse simulée pour : "${msg}"</div>`;
                 messages.scrollTop = messages.scrollHeight;
             }, 800);
         }
 
-        function logout() { if (confirm('Déconnexion ?')) window.location.href = 'login.html'; }
-
-        function openModal(id) {
-            document.getElementById(id).style.display = 'block';
-            if (id === 'employeesModal') loadEmployees();
-            if (id === 'pointagesModal') loadPointages();
-            if (id === 'salaryModal') loadSalaryData();
-            if (id === 'statsModal') loadStatistics();
-        }
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-            if (id === 'scanModal') stopCamera();
-            if (id === 'employeesModal') resetForm();
-        }
-
+        // === PARAMÈTRES ===
         function loadSettings() {
             const saved = localStorage.getItem('rh_settings');
             if (saved) {
-                const s = JSON.parse(saved);
-                document.getElementById('wifiSSID').value = s.wifiSSID;
-                document.getElementById('wifiPassword').value = s.wifiPassword;
-                document.getElementById('serverURL').value = s.serverURL;
-                document.getElementById('adminUser').value = s.adminUser;
-                document.getElementById('adminPassword').value = s.adminPassword;
-                API_URL = s.serverURL + '/api';
+                try {
+                    const s = JSON.parse(saved);
+                    document.getElementById('wifiSSID').value = s.wifiSSID || 'OPPO';
+                    document.getElementById('wifiPassword').value = s.wifiPassword || '1234567809';
+                    document.getElementById('serverURL').value = s.serverURL || 'https://postcam-1.onrender.com';
+                    document.getElementById('adminUser').value = s.adminUser || 'admin';
+                    document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
+                    API_URL = s.serverURL + '/api';
+                    console.log('⚙️ Paramètres chargés');
+                } catch (error) {
+                    console.error('❌ Erreur chargement paramètres:', error);
+                }
             }
         }
+        
         function saveSettings() {
             const settings = {
                 wifiSSID: document.getElementById('wifiSSID').value.trim(),
@@ -807,25 +1213,36 @@
                 adminUser: document.getElementById('adminUser').value.trim(),
                 adminPassword: document.getElementById('adminPassword').value
             };
+            
             localStorage.setItem('rh_settings', JSON.stringify(settings));
-            showSettingsStatus("Enregistré !", "success");
+            showSettingsStatus("Paramètres enregistrés avec succès !", "success");
             API_URL = settings.serverURL + '/api';
-            setTimeout(() => location.reload(), 1500);
+            
+            setTimeout(() => {
+                if (confirm('Recharger la page pour appliquer les changements ?')) {
+                    location.reload();
+                }
+            }, 1500);
         }
+        
         function resetSettings() {
-            if (confirm("Réinitialiser ?")) {
+            if (confirm("Réinitialiser tous les paramètres aux valeurs par défaut ?")) {
                 localStorage.removeItem('rh_settings');
-                location.reload();
+                showSettingsStatus("Paramètres réinitialisés", "success");
+                setTimeout(() => location.reload(), 1500);
             }
         }
+        
         function showSettingsStatus(msg, type) {
             const el = document.getElementById('settingsStatus');
-            el.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}">${msg}</span>`;
+            el.innerHTML = `<span style="color:${type === 'success' ? '#10b981' : '#ef4444'}; font-weight: 600;">${msg}</span>`;
             setTimeout(() => el.innerHTML = '', 3000);
         }
-        function togglePassword(id, iconId) {
-            const input = document.getElementById(id);
+        
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
             const icon = document.getElementById(iconId);
+            
             if (input.type === 'password') {
                 input.type = 'text';
                 icon.classList.replace('fa-eye', 'fa-eye-slash');
@@ -835,10 +1252,71 @@
             }
         }
 
-        window.onclick = e => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; };
+        // === MODALES ===
+        function openModal(id) {
+            document.getElementById(id).style.display = 'block';
+            console.log('📂 Ouverture modal:', id);
+            
+            if (id === 'employeesModal') loadEmployees();
+            if (id === 'pointagesModal') loadPointages();
+            if (id === 'salaryModal') loadSalaryData();
+            if (id === 'statsModal') loadStatistics();
+        }
+        
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            console.log('📁 Fermeture modal:', id);
+            
+            if (id === 'scanModal') stopCamera();
+            if (id === 'employeesModal') resetForm();
+        }
+
+        // === DÉCONNEXION ===
+        function logout() { 
+            if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+                window.location.href = 'login.html'; 
+            }
+        }
+
+        // === ÉVÉNEMENTS GLOBAUX ===
+        window.onclick = e => { 
+            if (e.target.classList.contains('modal')) {
+                const modalId = e.target.id;
+                closeModal(modalId);
+            }
+        };
+
+        // === INITIALISATION ===
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
-            document.getElementById('chatMessages').innerHTML = `<div class="message message-ai">Bonjour !</div>`;
+            
+            // Chat input - Entrée
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+            
+            // Message de bienvenue du chat
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="message message-ai">
+                    Bonjour ! Je suis votre assistant RH. Comment puis-je vous aider aujourd'hui ?
+                </div>
+            `;
+            
+            console.log('✅ Application RH Pro initialisée');
+            console.log('🔗 API URL:', API_URL);
+            
+            // Vérifier les dépendances
+            if (!window.jspdf) console.warn('⚠️ jsPDF non chargé');
+            if (!window.html2canvas) console.warn('⚠️ html2canvas non chargé');
+            if (!window.QRCode) console.warn('⚠️ QRCode.js non chargé');
+            if (!window.XLSX) console.warn('⚠️ XLSX non chargé');
+            if (!window.jsQR) console.warn('⚠️ jsQR non chargé');
+            if (!window.Chart) console.warn('⚠️ Chart.js non chargé');
         });
     </script>
 </body>
