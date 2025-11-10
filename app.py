@@ -2,7 +2,6 @@ import os
 import logging
 from flask import Flask, jsonify, request, render_template, session, redirect, url_for
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
 from datetime import datetime
 import uuid
 import math
@@ -12,7 +11,6 @@ from collections import defaultdict
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)  # Activer les journaux SocketIO
 
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +24,7 @@ except Exception as e:
     logger.error(f"❌ Échec import database.py : {e}")
     raise
 
-# === Placeholder SQL (Postgres = %s, SQLite = ?) ===
+# === Placeholder SQL ===
 PLACEHOLDER = "?" if DB_DRIVER == "sqlite" else "%s"
 
 # --- Initialisation DB ---
@@ -156,144 +154,6 @@ def add_employee():
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST ajouter salaire ===
-@app.route("/api/salary", methods=["POST"])
-def add_salary():
-    data = request.get_json(silent=True)
-    logger.info(f"📥 Données reçues: {data}")
-
-    if not data:
-        logger.error("❌ Requête vide")
-        return jsonify({"success": False, "message": "Requête vide"}), 400
-
-    # ✅ CORRECTION : Accepter les deux formats (camelCase ET snake_case)
-    employee_id = data.get("employeeId") or data.get("employee_id")
-    employee_name = data.get("employeeName") or data.get("employee_name")
-    amount = data.get("amount")
-    record_type = data.get("type")
-    hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
-
-    # Validation des champs requis
-    if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
-        logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
-
-    if not amount:
-        logger.error(f"❌ amount manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: amount"}), 400
-
-    if not record_type:
-        logger.error(f"❌ type manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
-
-    # Validation du montant
-    try:
-        amount = float(amount)
-        if amount <= 0:
-            logger.error(f"❌ Montant invalide: {amount}")
-            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
-    except (ValueError, TypeError):
-        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
-        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Nettoyer le nom
-        employee_name = employee_name.strip()
-
-        # Si employee_id fourni, vérifier qu'il existe
-        if employee_id:
-            cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
-            employee = cur.fetchone()
-
-            if not employee:
-                logger.warning(f"⚠️ Employé {employee_id} non trouvé")
-        else:
-            # Chercher l'employé par nom
-            cur.execute(f"""
-                SELECT id FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
-                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name, employee_name))
-            
-            employee = cur.fetchone()
-            
-            if employee:
-                employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-                logger.info(f"✅ Employé trouvé par nom: {employee_id}")
-            else:
-                # Créer un nouvel employé si introuvable
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
-                emp_name_parts = employee_name.split(" ", 1)
-                prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
-                nom = emp_name_parts[1] if len(emp_name_parts) > 1 else employee_name
-                
-                employee_id = str(uuid.uuid4())
-                
-                cur.execute(f"""
-                    INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-                """, [employee_id, nom, prenom, "employe", 1, int(datetime.now().timestamp() * 1000)])
-                
-                logger.info(f"✅ Nouvel employé créé: {employee_id}")
-
-        # Préparer les données
-        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
-        period = data.get("period") or datetime.now().strftime("%Y-%m")
-        salary_id = data.get("id") or str(uuid.uuid4())
-
-        # ✅ CORRECTION : Vérifier si l'enregistrement existe déjà
-        cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
-        existing = cur.fetchone()
-
-        if existing:
-            logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
-            
-            # UPDATE au lieu de INSERT
-            cur.execute(f"""
-                UPDATE salaries 
-                SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
-                    amount = {PLACEHOLDER}, hours_worked = {PLACEHOLDER}, 
-                    type = {PLACEHOLDER}, period = {PLACEHOLDER}, date = {PLACEHOLDER}
-                WHERE id = {PLACEHOLDER}
-            """, [
-                employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date, salary_id
-            ])
-            
-            action = "mis à jour"
-        else:
-            # INSERT normal
-            cur.execute(f"""
-                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                salary_id, employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date
-            ])
-            
-            action = "créé"
-
-        conn.commit()
-        logger.info(f"✅ Salaire {action}: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
-
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "success": True, 
-            "message": f"Salaire {action} avec succès", 
-            "id": salary_id,
-            "employeeId": employee_id,
-            "action": action
-        }), 201 if action == "créé" else 200
-
-    except Exception as e:
-        logger.error(f"❌ add_salary: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
 # === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
 def update_employee(id):
@@ -346,47 +206,6 @@ def delete_employee(id):
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === GET historique salaires ===
-@app.route("/api/salary/history", methods=["GET"])
-def get_salary_history():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(f"""
-            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
-                   s.type, s.period, s.date,
-                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
-                   e.date_naissance, e.lieu_naissance
-            FROM salaries s
-            LEFT JOIN employees e ON e.id = s.employee_id
-            WHERE s.employee_id IS NOT NULL 
-              AND s.employee_name IS NOT NULL 
-              AND s.employee_name != ''
-              AND s.amount > 0
-            ORDER BY s.date DESC
-        """)
-        rows = cur.fetchall()
-
-        salaries = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
-        for record in salaries:
-            if record.get("hours_worked") is None:
-                record["hours_worked"] = 0.0
-            if record.get("period") is None:
-                record["period"] = ""
-
-        cur.close()
-        conn.close()
-        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
-        return jsonify({"success": True, "salaries": salaries}), 200
-
-    except Exception as e:
-        logger.error(f"❌ get_salary_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
 # === Dashboard ===
 @app.route("/dashboard")
 def dashboard():
@@ -419,355 +238,68 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# ========== CORRECTIONS POUR VOS FONCTIONS PYTHON ==========
-
-# ========== MODIFICATIONS DES FONCTIONS POINTAGE ==========
-
-# 1️⃣ Fonction add_pointage() MODIFIÉE (automatise is_active)
-
-@app.route("/api/pointages", methods=["POST"])
-def add_pointage():
+# ========== ROUTE HTTP POUR RSSI (REMPLACE WEBSOCKET) ==========
+@app.route("/api/rssi-data", methods=["POST"])
+def receive_rssi_data_http():
+    """
+    Reçoit les données RSSI via HTTP POST depuis ESP32
+    """
     data = request.get_json(silent=True)
-    logger.info(f"📥 Données pointage reçues: {data}")
     
     if not data:
-        return jsonify({"success": False, "message": "Requête vide"}), 400
+        logger.error("❌ Requête vide")
+        return jsonify({"success": False, "message": "Données vides"}), 400
     
-    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
-    for field in required:
-        if field not in data or not data[field]:
-            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+    logger.info(f"📡 RSSI reçu via HTTP de l'Ancre #{data.get('anchor_id')}")
     
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        emp_id = data.get("employeeId")
-        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
-        employee = cur.fetchone()
-        
-        if not employee:
-            cur.close()
-            conn.close()
-            return jsonify({"success": False, "message": f"Employé avec ID {emp_id} non trouvé"}), 404
-        
-        # Extraire nom et prénom selon le driver
-        if DB_DRIVER == "sqlite":
-            emp_nom = employee[1]
-            emp_prenom = employee[2]
-        else:
-            emp_nom = employee['nom']
-            emp_prenom = employee['prenom']
-        
-        pointage_id = str(uuid.uuid4())
-        pointage_type = data.get("type").upper()
-        
-        # Mapper "arrivee" -> "ENTREE" et "depart" -> "SORTIE"
-        if pointage_type.lower() == "arrivee":
-            pointage_type = "ENTREE"
-        elif pointage_type.lower() == "depart":
-            pointage_type = "SORTIE"
-        
-        # ✅ DÉTERMINER is_active SELON LE TYPE DE POINTAGE
-        new_is_active = 1 if pointage_type == "ENTREE" else 0
-        
-        # ✅ METTRE À JOUR is_active DANS employees
-        cur.execute(f"""
-            UPDATE employees 
-            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
-            WHERE id = {PLACEHOLDER}
-        """, [new_is_active, int(data.get("timestamp")), emp_id])
-        
-        logger.info(f"✅ is_active mis à jour: {emp_prenom} {emp_nom} -> {new_is_active} ({pointage_type})")
-        
-        # Enregistrer le pointage
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id,
-            emp_id,
-            data.get("employeeName"),
-            pointage_type,
-            int(data.get("timestamp")),
-            data.get("date")
-        ])
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Émettre vers ESP32
-        timestamp = int(data.get("timestamp"))
-        dt = datetime.fromtimestamp(timestamp / 1000)
-        date_formatted = dt.strftime("%d/%m/%y")
-        time_formatted = dt.strftime("%H:%M:%S")
-        
-        socketio.emit('pointage_event', {
-            'nom': emp_nom,
-            'prenom': emp_prenom,
-            'type': pointage_type,
-            'date': date_formatted,
-            'time': time_formatted,
-            'timestamp': timestamp,
-            'is_active': new_is_active
-        }, namespace='/api/rssi-data')
-        
-        logger.info(f"📡 Événement pointage émis vers ESP32: {emp_prenom} {emp_nom} - {pointage_type}")
-        
-        return jsonify({
-            "success": True,
-            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
-            "pointageId": pointage_id,
-            "is_active": new_is_active
-        }), 201
-        
-    except Exception as e:
-        logger.error(f"❌ add_pointage: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === GET historique pointages ===
-@app.route("/api/pointages/history", methods=["GET"])
-def get_pointage_history():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute(f"""
-            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date,
-                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
-                   e.date_naissance, e.lieu_naissance
-            FROM pointages p
-            LEFT JOIN employees e ON e.id = p.employee_id
-            ORDER BY p.timestamp DESC
-        """)
-        rows = cur.fetchall()
-
-        pointages = (
-            [dict(row) for row in rows] if DB_DRIVER == "postgres"
-            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
-        )
-
-        cur.close()
-        conn.close()
-        return jsonify({"success": True, "pointages": pointages}), 200
-    except Exception as e:
-        logger.error(f"❌ get_pointage_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-# 2️⃣ Fonction scan_qr_code() MODIFIÉE (automatise is_active)
-
-@app.route("/api/scan", methods=["POST"])
-def scan_qr_code():
-    data = request.get_json(silent=True)
-    logger.info(f"📸 Scan reçu : {data}")
-    
-    if not data or "qr_code" not in data:
-        return jsonify({"success": False, "message": "QR code manquant"}), 400
-    
-    qr_code = data["qr_code"].strip()
-    if not qr_code:
-        return jsonify({"success": False, "message": "QR code vide"}), 400
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        cur.execute(f"SELECT id, nom, prenom, is_active FROM employees WHERE id = {PLACEHOLDER}", (qr_code,))
-        employee = cur.fetchone()
-        
-        if not employee:
-            logger.warning(f"❌ Aucun employé trouvé pour le QR {qr_code}")
-            cur.close()
-            conn.close()
-            return jsonify({"success": False, "message": "Employé non trouvé"}), 404
-        
-        emp_id, nom, prenom, is_active = employee
-        now = int(datetime.now().timestamp() * 1000)
-        today = datetime.now().strftime("%Y-%m-%d")
-        
-        # ✅ DÉTERMINER LE TYPE DE POINTAGE SELON is_active ACTUEL
-        if is_active == 0:
-            pointage_type = "ENTREE"
-            new_is_active = 1
-            message = f"{prenom} {nom} est entré (activé)."
-        else:
-            pointage_type = "SORTIE"
-            new_is_active = 0
-            message = f"{prenom} {nom} est sorti (désactivé)."
-        
-        # ✅ METTRE À JOUR is_active
-        cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}", 
-                    [new_is_active, now, emp_id])
-        
-        # Enregistrer le pointage
-        pointage_id = str(uuid.uuid4())
-        cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id,
-            emp_id,
-            f"{prenom} {nom}",
-            pointage_type,
-            now,
-            today
-        ])
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        # Émettre vers ESP32
-        dt = datetime.fromtimestamp(now / 1000)
-        date_formatted = dt.strftime("%d/%m/%y")
-        time_formatted = dt.strftime("%H:%M:%S")
-        
-        socketio.emit('pointage_event', {
-            'nom': nom,
-            'prenom': prenom,
-            'type': pointage_type,
-            'date': date_formatted,
-            'time': time_formatted,
-            'timestamp': now,
-            'is_active': new_is_active
-        }, namespace='/api/rssi-data')
-        
-        logger.info(f"📡 Événement pointage émis vers ESP32: {prenom} {nom} - {pointage_type}")
-        logger.info(f"✅ {pointage_type} enregistré pour {prenom} {nom} (is_active={new_is_active})")
-        
-        return jsonify({
-            "success": True,
-            "action": pointage_type,
-            "message": message,
-            "employeeId": emp_id,
-            "timestamp": now,
-            "date": today,
-            "is_active": new_is_active
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"❌ scan_qr_code: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-
-# 3️⃣ NOUVELLE FONCTION : Synchroniser is_active avec le dernier pointage
-
-@app.route("/api/pointages/sync-active", methods=["POST"])
-def sync_active_status():
-    """
-    Synchronise is_active de tous les employés avec leur dernier pointage.
-    Utile pour corriger les incohérences.
-    """
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Récupérer tous les employés
-        cur.execute(f"SELECT id, nom, prenom FROM employees")
-        employees = cur.fetchall()
-        
-        updated_count = 0
-        
-        for emp in employees:
-            emp_id = emp[0] if DB_DRIVER == "sqlite" else emp['id']
-            
-            # Trouver le dernier pointage
-            cur.execute(f"""
-                SELECT type FROM pointages 
-                WHERE employee_id = {PLACEHOLDER}
-                ORDER BY timestamp DESC 
-                LIMIT 1
-            """, (emp_id,))
-            
-            last_pointage = cur.fetchone()
-            
-            if last_pointage:
-                last_type = last_pointage[0] if DB_DRIVER == "sqlite" else last_pointage['type']
-                
-                # Déterminer is_active
-                should_be_active = 1 if last_type == "ENTREE" else 0
-                
-                # Mettre à jour
-                cur.execute(f"""
-                    UPDATE employees 
-                    SET is_active = {PLACEHOLDER}
-                    WHERE id = {PLACEHOLDER}
-                """, [should_be_active, emp_id])
-                
-                updated_count += 1
-                logger.info(f"✅ {emp[2]} {emp[1]}: is_active={should_be_active} (dernier: {last_type})")
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "message": f"{updated_count} employés synchronisés",
-            "updated_count": updated_count
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"❌ sync_active_status: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-# Modifier handle_rssi_connect
-@socketio.on('connect', namespace='/api/rssi-data')
-def handle_rssi_connect():
-    logger.info(f"📡 Client connecté: {request.sid}")
-    logger.info(f"   Transport: {request.environ.get('HTTP_UPGRADE', 'N/A')}")
-    emit('connected', {'message': 'Bienvenue', 'sid': request.sid})
-@socketio.on('disconnect', namespace='/api/rssi-data')
-def handle_rssi_disconnect():
-    logger.info("📡 Client WebSocket déconnecté de /api/rssi-data")
-socketio.on_error(namespace='/api/rssi-data')
-def error_handler(e):
-    logger.error(f"❌ Erreur SocketIO: {e}", exc_info=True)
-
-@socketio.on_error_default
-def default_error_handler(e):
-    logger.error(f"❌ Erreur SocketIO globale: {e}", exc_info=True)
-
-# 👇 Correction ici : on écoute 'rssi_data' (et non 'message')
-@socketio.on('rssi_data', namespace='/api/rssi-data')
-def handle_rssi_data(data):
-    logger.info(f"📡 RSSI reçu via WebSocket: {data}")
-
     try:
         anchor_id = data.get("anchor_id")
         anchor_x = data.get("anchor_x")
         anchor_y = data.get("anchor_y")
         badges = data.get("badges", [])
-
-        logger.info(f"📡 Ancre #{anchor_id} à ({anchor_x}, {anchor_y}) : {len(badges)} badges")
-
+        
+        if anchor_id is None or anchor_x is None or anchor_y is None:
+            return jsonify({
+                "success": False, 
+                "message": "Champs manquants: anchor_id, anchor_x, anchor_y"
+            }), 400
+        
+        logger.info(f"   Position: ({anchor_x}, {anchor_y})")
+        logger.info(f"   Badges détectés: {len(badges)}")
+        
         conn = get_db()
         cur = conn.cursor()
-
+        
+        processed = 0
+        
         for badge in badges:
             ssid = badge.get("ssid")
             mac = badge.get("mac")
             rssi = badge.get("rssi")
-
-            if not ssid or ssid == "None" or not isinstance(ssid, str) or ssid.strip() == "":
-                logger.warning(f"❌ SSID invalide: {repr(ssid)}")
+            
+            if not ssid or not isinstance(ssid, str) or ssid.strip() == "":
+                logger.warning(f"   ⚠️ SSID invalide: {repr(ssid)}")
                 continue
-
+            
             employee_name = ssid.strip()
-
+            
+            # Chercher l'employé
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
+                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
                 LIMIT 1
-            """, (employee_name,))
-
+            """, (employee_name, employee_name))
+            
             employee = cur.fetchone()
+            
             if not employee:
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé")
+                logger.warning(f"   ⚠️ Employé '{employee_name}' non trouvé en BDD")
                 continue
-
+            
             employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-            logger.info(f"✅ Employé trouvé: {employee_id}")
-
+            
+            # Insérer mesure RSSI
             cur.execute(f"""
                 INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
@@ -775,23 +307,37 @@ def handle_rssi_data(data):
                 employee_id, anchor_id, anchor_x, anchor_y, rssi, mac,
                 int(datetime.now().timestamp() * 1000)
             ])
-
+            
+            processed += 1
+            logger.info(f"   ✅ {employee_name} → {rssi} dBm")
+        
         conn.commit()
-        calculate_and_broadcast_positions(cur)
-        conn.commit()
-
+        
+        # Calculer positions si au moins 1 badge traité
+        if processed > 0:
+            calculate_and_broadcast_positions(cur)
+            conn.commit()
+            logger.info(f"   📍 Positions recalculées")
+        
         cur.close()
         conn.close()
-
-        # ✅ Réponse positive à l’ESP32
-        emit('ack', {'success': True, 'message': f'{len(badges)} mesures traitées'}, namespace='/api/rssi-data')
-
+        
+        return jsonify({
+            "success": True, 
+            "message": f"{processed}/{len(badges)} mesures enregistrées",
+            "processed": processed,
+            "anchor_id": anchor_id
+        }), 200
+        
     except Exception as e:
-        logger.error(f"❌ Erreur WebSocket RSSI: {e}", exc_info=True)
-        emit('error', {'success': False, 'message': str(e)}, namespace='/api/rssi-data')
+        logger.error(f"❌ receive_rssi_data_http: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # === Calcul et diffusion des positions ===
 def calculate_and_broadcast_positions(cursor):
+    """
+    Calcule la position de chaque employé actif via trilatération
+    """
     threshold = int((datetime.now().timestamp() - 5) * 1000)
 
     cursor.execute(f"""
@@ -803,10 +349,11 @@ def calculate_and_broadcast_positions(cursor):
     measurements = cursor.fetchall()
 
     if not measurements:
-        logger.info("Aucune mesure récente pour triangulation")
+        logger.info("   ℹ️ Aucune mesure récente pour triangulation")
         return
 
     employee_data = defaultdict(list)
+    
     for row in measurements:
         emp_id = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
         anchor_id = row[1] if DB_DRIVER == "sqlite" else row['anchor_id']
@@ -832,30 +379,7 @@ def calculate_and_broadcast_positions(cursor):
                 WHERE id = {PLACEHOLDER}
             """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
 
-            logger.info(f"Position calculée pour {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
-
-    cursor.execute(f"""
-        SELECT id, nom, prenom, type, is_active, created_at,
-               email, telephone, taux_horaire, frais_ecolage,
-               profession, date_naissance, lieu_naissance,
-               last_position_x, last_position_y, last_seen
-        FROM employees 
-        WHERE is_active = 1
-        ORDER BY nom, prenom
-    """)
-    rows = cursor.fetchall()
-
-    employees = (
-        [dict(row) for row in rows] if DB_DRIVER == "postgres"
-        else [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
-    )
-
-    logger.info(f"📤 Diffusion positions à {len(employees)} employés actifs")
-    for emp in employees:
-        if emp.get('last_position_x') is not None:
-            logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
-
-    socketio.emit('positions', {'success': True, 'employees': employees}, namespace='/api/employees/active')
+            logger.info(f"   📍 Position employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
 def rssi_to_distance(rssi, tx_power=-59, n=2.0):
     """Convertit un RSSI en distance estimée (mètres)."""
@@ -864,13 +388,9 @@ def rssi_to_distance(rssi, tx_power=-59, n=2.0):
     ratio = (tx_power - rssi) / (10 * n)
     return round(math.pow(10, ratio), 2)
 
-
 def trilateration(anchors):
     """Calcule la position (x, y) à partir de 3 ancres RSSI."""
     anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
-    logger.info("📡 Ancres utilisées pour la triangulation :")
-    for i, a in enumerate(anchors):
-        logger.info(f"  {i+1}. Ancre #{a['anchor_id']} ({a['x']}, {a['y']}) d={a['distance']:.2f}m")
 
     (x1, y1, r1), (x2, y2, r2), (x3, y3, r3) = \
         (anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']), \
@@ -886,12 +406,12 @@ def trilateration(anchors):
 
     denom = (A*E - B*D)
     if denom == 0:
-        logger.warning("⚠️ Triangulation impossible (points alignés)")
         return (x1, y1)
 
     x = (C*E - B*F) / denom
     y = (A*F - C*D) / denom
     return round(x, 2), round(y, 2)
+
 # === GET employés actifs ===
 @app.route("/api/employees/active", methods=["GET"])
 def get_active_employees():
@@ -915,65 +435,108 @@ def get_active_employees():
         )
 
         conn.close()
-        logger.info(f"📤 {len(employees)} employés actifs renvoyés")
-        for emp in employees:
-            if emp.get('last_position_x') is not None:
-                logger.info(f"  {emp['prenom']} {emp['nom']}: ({emp['last_position_x']:.2f}, {emp['last_position_y']:.2f})")
-        
         return jsonify({"success": True, "employees": employees}), 200
     except Exception as e:
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === POST activer via QR ===
-@app.route("/api/activate-qr", methods=["POST"])
-def activate_via_qr():
-    data = request.get_json(silent=True) or request.form
+# === Pointages ===
+@app.route("/api/pointages", methods=["POST"])
+def add_pointage():
+    data = request.get_json(silent=True)
+    logger.info(f"📥 Pointage reçu: {data}")
+    
     if not data:
-        return jsonify({"success": False, "message": "Données manquantes"}), 400
-
-    emp_id = data.get("employee_id")
-    badge_id = data.get("badge_id")
-    identifier = emp_id or badge_id
-    if not identifier:
-        return jsonify({"success": False, "message": "employee_id ou badge_id requis"}), 400
-
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+    
+    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
+    for field in required:
+        if field not in data or not data[field]:
+            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
+    
     try:
         conn = get_db()
         cur = conn.cursor()
-
-        try:
-            cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
-        except Exception as e:
-            logger.warning(f"🔁 update is_active failed: {e}, trying 'active' column")
-            cur.execute(f"UPDATE employees SET active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                        [1, int(datetime.now().timestamp() * 1000), identifier])
-
-        if cur.rowcount == 0:
-            cur.execute(f"SELECT employee_id FROM rssi_data WHERE badge_id = {PLACEHOLDER} LIMIT 1", [identifier])
-            row = cur.fetchone()
-            if row:
-                emp_id_from_badge = row[0] if DB_DRIVER == "sqlite" else row['employee_id']
-                cur.execute(f"UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER} WHERE id = {PLACEHOLDER}",
-                            [1, int(datetime.now().timestamp() * 1000), emp_id_from_badge])
-
+        
+        emp_id = data.get("employeeId")
+        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+        
+        if not employee:
+            cur.close()
+            conn.close()
+            return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
+        
+        emp_nom = employee[1] if DB_DRIVER == "sqlite" else employee['nom']
+        emp_prenom = employee[2] if DB_DRIVER == "sqlite" else employee['prenom']
+        
+        pointage_type = data.get("type").upper()
+        if pointage_type.lower() == "arrivee":
+            pointage_type = "ENTREE"
+        elif pointage_type.lower() == "depart":
+            pointage_type = "SORTIE"
+        
+        new_is_active = 1 if pointage_type == "ENTREE" else 0
+        
+        cur.execute(f"""
+            UPDATE employees 
+            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [new_is_active, int(data.get("timestamp")), emp_id])
+        
+        pointage_id = str(uuid.uuid4())
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            pointage_id, emp_id, data.get("employeeName"),
+            pointage_type, int(data.get("timestamp")), data.get("date")
+        ])
+        
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"success": True, "message": "Employé activé"}), 200
-
+        
+        logger.info(f"✅ Pointage: {emp_prenom} {emp_nom} - {pointage_type} (is_active={new_is_active})")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
+            "pointageId": pointage_id,
+            "is_active": new_is_active
+        }), 201
+        
     except Exception as e:
-        logger.error(f"❌ activate_via_qr: {e}", exc_info=True)
+        logger.error(f"❌ add_pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === Route temporaire pour déboguer les requêtes HTTP erronées ===
-@app.route("/api/rssi-data", methods=["GET", "POST"])
-def receive_rssi_data_http():
-    logger.warning("⚠️ Requête HTTP reçue sur /api/rssi-data (WebSocket attendu)")
-    return jsonify({"success": False, "message": "Utilisez WebSocket (wss://) pour /api/rssi-data"}), 400
+@app.route("/api/pointages/history", methods=["GET"])
+def get_pointage_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date,
+                   e.email, e.telephone
+            FROM pointages p
+            LEFT JOIN employees e ON e.id = p.employee_id
+            ORDER BY p.timestamp DESC
+        """)
+        rows = cur.fetchall()
+
+        pointages = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        cur.close()
+        conn.close()
+        return jsonify({"success": True, "pointages": pointages}), 200
+    except Exception as e:
+        logger.error(f"❌ get_pointage_history: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # --- Démarrage ---
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))  # Port 8000 pour Koyeb
-    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)  # allow_unsafe pour SocketIO
+    port = int(os.getenv("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=False)
