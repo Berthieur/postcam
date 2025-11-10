@@ -153,6 +153,145 @@ def add_employee():
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+# === POST ajouter salaire ===
+@app.route("/api/salary", methods=["POST"])
+def add_salary():
+    data = request.get_json(silent=True)
+    logger.info(f"📥 Données reçues: {data}")
+
+    if not data:
+        logger.error("❌ Requête vide")
+        return jsonify({"success": False, "message": "Requête vide"}), 400
+
+    # ✅ CORRECTION : Accepter les deux formats (camelCase ET snake_case)
+    employee_id = data.get("employeeId") or data.get("employee_id")
+    employee_name = data.get("employeeName") or data.get("employee_name")
+    amount = data.get("amount")
+    record_type = data.get("type")
+    hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
+
+    # Validation des champs requis
+    if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
+        logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
+
+    if not amount:
+        logger.error(f"❌ amount manquant")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: amount"}), 400
+
+    if not record_type:
+        logger.error(f"❌ type manquant")
+        return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
+
+    # Validation du montant
+    try:
+        amount = float(amount)
+        if amount <= 0:
+            logger.error(f"❌ Montant invalide: {amount}")
+            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
+    except (ValueError, TypeError):
+        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
+        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Nettoyer le nom
+        employee_name = employee_name.strip()
+
+        # Si employee_id fourni, vérifier qu'il existe
+        if employee_id:
+            cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
+            employee = cur.fetchone()
+
+            if not employee:
+                logger.warning(f"⚠️ Employé {employee_id} non trouvé")
+        else:
+            # Chercher l'employé par nom
+            cur.execute(f"""
+                SELECT id FROM employees 
+                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
+                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
+                LIMIT 1
+            """, (employee_name, employee_name))
+            
+            employee = cur.fetchone()
+            
+            if employee:
+                employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
+                logger.info(f"✅ Employé trouvé par nom: {employee_id}")
+            else:
+                # Créer un nouvel employé si introuvable
+                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
+                emp_name_parts = employee_name.split(" ", 1)
+                prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
+                nom = emp_name_parts[1] if len(emp_name_parts) > 1 else employee_name
+                
+                employee_id = str(uuid.uuid4())
+                
+                cur.execute(f"""
+                    INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
+                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+                """, [employee_id, nom, prenom, "employe", 1, int(datetime.now().timestamp() * 1000)])
+                
+                logger.info(f"✅ Nouvel employé créé: {employee_id}")
+
+        # Préparer les données
+        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
+        period = data.get("period") or datetime.now().strftime("%Y-%m")
+        salary_id = data.get("id") or str(uuid.uuid4())
+
+        # ✅ CORRECTION : Vérifier si l'enregistrement existe déjà
+        cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
+        existing = cur.fetchone()
+
+        if existing:
+            logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
+            
+            # UPDATE au lieu de INSERT
+            cur.execute(f"""
+                UPDATE salaries 
+                SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
+                    amount = {PLACEHOLDER}, hours_worked = {PLACEHOLDER}, 
+                    type = {PLACEHOLDER}, period = {PLACEHOLDER}, date = {PLACEHOLDER}
+                WHERE id = {PLACEHOLDER}
+            """, [
+                employee_id, employee_name, amount, hours_worked,
+                record_type, period, salary_date, salary_id
+            ])
+            
+            action = "mis à jour"
+        else:
+            # INSERT normal
+            cur.execute(f"""
+                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
+                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            """, [
+                salary_id, employee_id, employee_name, amount, hours_worked,
+                record_type, period, salary_date
+            ])
+            
+            action = "créé"
+
+        conn.commit()
+        logger.info(f"✅ Salaire {action}: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
+
+        cur.close()
+        conn.close()
+        
+        return jsonify({
+            "success": True, 
+            "message": f"Salaire {action} avec succès", 
+            "id": salary_id,
+            "employeeId": employee_id,
+            "action": action
+        }), 201 if action == "créé" else 200
+
+    except Exception as e:
+        logger.error(f"❌ add_salary: {e}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
@@ -205,6 +344,47 @@ def delete_employee(id):
     except Exception as e:
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+# === GET historique salaires ===
+@app.route("/api/salary/history", methods=["GET"])
+def get_salary_history():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT s.id, s.employee_id, s.employee_name, s.amount, s.hours_worked, 
+                   s.type, s.period, s.date,
+                   e.email, e.telephone, e.taux_horaire, e.frais_ecolage,
+                   e.date_naissance, e.lieu_naissance
+            FROM salaries s
+            LEFT JOIN employees e ON e.id = s.employee_id
+            WHERE s.employee_id IS NOT NULL 
+              AND s.employee_name IS NOT NULL 
+              AND s.employee_name != ''
+              AND s.amount > 0
+            ORDER BY s.date DESC
+        """)
+        rows = cur.fetchall()
+
+        salaries = (
+            [dict(row) for row in rows] if DB_DRIVER == "postgres"
+            else [dict(zip([col[0] for col in cur.description], row)) for row in rows]
+        )
+
+        for record in salaries:
+            if record.get("hours_worked") is None:
+                record["hours_worked"] = 0.0
+            if record.get("period") is None:
+                record["period"] = ""
+
+        cur.close()
+        conn.close()
+        logger.info(f"📤 Historique salaires renvoyé: {len(salaries)} enregistrements")
+        return jsonify({"success": True, "salaries": salaries}), 200
+
+    except Exception as e:
+        logger.error(f"❌ get_salary_history: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
 
 # === Dashboard ===
 @app.route("/dashboard")
