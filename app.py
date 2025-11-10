@@ -417,6 +417,50 @@ def dashboard():
     except Exception as e:
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+@app.route("/api/pointages/recent", methods=["GET"])
+def get_recent_pointages():
+    """
+    Retourne les pointages des 10 dernières secondes
+    pour affichage temps réel sur LCD
+    """
+    try:
+        anchor_id = request.args.get("anchor_id")
+        threshold = int((datetime.now().timestamp() - 10) * 1000)
+        
+        conn = get_db()
+        cur = conn.cursor()
+        
+        cur.execute(f"""
+            SELECT p.employee_name, p.type, p.timestamp,
+                   e.nom, e.prenom
+            FROM pointages p
+            LEFT JOIN employees e ON e.id = p.employee_id
+            WHERE p.timestamp > {PLACEHOLDER}
+            ORDER BY p.timestamp DESC
+            LIMIT 1
+        """, (threshold,))
+        
+        row = cur.fetchone()
+        pointages = []
+        
+        if row:
+            pointage = {
+                "employee_name": row[0] if DB_DRIVER == "sqlite" else row['employee_name'],
+                "type": row[1] if DB_DRIVER == "sqlite" else row['type'],
+                "timestamp": row[2] if DB_DRIVER == "sqlite" else row['timestamp'],
+                "nom": row[3] if DB_DRIVER == "sqlite" else row['nom'],
+                "prenom": row[4] if DB_DRIVER == "sqlite" else row['prenom']
+            }
+            pointages.append(pointage)
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify({"success": True, "pointages": pointages}), 200
+        
+    except Exception as e:
+        logger.error(f"❌ get_recent_pointages: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 # ========== ROUTE HTTP POUR RSSI (REMPLACE WEBSOCKET) ==========
 @app.route("/api/rssi-data", methods=["POST"])
