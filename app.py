@@ -710,14 +710,22 @@ def sync_active_status():
     except Exception as e:
         logger.error(f"❌ sync_active_status: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-# === WebSocket pour RSSI ===
+# Modifier handle_rssi_connect
 @socketio.on('connect', namespace='/api/rssi-data')
 def handle_rssi_connect():
-    logger.info("📡 Client WebSocket connecté à /api/rssi-data")
-
+    logger.info(f"📡 Client connecté: {request.sid}")
+    logger.info(f"   Transport: {request.environ.get('HTTP_UPGRADE', 'N/A')}")
+    emit('connected', {'message': 'Bienvenue', 'sid': request.sid})
 @socketio.on('disconnect', namespace='/api/rssi-data')
 def handle_rssi_disconnect():
     logger.info("📡 Client WebSocket déconnecté de /api/rssi-data")
+socketio.on_error(namespace='/api/rssi-data')
+def error_handler(e):
+    logger.error(f"❌ Erreur SocketIO: {e}", exc_info=True)
+
+@socketio.on_error_default
+def default_error_handler(e):
+    logger.error(f"❌ Erreur SocketIO globale: {e}", exc_info=True)
 
 # 👇 Correction ici : on écoute 'rssi_data' (et non 'message')
 @socketio.on('rssi_data', namespace='/api/rssi-data')
