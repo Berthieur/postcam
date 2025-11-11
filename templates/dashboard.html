@@ -228,11 +228,47 @@
                 <div class="card-title">Statistiques</div>
                 <div class="card-desc">Tableaux de bord et analyses</div>
             </div>
-            <div class="card" onclick="openModal('trackingModal')">
-                <div class="card-icon"><i class="fas fa-map-marker-alt"></i></div>
-                <div class="card-title">Suivi Temps Réel</div>
-                <div class="card-desc">Localisation des employés</div>
+           <div id="trackingModal" class="modal">
+    <div class="modal-content" style="max-width: 1000px;">
+        <div class="modal-header">
+            <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel (Triangulation)</h2>
+            <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
+        </div>
+
+        <!-- Carte de localisation -->
+        <div style="position: relative; width: 100%; height: 500px; background: #0f172a; border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;">
+            <!-- Fond grille -->
+            <div style="position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px);"></div>
+
+            <!-- 3 Ancres fixes -->
+            <div id="anchorsContainer" style="position: relative; width: 100%; height: 100%;"></div>
+
+            <!-- Badges détectés -->
+            <div id="badgesContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+        </div>
+
+        <!-- Légende -->
+        <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
+                <i class="fas fa-broadcast-tower" style="font-size: 1.5rem; color: #00d4ff;"></i>
+                <span>Ancre</span>
             </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
+                <i class="fas fa-id-badge" style="font-size: 1.5rem; color: #00ff00;"></i>
+                <span>Badge actif</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: #ef4444;">
+                <i class="fas fa-circle" style="font-size: 0.8rem; color: #ef4444;"></i>
+                <span>Hors zone</span>
+            </div>
+        </div>
+
+        <!-- Liste des employés en temps réel -->
+        <div id="trackingList" style="margin-top: 1.5rem; max-height: 200px; overflow-y: auto;">
+            <p style="text-align: center; color: #94a3b8;">Chargement des positions...</p>
+        </div>
+    </div>
+</div>
             <div class="card" onclick="openModal('chatModal')">
                 <div class="card-icon"><i class="fas fa-robot"></i></div>
                 <div class="card-title">Assistant IA</div>
@@ -1220,6 +1256,116 @@
                 hideLoading();
             }
         }
+    const ANCHORS = [
+    { id: "A1", x: 0,   y: 0,   label: "Ancre 1" },
+    { id: "A2", x: 800, y: 0,   label: "Ancre 2" },
+    { id: "A3", x: 400, y: 600, label: "Ancre 3" }
+];
+
+const MAP_WIDTH = 800;
+const MAP_HEIGHT = 600;
+const SCALE = 1;
+
+// === CHARGEMENT DU SUIVI EN TEMPS RÉEL ===
+let trackingInterval = null;
+
+function initTrackingMap() {
+    const container = document.getElementById('anchorsContainer');
+    const badgesContainer = document.getElementById('badgesContainer');
+    container.innerHTML = '';
+    badgesContainer.innerHTML = '';
+
+    // Ajouter les 3 ancres
+    ANCHORS.forEach(anchor => {
+        const el = document.createElement('div');
+        el.style.position = 'absolute';
+        el.style.left = `${(anchor.x / MAP_WIDTH) * 100}%`;
+        el.style.top = `${(anchor.y / MAP_HEIGHT) * 100}%`;
+        el.style.transform = 'translate(-50%, -50%)';
+        el.style.textAlign = 'center';
+        el.style.color = '#00d4ff';
+        el.style.fontWeight = 'bold';
+        el.innerHTML = `
+            <div style="width: 50px; height: 50px; background: rgba(0,212,255,0.2); border: 3px solid #00d4ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px #00d4ff;">
+                <i class="fas fa-broadcast-tower" style="font-size: 1.8rem; color: #00d4ff;"></i>
+            </div>
+            <div style="margin-top: 8px; font-size: 0.9rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">${anchor.label}</div>
+        `;
+        container.appendChild(el);
+    });
+}
+
+async function updateTracking() {
+    try {
+        const res = await fetch(`${API_URL}/employees/active`);
+        const data = await res.json();
+
+        if (!data.success || !data.employees) {
+            document.getElementById('trackingList').innerHTML = '<p style="color:#ef4444;">Erreur de connexion au serveur.</p>';
+            return;
+        }
+
+        const badgesContainer = document.getElementById('badgesContainer');
+        const listContainer = document.getElementById('trackingList');
+        badgesContainer.innerHTML = '';
+        listContainer.innerHTML = '';
+
+        const now = Date.now();
+
+        data.employees.forEach(emp => {
+            const x = emp.last_position_x;
+            const y = emp.last_position_y;
+            const lastSeen = emp.last_seen;
+
+            const isActive = lastSeen && (now - lastSeen) < 10000; // < 10s
+
+            // Badge sur la carte
+            if (isActive && x !== null && y !== null) {
+                const badgeEl = document.createElement('div');
+                badgeEl.style.position = 'absolute';
+                badgeEl.style.left = `${(x / MAP_WIDTH) * 100}%`;
+                badgeEl.style.top = `${(y / MAP_HEIGHT) * 100}%`;
+                badgeEl.style.transform = 'translate(-50%, -50%)';
+                badgeEl.style.textAlign = 'center';
+                badgeEl.style.zIndex = 10;
+                badgeEl.innerHTML = `
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #00ff00; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 25px #00ff00; animation: pulse 2s infinite;">
+                        <i class="fas fa-id-badge" style="font-size: 1.5rem; color: white;"></i>
+                        <div style="font-size: 0.7rem; color: white; font-weight: bold; margin-top: 2px;">${emp.prenom}</div>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: bold; text-shadow: 0 1px 2px black;">
+                        (${Math.round(x)}, ${Math.round(y)})
+                    </div>
+                `;
+                badgesContainer.appendChild(badgeEl);
+            }
+
+            // Liste textuelle
+            const status = isActive ? 
+                `<span style="color:#10b981; font-weight:600;">En ligne</span> → (${x !== null ? Math.round(x) : '?'}, ${y !== null ? Math.round(y) : '?'})` :
+                `<span style="color:#ef4444;">Hors ligne</span>`;
+
+            const item = document.createElement('div');
+            item.className = 'employee-item';
+            item.innerHTML = `
+                <div>
+                    <div class="employee-name">${emp.prenom} ${emp.nom}</div>
+                    <span class="employee-type">${emp.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
+                </div>
+                <div style="font-size: 0.9rem; color: #e2e8f0;">${status}</div>
+            `;
+            listContainer.appendChild(item);
+        });
+
+        if (data.employees.length === 0) {
+            listContainer.innerHTML = '<p style="text-align:center; color:#94a3b8;">Aucun employé actif.</p>';
+        }
+
+    } catch (error) {
+        console.error('❌ Erreur tracking:', error);
+        document.getElementById('trackingList').innerHTML = '<p style="color:#ef4444;">Erreur de chargement.</p>';
+    }
+}
 
         // === EXPORT EXCEL ===
         function exportToExcel(data, filename) {
@@ -1419,6 +1565,11 @@
             if (id === 'pointagesModal') loadPointages();
             if (id === 'salaryModal') loadSalaryData();
             if (id === 'statsModal') loadStatistics();
+            if (id === 'trackingModal') {
+        initTrackingMap();
+        updateTracking();
+        trackingInterval = setInterval(updateTracking, 3000);
+    }
         }
         
         function closeModal(id) {
