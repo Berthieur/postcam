@@ -1252,17 +1252,16 @@
                 hideLoading();
             }
         }
-    const ANCHORS = [
-    { id: "A1", x: 0,   y: 0,   label: "Ancre 1" },
-    { id: "A2", x: 800, y: 0,   label: "Ancre 2" },
-    { id: "A3", x: 400, y: 600, label: "Ancre 3" }
+    // === CONSTANTES CORRECTES ===
+const ANCHORS = [
+    { id: 1, x: 0.2, y: 0.2, label: "Ancre 1" },
+    { id: 2, x: 0.2, y: 4.8, label: "Ancre 2" },
+    { id: 3, x: 5.8, y: 4.8, label: "Ancre 3" }
 ];
 
-const MAP_WIDTH = 800;
-const MAP_HEIGHT = 600;
-const SCALE = 1;
+const ROOM_WIDTH = 6;   // mètres
+const ROOM_HEIGHT = 5;  // mètres
 
-// === CHARGEMENT DU SUIVI EN TEMPS RÉEL ===
 let trackingInterval = null;
 
 function initTrackingMap() {
@@ -1271,24 +1270,28 @@ function initTrackingMap() {
     container.innerHTML = '';
     badgesContainer.innerHTML = '';
 
-    // Ajouter les 3 ancres
+    // Ajouter les 3 ancres avec VRAIES positions
     ANCHORS.forEach(anchor => {
         const el = document.createElement('div');
         el.style.position = 'absolute';
-        el.style.left = `${(anchor.x / MAP_WIDTH) * 100}%`;
-        el.style.top = `${(anchor.y / MAP_HEIGHT) * 100}%`;
+        el.style.left = `${(anchor.x / ROOM_WIDTH) * 100}%`;
+        el.style.top = `${(anchor.y / ROOM_HEIGHT) * 100}%`;
         el.style.transform = 'translate(-50%, -50%)';
         el.style.textAlign = 'center';
         el.style.color = '#00d4ff';
         el.style.fontWeight = 'bold';
+        el.style.zIndex = '5';
         el.innerHTML = `
             <div style="width: 50px; height: 50px; background: rgba(0,212,255,0.2); border: 3px solid #00d4ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px #00d4ff;">
                 <i class="fas fa-broadcast-tower" style="font-size: 1.8rem; color: #00d4ff;"></i>
             </div>
             <div style="margin-top: 8px; font-size: 0.9rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">${anchor.label}</div>
+            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.6);">(${anchor.x}, ${anchor.y})</div>
         `;
         container.appendChild(el);
     });
+    
+    console.log('🗺️ Carte initialisée avec', ANCHORS.length, 'ancres');
 }
 
 async function updateTracking() {
@@ -1297,7 +1300,8 @@ async function updateTracking() {
         const data = await res.json();
 
         if (!data.success || !data.employees) {
-            document.getElementById('trackingList').innerHTML = '<p style="color:#ef4444;">Erreur de connexion au serveur.</p>';
+            document.getElementById('trackingList').innerHTML = 
+                '<p style="color:#ef4444;">Erreur de connexion au serveur.</p>';
             return;
         }
 
@@ -1307,39 +1311,45 @@ async function updateTracking() {
         listContainer.innerHTML = '';
 
         const now = Date.now();
+        let activeCount = 0;
 
         data.employees.forEach(emp => {
             const x = emp.last_position_x;
             const y = emp.last_position_y;
             const lastSeen = emp.last_seen;
 
-            const isActive = lastSeen && (now - lastSeen) < 10000; // < 10s
+            // Employé actif si vu dans les 10 dernières secondes
+            const isActive = lastSeen && (now - lastSeen) < 10000;
 
-            // Badge sur la carte
-            if (isActive && x !== null && y !== null) {
+            // ✅ Badge sur la carte (UNIQUEMENT si position valide)
+            if (isActive && x !== null && y !== null && x >= 0 && y >= 0) {
                 const badgeEl = document.createElement('div');
                 badgeEl.style.position = 'absolute';
-                badgeEl.style.left = `${(x / MAP_WIDTH) * 100}%`;
-                badgeEl.style.top = `${(y / MAP_HEIGHT) * 100}%`;
+                badgeEl.style.left = `${(x / ROOM_WIDTH) * 100}%`;
+                badgeEl.style.top = `${(y / ROOM_HEIGHT) * 100}%`;
                 badgeEl.style.transform = 'translate(-50%, -50%)';
                 badgeEl.style.textAlign = 'center';
-                badgeEl.style.zIndex = 10;
+                badgeEl.style.zIndex = '10';
+                badgeEl.style.animation = 'pulse 2s infinite';
                 badgeEl.innerHTML = `
-                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #00ff00; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 25px #00ff00; animation: pulse 2s infinite;">
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #00ff00; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 25px #00ff00;">
                         <i class="fas fa-id-badge" style="font-size: 1.5rem; color: white;"></i>
                         <div style="font-size: 0.7rem; color: white; font-weight: bold; margin-top: 2px;">${emp.prenom}</div>
                     </div>
-                    <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: bold; text-shadow: 0 1px 2px black;">
-                        (${Math.round(x)}, ${Math.round(y)})
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: bold; text-shadow: 0 1px 2px black; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px;">
+                        ${x.toFixed(1)}m, ${y.toFixed(1)}m
                     </div>
                 `;
                 badgesContainer.appendChild(badgeEl);
+                activeCount++;
+                
+                console.log(`📍 ${emp.prenom} ${emp.nom}: (${x.toFixed(2)}, ${y.toFixed(2)})`);
             }
 
-            // Liste textuelle
-            const status = isActive ? 
-                `<span style="color:#10b981; font-weight:600;">En ligne</span> → (${x !== null ? Math.round(x) : '?'}, ${y !== null ? Math.round(y) : '?'})` :
-                `<span style="color:#ef4444;">Hors ligne</span>`;
+            // ✅ Liste textuelle
+            const status = isActive && x !== null && y !== null
+                ? `<span style="color:#10b981; font-weight:600;">● En ligne</span> → (${x.toFixed(1)}m, ${y.toFixed(1)}m)`
+                : `<span style="color:#ef4444;">○ Hors ligne</span>`;
 
             const item = document.createElement('div');
             item.className = 'employee-item';
@@ -1354,15 +1364,17 @@ async function updateTracking() {
         });
 
         if (data.employees.length === 0) {
-            listContainer.innerHTML = '<p style="text-align:center; color:#94a3b8;">Aucun employé actif.</p>';
+            listContainer.innerHTML = '<p style="text-align:center; color:#94a3b8;">Aucun employé enregistré.</p>';
+        } else {
+            console.log(`🎯 Tracking: ${activeCount}/${data.employees.length} employés visibles`);
         }
 
     } catch (error) {
         console.error('❌ Erreur tracking:', error);
-        document.getElementById('trackingList').innerHTML = '<p style="color:#ef4444;">Erreur de chargement.</p>';
+        document.getElementById('trackingList').innerHTML = 
+            '<p style="color:#ef4444;">Erreur de chargement.</p>';
     }
 }
-
         // === EXPORT EXCEL ===
         function exportToExcel(data, filename) {
             try {
