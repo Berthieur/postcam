@@ -7,6 +7,14 @@ import uuid
 import math
 from collections import defaultdict
 
+# === Import NumPy/SciPy pour calculs précis ===
+try:
+    import numpy as np
+    from scipy.optimize import least_squares
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+
 # === Configuration Flask ===
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "3fb5222037e2be9d7d09019e1b46e268ec470fa2974a3981")
@@ -15,6 +23,12 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 # === Logger ===
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# === Vérification NumPy/SciPy ===
+if NUMPY_AVAILABLE:
+    logger.info("✅ NumPy et SciPy disponibles pour calculs précis")
+else:
+    logger.warning("⚠️ NumPy/SciPy non disponibles, utilisation de math standard")
 
 # === DB imports ===
 try:
@@ -153,6 +167,7 @@ def add_employee():
     except Exception as e:
         logger.error(f"❌ add_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 # === POST ajouter salaire ===
 @app.route("/api/salary", methods=["POST"])
 def add_salary():
@@ -163,14 +178,12 @@ def add_salary():
         logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
 
-    # ✅ CORRECTION : Accepter les deux formats (camelCase ET snake_case)
     employee_id = data.get("employeeId") or data.get("employee_id")
     employee_name = data.get("employeeName") or data.get("employee_name")
     amount = data.get("amount")
     record_type = data.get("type")
     hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
 
-    # Validation des champs requis
     if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
         logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
         return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
@@ -183,7 +196,6 @@ def add_salary():
         logger.error(f"❌ type manquant")
         return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
 
-    # Validation du montant
     try:
         amount = float(amount)
         if amount <= 0:
@@ -197,10 +209,8 @@ def add_salary():
         conn = get_db()
         cur = conn.cursor()
 
-        # Nettoyer le nom
         employee_name = employee_name.strip()
 
-        # Si employee_id fourni, vérifier qu'il existe
         if employee_id:
             cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
             employee = cur.fetchone()
@@ -208,7 +218,6 @@ def add_salary():
             if not employee:
                 logger.warning(f"⚠️ Employé {employee_id} non trouvé")
         else:
-            # Chercher l'employé par nom
             cur.execute(f"""
                 SELECT id FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
@@ -222,7 +231,6 @@ def add_salary():
                 employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
                 logger.info(f"✅ Employé trouvé par nom: {employee_id}")
             else:
-                # Créer un nouvel employé si introuvable
                 logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
                 emp_name_parts = employee_name.split(" ", 1)
                 prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
@@ -237,19 +245,16 @@ def add_salary():
                 
                 logger.info(f"✅ Nouvel employé créé: {employee_id}")
 
-        # Préparer les données
         salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
         period = data.get("period") or datetime.now().strftime("%Y-%m")
         salary_id = data.get("id") or str(uuid.uuid4())
 
-        # ✅ CORRECTION : Vérifier si l'enregistrement existe déjà
         cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
         existing = cur.fetchone()
 
         if existing:
             logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
             
-            # UPDATE au lieu de INSERT
             cur.execute(f"""
                 UPDATE salaries 
                 SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
@@ -263,7 +268,6 @@ def add_salary():
             
             action = "mis à jour"
         else:
-            # INSERT normal
             cur.execute(f"""
                 INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
@@ -291,7 +295,6 @@ def add_salary():
     except Exception as e:
         logger.error(f"❌ add_salary: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-
 
 # === PUT modifier employé ===
 @app.route("/api/employees/<id>", methods=["PUT"])
@@ -344,6 +347,7 @@ def delete_employee(id):
     except Exception as e:
         logger.error(f"❌ delete_employee: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+
 # === GET historique salaires ===
 @app.route("/api/salary/history", methods=["GET"])
 def get_salary_history():
@@ -385,7 +389,6 @@ def get_salary_history():
         logger.error(f"❌ get_salary_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-
 # === Dashboard ===
 @app.route("/dashboard")
 def dashboard():
@@ -418,8 +421,7 @@ def dashboard():
         logger.error(f"❌ dashboard: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-
-# ========== ROUTE HTTP POUR RSSI (REMPLACE WEBSOCKET) ==========
+# ========== ROUTE HTTP POUR RSSI ==========
 @app.route("/api/rssi-data", methods=["POST"])
 def receive_rssi_data_http():
     """
@@ -464,7 +466,6 @@ def receive_rssi_data_http():
             
             employee_name = ssid.strip()
             
-            # Chercher l'employé
             cur.execute(f"""
                 SELECT id, nom, prenom FROM employees 
                 WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER}
@@ -480,7 +481,6 @@ def receive_rssi_data_http():
             
             employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
             
-            # Insérer mesure RSSI
             cur.execute(f"""
                 INSERT INTO rssi_measurements (employee_id, anchor_id, anchor_x, anchor_y, rssi, mac, timestamp)
                 VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
@@ -494,7 +494,6 @@ def receive_rssi_data_http():
         
         conn.commit()
         
-        # Calculer positions si au moins 1 badge traité
         if processed > 0:
             calculate_and_broadcast_positions(cur)
             conn.commit()
@@ -514,10 +513,120 @@ def receive_rssi_data_http():
         logger.error(f"❌ receive_rssi_data_http: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === Calcul et diffusion des positions ===
+# ========== FONCTIONS DE CALCUL OPTIMISÉES ==========
+
+def rssi_to_distance(rssi, tx_power=-59, n=2.5):
+    """
+    Convertit un RSSI en distance estimée (mètres).
+    Modèle de propagation: d = 10^((TxPower - RSSI) / (10 * n))
+    
+    Args:
+        rssi: Signal reçu en dBm
+        tx_power: Puissance d'émission de référence à 1m (calibré)
+        n: Exposant de perte de trajet (2.0 = espace libre, 2.5-3.5 = intérieur)
+    """
+    if rssi == 0:
+        return -1.0
+    
+    # Filtrage des valeurs aberrantes
+    if rssi > -30 or rssi < -100:
+        logger.warning(f"⚠️ RSSI hors limites: {rssi} dBm")
+        rssi = max(-100, min(-30, rssi))
+    
+    ratio = (tx_power - rssi) / (10 * n)
+    distance = math.pow(10, ratio)
+    
+    # Limite la distance max à 15m pour éviter les valeurs aberrantes
+    return round(min(distance, 15.0), 2)
+
+def trilateration_numpy(anchors):
+    """
+    Trilatération optimisée avec NumPy/SciPy (moindres carrés non linéaires).
+    Résout le système: min Σ((x - xi)² + (y - yi)² - ri²)²
+    """
+    if len(anchors) < 3:
+        return (anchors[0]['x'], anchors[0]['y'])
+    
+    # Préparer les données
+    positions = np.array([[a['x'], a['y']] for a in anchors])
+    distances = np.array([a['distance'] for a in anchors])
+    
+    # Fonction objectif pour least_squares
+    def equations(p, positions, distances):
+        x, y = p
+        return np.sqrt((positions[:, 0] - x)**2 + (positions[:, 1] - y)**2) - distances
+    
+    # Point initial = centroïde pondéré par inverse des distances
+    weights = 1.0 / (distances + 0.1)  # Éviter division par zéro
+    x_init = np.sum(positions[:, 0] * weights) / np.sum(weights)
+    y_init = np.sum(positions[:, 1] * weights) / np.sum(weights)
+    
+    # Résolution par moindres carrés
+    result = least_squares(
+        equations, 
+        [x_init, y_init], 
+        args=(positions, distances),
+        method='lm',  # Levenberg-Marquardt
+        max_nfev=100
+    )
+    
+    x, y = result.x
+    
+    # Limiter aux dimensions de la zone (0-6m × 0-5m)
+    x = max(0.0, min(6.0, x))
+    y = max(0.0, min(5.0, y))
+    
+    return round(x, 2), round(y, 2)
+
+def trilateration_basic(anchors):
+    """
+    Trilatération géométrique classique (fallback si NumPy indisponible).
+    """
+    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
+
+    (x1, y1, r1), (x2, y2, r2), (x3, y3, r3) = \
+        (anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']), \
+        (anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']), \
+        (anchors[2]['x'], anchors[2]['y'], anchors[2]['distance'])
+
+    A = 2*(x2 - x1)
+    B = 2*(y2 - y1)
+    C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
+    D = 2*(x3 - x2)
+    E = 2*(y3 - y2)
+    F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
+
+    denom = (A*E - B*D)
+    if abs(denom) < 1e-6:  # Éviter division par zéro
+        return (x1, y1)
+
+    x = (C*E - B*F) / denom
+    y = (A*F - C*D) / denom
+    
+    # Limiter aux dimensions de la zone
+    x = max(0.0, min(6.0, x))
+    y = max(0.0, min(5.0, y))
+    
+    return round(x, 2), round(y, 2)
+
+def trilateration(anchors):
+    """
+    Point d'entrée principal pour la trilatération.
+    Utilise NumPy si disponible, sinon méthode géométrique.
+    """
+    if NUMPY_AVAILABLE:
+        try:
+            return trilateration_numpy(anchors)
+        except Exception as e:
+            logger.warning(f"⚠️ Échec trilatération NumPy: {e}, utilisation méthode basique")
+            return trilateration_basic(anchors)
+    else:
+        return trilateration_basic(anchors)
+
 def calculate_and_broadcast_positions(cursor):
     """
-    Calcule la position de chaque employé actif via trilatération
+    Calcule la position de chaque employé actif via trilatération optimisée.
+    Applique un filtre de lissage exponentiel pour stabiliser les positions.
     """
     threshold = int((datetime.now().timestamp() - 5) * 1000)
 
@@ -543,16 +652,40 @@ def calculate_and_broadcast_positions(cursor):
         rssi = row[4] if DB_DRIVER == "sqlite" else row['rssi']
 
         distance = rssi_to_distance(rssi)
-        employee_data[emp_id].append({
-            'anchor_id': anchor_id,
-            'x': anchor_x,
-            'y': anchor_y,
-            'distance': distance
-        })
+        
+        if distance > 0:  # Ignorer les mesures invalides
+            employee_data[emp_id].append({
+                'anchor_id': anchor_id,
+                'x': anchor_x,
+                'y': anchor_y,
+                'distance': distance,
+                'rssi': rssi
+            })
 
     for emp_id, anchors in employee_data.items():
         if len(anchors) >= 3:
-            pos_x, pos_y = trilateration(anchors)
+            # Calculer nouvelle position
+            new_x, new_y = trilateration(anchors)
+            
+            # Récupérer ancienne position pour lissage
+            cursor.execute(f"""
+                SELECT last_position_x, last_position_y 
+                FROM employees 
+                WHERE id = {PLACEHOLDER}
+            """, (emp_id,))
+            
+            old_pos = cursor.fetchone()
+            
+            if old_pos and old_pos[0] is not None and old_pos[1] is not None:
+                old_x = old_pos[0] if DB_DRIVER == "sqlite" else old_pos['last_position_x']
+                old_y = old_pos[1] if DB_DRIVER == "sqlite" else old_pos['last_position_y']
+                
+                # Filtre de lissage exponentiel (alpha=0.3 pour réactivité/stabilité)
+                alpha = 0.3
+                pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
+                pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
+            else:
+                pos_x, pos_y = new_x, new_y
 
             cursor.execute(f"""
                 UPDATE employees
@@ -561,7 +694,11 @@ def calculate_and_broadcast_positions(cursor):
             """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
 
             logger.info(f"   📍 Position employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
-            
+        else:
+            logger.info(f"   ⚠️ Employé {emp_id}: seulement {len(anchors)} ancres (min 3 requis)")
+
+# ========== AUTRES ROUTES ==========
+
 @app.route("/api/pointages/recent", methods=["GET"])
 def get_recent_pointages():
     """
@@ -575,7 +712,6 @@ def get_recent_pointages():
         conn = get_db()
         cur = conn.cursor()
         
-        # ✅ AJOUT DE p.id pour éviter les doublons
         cur.execute(f"""
             SELECT p.id, p.employee_name, p.type, p.timestamp,
                    e.nom, e.prenom
@@ -592,7 +728,7 @@ def get_recent_pointages():
         if row:
             if DB_DRIVER == "sqlite":
                 pointage = {
-                    "id": row[0],  # ✅ AJOUTÉ
+                    "id": row[0],
                     "employee_name": row[1],
                     "type": row[2],
                     "timestamp": row[3],
@@ -601,7 +737,7 @@ def get_recent_pointages():
                 }
             else:
                 pointage = {
-                    "id": row['id'],  # ✅ AJOUTÉ
+                    "id": row['id'],
                     "employee_name": row['employee_name'],
                     "type": row['type'],
                     "timestamp": row['timestamp'],
@@ -613,7 +749,6 @@ def get_recent_pointages():
         cur.close()
         conn.close()
         
-        # ✅ AJOUT DE LOGS POUR DEBUG
         if pointages:
             logger.info(f"📺 Pointage récent trouvé: {pointages[0]['prenom']} {pointages[0]['nom']} - {pointages[0]['type']}")
         else:
@@ -624,38 +759,7 @@ def get_recent_pointages():
     except Exception as e:
         logger.error(f"❌ get_recent_pointages: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
-def rssi_to_distance(rssi, tx_power=-59, n=2.0):
-    """Convertit un RSSI en distance estimée (mètres)."""
-    if rssi == 0:
-        return -1.0
-    ratio = (tx_power - rssi) / (10 * n)
-    return round(math.pow(10, ratio), 2)
 
-def trilateration(anchors):
-    """Calcule la position (x, y) à partir de 3 ancres RSSI."""
-    anchors = sorted(anchors, key=lambda x: x['distance'])[:3]
-
-    (x1, y1, r1), (x2, y2, r2), (x3, y3, r3) = \
-        (anchors[0]['x'], anchors[0]['y'], anchors[0]['distance']), \
-        (anchors[1]['x'], anchors[1]['y'], anchors[1]['distance']), \
-        (anchors[2]['x'], anchors[2]['y'], anchors[2]['distance'])
-
-    A = 2*(x2 - x1)
-    B = 2*(y2 - y1)
-    C = r1**2 - r2**2 - x1**2 + x2**2 - y1**2 + y2**2
-    D = 2*(x3 - x2)
-    E = 2*(y3 - y2)
-    F = r2**2 - r3**2 - x2**2 + x3**2 - y2**2 + y3**2
-
-    denom = (A*E - B*D)
-    if denom == 0:
-        return (x1, y1)
-
-    x = (C*E - B*F) / denom
-    y = (A*F - C*D) / denom
-    return round(x, 2), round(y, 2)
-
-# === GET employés actifs ===
 @app.route("/api/employees/active", methods=["GET"])
 def get_active_employees():
     try:
@@ -683,7 +787,6 @@ def get_active_employees():
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === Pointages ===
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
