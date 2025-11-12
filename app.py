@@ -676,14 +676,23 @@ def calculate_and_broadcast_positions(cursor):
             
             old_pos = cursor.fetchone()
             
-            if old_pos and old_pos[0] is not None and old_pos[1] is not None:
-                old_x = old_pos[0] if DB_DRIVER == "sqlite" else old_pos['last_position_x']
-                old_y = old_pos[1] if DB_DRIVER == "sqlite" else old_pos['last_position_y']
+            if old_pos:
+                # Gestion compatible SQLite et PostgreSQL
+                if DB_DRIVER == "sqlite":
+                    old_x = old_pos[0]
+                    old_y = old_pos[1]
+                else:  # PostgreSQL
+                    old_x = old_pos['last_position_x']
+                    old_y = old_pos['last_position_y']
                 
-                # Filtre de lissage exponentiel (alpha=0.3 pour réactivité/stabilité)
-                alpha = 0.3
-                pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
-                pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
+                # Vérifier que les valeurs ne sont pas NULL
+                if old_x is not None and old_y is not None:
+                    # Filtre de lissage exponentiel (alpha=0.3 pour réactivité/stabilité)
+                    alpha = 0.3
+                    pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
+                    pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
+                else:
+                    pos_x, pos_y = new_x, new_y
             else:
                 pos_x, pos_y = new_x, new_y
 
