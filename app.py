@@ -629,7 +629,8 @@ def calculate_and_broadcast_positions(cursor):
     Calcule la position de chaque employé actif via trilatération optimisée.
     Applique un filtre de lissage exponentiel pour stabiliser les positions.
     """
-    threshold = int((datetime.now().timestamp() - 5) * 1000)
+    # ✅ Fenêtre élargie à 8 secondes pour plus de stabilité
+    threshold = int((datetime.now().timestamp() - 8) * 1000)
 
     cursor.execute(f"""
         SELECT employee_id, anchor_id, anchor_x, anchor_y, rssi
@@ -654,7 +655,7 @@ def calculate_and_broadcast_positions(cursor):
 
         distance = rssi_to_distance(rssi)
         
-        if distance > 0:  # Ignorer les mesures invalides
+        if distance > 0:
             employee_data[emp_id].append({
                 'anchor_id': anchor_id,
                 'x': anchor_x,
@@ -665,8 +666,33 @@ def calculate_and_broadcast_positions(cursor):
 
     for emp_id, anchors in employee_data.items():
         if len(anchors) >= 3:
+            # ✅ Moyenner les mesures par ancre pour réduire le bruit
+            anchor_averages = defaultdict(lambda: {'x': 0, 'y': 0, 'distances': [], 'count': 0})
+            
+            for anchor in anchors:
+                aid = anchor['anchor_id']
+                anchor_averages[aid]['x'] = anchor['x']
+                anchor_averages[aid]['y'] = anchor['y']
+                anchor_averages[aid]['distances'].append(anchor['distance'])
+                anchor_averages[aid]['count'] += 1
+            
+            # Calculer distance moyenne par ancre
+            averaged_anchors = []
+            for aid, data in anchor_averages.items():
+                avg_distance = sum(data['distances']) / len(data['distances'])
+                averaged_anchors.append({
+                    'anchor_id': aid,
+                    'x': data['x'],
+                    'y': data['y'],
+                    'distance': avg_distance
+                })
+            
+            if len(averaged_anchors) < 3:
+                logger.info(f"   ⚠️ Employé {emp_id}: seulement {len(averaged_anchors)} ancres après moyennage")
+                continue
+            
             # Calculer nouvelle position
-            new_x, new_y = trilateration(anchors)
+            new_x, new_y = trilateration(averaged_anchors)
             
             # Récupérer ancienne position pour lissage
             cursor.execute(f"""
@@ -678,22 +704,27 @@ def calculate_and_broadcast_positions(cursor):
             old_pos = cursor.fetchone()
             
             if old_pos:
-                # Gestion compatible SQLite et PostgreSQL
                 if DB_DRIVER == "sqlite":
                     old_x = old_pos[0]
                     old_y = old_pos[1]
-                else:  # PostgreSQL
+                else:
                     old_x = old_pos['last_position_x']
                     old_y = old_pos['last_position_y']
                 
-                # Vérifier que les valeurs ne sont pas NULL
                 if old_x is not None and old_y is not None:
-                    # Filtre de lissage exponentiel (alpha=0.3 pour réactivité/stabilité)
-                    alpha = 0.3
+                    # ✅ Filtre plus fort (alpha=0.15 au lieu de 0.3)
+                    # Plus stable, moins réactif aux variations
+                    alpha = 0.15
                     pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
                     pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
                     
-                    # ✅ Convertir en float Python si NumPy
+                    # ✅ Seuil de mise à jour: ignorer si mouvement < 20cm
+                    distance_moved = ((pos_x - old_x)**2 + (pos_y - old_y)**2)**0.5
+                    
+                    if distance_moved < 0.2:  # Moins de 20cm
+                        logger.info(f"   🔒 Employé {emp_id}: mouvement négligeable ({distance_moved:.2f}m), position maintenue")
+                        continue  # Ne pas mettre à jour
+                    
                     pos_x = float(pos_x)
                     pos_y = float(pos_y)
                 else:
