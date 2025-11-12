@@ -576,7 +576,8 @@ def trilateration_numpy(anchors):
     x = max(0.0, min(6.0, x))
     y = max(0.0, min(5.0, y))
     
-    return round(x, 2), round(y, 2)
+    # ✅ IMPORTANT: Convertir np.float64 en float Python pour PostgreSQL
+    return round(float(x), 2), round(float(y), 2)
 
 def trilateration_basic(anchors):
     """
@@ -691,10 +692,14 @@ def calculate_and_broadcast_positions(cursor):
                     alpha = 0.3
                     pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
                     pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
+                    
+                    # ✅ Convertir en float Python si NumPy
+                    pos_x = float(pos_x)
+                    pos_y = float(pos_y)
                 else:
-                    pos_x, pos_y = new_x, new_y
+                    pos_x, pos_y = float(new_x), float(new_y)
             else:
-                pos_x, pos_y = new_x, new_y
+                pos_x, pos_y = float(new_x), float(new_y)
 
             cursor.execute(f"""
                 UPDATE employees
