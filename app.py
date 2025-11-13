@@ -628,6 +628,7 @@ def calculate_and_broadcast_positions(cursor):
     """
     Calcule la position de chaque employé actif via trilatération optimisée.
     Applique un filtre de lissage exponentiel pour stabiliser les positions.
+    NOUVEAU: Seuil adaptatif selon qualité du signal RSSI.
     """
     # ✅ Fenêtre élargie à 8 secondes pour plus de stabilité
     threshold = int((datetime.now().timestamp() - 8) * 1000)
@@ -667,29 +668,53 @@ def calculate_and_broadcast_positions(cursor):
     for emp_id, anchors in employee_data.items():
         if len(anchors) >= 3:
             # ✅ Moyenner les mesures par ancre pour réduire le bruit
-            anchor_averages = defaultdict(lambda: {'x': 0, 'y': 0, 'distances': [], 'count': 0})
+            anchor_averages = defaultdict(lambda: {'x': 0, 'y': 0, 'distances': [], 'rssis': [], 'count': 0})
             
             for anchor in anchors:
                 aid = anchor['anchor_id']
                 anchor_averages[aid]['x'] = anchor['x']
                 anchor_averages[aid]['y'] = anchor['y']
                 anchor_averages[aid]['distances'].append(anchor['distance'])
+                anchor_averages[aid]['rssis'].append(anchor['rssi'])
                 anchor_averages[aid]['count'] += 1
             
             # Calculer distance moyenne par ancre
             averaged_anchors = []
+            all_rssis = []
+            
             for aid, data in anchor_averages.items():
                 avg_distance = sum(data['distances']) / len(data['distances'])
+                avg_rssi = sum(data['rssis']) / len(data['rssis'])
+                
                 averaged_anchors.append({
                     'anchor_id': aid,
                     'x': data['x'],
                     'y': data['y'],
-                    'distance': avg_distance
+                    'distance': avg_distance,
+                    'rssi': avg_rssi
                 })
+                all_rssis.append(avg_rssi)
             
             if len(averaged_anchors) < 3:
                 logger.info(f"   ⚠️ Employé {emp_id}: seulement {len(averaged_anchors)} ancres après moyennage")
                 continue
+            
+            # ✅ NOUVEAU: Calculer qualité moyenne des signaux
+            avg_rssi = sum(all_rssis) / len(all_rssis)
+            
+            # Classifier la qualité du signal
+            if avg_rssi > -60:
+                signal_quality = "excellent"
+                movement_threshold = 0.05  # 5cm - très précis
+                alpha = 0.20  # Plus réactif
+            elif avg_rssi > -70:
+                signal_quality = "good"
+                movement_threshold = 0.10  # 10cm - bon équilibre
+                alpha = 0.15  # Équilibré
+            else:
+                signal_quality = "weak"
+                movement_threshold = 0.20  # 20cm - plus stable
+                alpha = 0.10  # Très stable
             
             # Calculer nouvelle position
             new_x, new_y = trilateration(averaged_anchors)
@@ -712,25 +737,36 @@ def calculate_and_broadcast_positions(cursor):
                     old_y = old_pos['last_position_y']
                 
                 if old_x is not None and old_y is not None:
-                    # ✅ Filtre plus fort (alpha=0.15 au lieu de 0.3)
-                    # Plus stable, moins réactif aux variations
-                    alpha = 0.15
+                    # ✅ Filtre adaptatif selon qualité signal
                     pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
                     pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
                     
-                    # ✅ Seuil de mise à jour: ignorer si mouvement < 20cm
+                    # ✅ Seuil de mise à jour adaptatif
                     distance_moved = ((pos_x - old_x)**2 + (pos_y - old_y)**2)**0.5
                     
-                    if distance_moved < 0.2:  # Moins de 20cm
-                        logger.info(f"   🔒 Employé {emp_id}: mouvement négligeable ({distance_moved:.2f}m), position maintenue")
+                    if distance_moved < movement_threshold:
+                        logger.info(
+                            f"   🔒 Employé {emp_id}: mouvement négligeable "
+                            f"({distance_moved:.2f}m < {movement_threshold}m), "
+                            f"signal={signal_quality} ({avg_rssi:.0f}dBm), position maintenue"
+                        )
                         continue  # Ne pas mettre à jour
                     
+                    # Conversion pour PostgreSQL
                     pos_x = float(pos_x)
                     pos_y = float(pos_y)
+                    
+                    logger.info(
+                        f"   📍 Position employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f}) "
+                        f"[mouvement={distance_moved:.2f}m, signal={signal_quality}, "
+                        f"RSSI={avg_rssi:.0f}dBm, alpha={alpha}]"
+                    )
                 else:
                     pos_x, pos_y = float(new_x), float(new_y)
+                    logger.info(f"   📍 Position initiale employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
             else:
                 pos_x, pos_y = float(new_x), float(new_y)
+                logger.info(f"   📍 Première position employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
 
             cursor.execute(f"""
                 UPDATE employees
@@ -738,10 +774,8 @@ def calculate_and_broadcast_positions(cursor):
                 WHERE id = {PLACEHOLDER}
             """, [pos_x, pos_y, int(datetime.now().timestamp() * 1000), emp_id])
 
-            logger.info(f"   📍 Position employé {emp_id}: ({pos_x:.2f}, {pos_y:.2f})")
         else:
             logger.info(f"   ⚠️ Employé {emp_id}: seulement {len(anchors)} ancres (min 3 requis)")
-
 # ========== AUTRES ROUTES ==========
 
 @app.route("/api/pointages/recent", methods=["GET"])
