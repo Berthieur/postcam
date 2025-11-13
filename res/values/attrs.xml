@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="ViewfinderView">
+        <attr name="zxing_viewfinder_laser_color" format="color" />
+        <attr name="zxing_viewfinder_mask_color" format="color" />
+        <attr name="zxing_viewfinder_border_color" format="color" />
+        <attr name="zxing_viewfinder_border_width" format="dimension" />
+        <attr name="zxing_viewfinder_border_length" format="dimension" />
+        <attr name="zxing_viewfinder_border_corner_rounded" format="boolean" />
+    </declare-styleable>
+</resources>

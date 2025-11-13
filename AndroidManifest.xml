@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <!-- PERMISSIONS FOREGROUND SERVICE (Android 14+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TrackingSystem"
+        android:usesCleartextTraffic="true"
+        tools:targetApi="31">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".EmployeeListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity
+            android:name=".QRScanActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+
+        <activity
+            android:name=".TrackingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity
+            android:name=".SalaryManagementActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity
+            android:name=".StatisticsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity
+            android:name=".EditEmployeeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity
+            android:name=".QRCodeDisplayActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <!-- Nouvelle activité pour le chat IA -->
+        <activity
+            android:name=".IAChatActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+
+        <activity android:name=".PointageReceiverActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem"/>
+
+        <!-- Déclaration de la nouvelle activité ESP32-CAM -->
+        <activity android:name=".Esp32CamActivity"
+            android:exported="false"
+            android:theme="@style/Theme.TrackingSystem" />
+    </application>
+
+</manifest>

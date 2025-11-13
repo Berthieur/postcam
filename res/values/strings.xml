@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Système de Suivi</string>
+    <string name="login">Connexion</string>
+    <string name="username">Nom d\'utilisateur</string>
+    <string name="password">Mot de passe</string>
+    <string name="login_button">Se connecter</string>
+    <string name="scan_qr">Scanner QR</string>
+    <string name="tracking">Suivi</string>
+    <string name="salary_management">Gestion Salaires</string>
+    <string name="statistics">Statistiques</string>
+    <string name="logout">Déconnexion</string>
+    <string name="employee_name">Nom de l\'employé</string>
+    <string name="mac_address">Adresse MAC</string>
+    <string name="generate_qr">Générer QR</string>
+    <string name="save_employee">Enregistrer</string>
+    <string name="forbidden_zone_alert">Zone interdite détectée!</string>
+    <string name="employee_in_forbidden_zone">L\'employé %s est entré dans une zone interdite</string>
+    <string name="salary">Salaire</string>
+    <string name="hours_worked">Heures travaillées</string>
+    <string name="calculate_salary">Calculer Salaire</string>
+    <string name="time_in_zone">Temps dans la zone</string>
+    <string name="movement_history">Historique des déplacements</string>
+    <string name="invalid_credentials">Identifiants invalides</string>
+    <string name="connection_error">Erreur de connexion</string>
+    <string name="qr_scan_success">QR scanné avec succès</string>
+    <string name="qr_scan_error">Erreur lors du scan QR</string>
+    <string name="nom">Nom</string>
+    <string name="prenom">Prénom</string>
+    <string name="date_naissance">Date de naissance</string>
+    <string name="lieu_naissance">Lieu de naissance</string>
+    <string name="telephone">Numéro de téléphone</string>
+    <string name="email">Adresse e-mail</string>
+    <string name="profession">Profession</string>
+    <string name="prompt_ia_chat_hint">Tapez votre question ici...</string>
+    <string name="send_button_content_description">Envoyer un message</string>
+    <string name="pointage_receiver">Réception des pointages</string>
+    <string name="parametre">Paramètres</string>
+</resources>
