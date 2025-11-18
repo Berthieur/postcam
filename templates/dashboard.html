@@ -834,51 +834,306 @@
             }
         }
 
-        // === QR CODE (CORRIGÉ POUR ANDROID) ===
-        function showQRCode(id, name) {
-            console.log('📸 Affichage QR pour:', name, id);
-            
-            const container = document.getElementById('qrCodeContainer');
-            const img = document.getElementById('qrImage');
-            
-            // Nettoyer le conteneur
-            container.innerHTML = '';
-            img.style.display = 'none';
-            
-            // ✅ FORMAT JSON POUR ANDROID (comme dans le code Java)
-            const qrData = JSON.stringify({
-                id: id,
-                name: name
-            });
-            
-            // Essayer de générer avec QRCode.js
-            if (window.QRCode) {
-                try {
-                    new QRCode(container, {
-                        text: qrData,
-                        width: 300,
-                        height: 300,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff"
-                    });
-                    console.log('✅ QR généré avec QRCode.js:', qrData);
-                } catch (error) {
-                    console.error('❌ Erreur QRCode.js:', error);
-                    // Fallback sur API externe
-                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                    img.style.display = 'block';
-                    container.style.display = 'none';
-                }
-            } else {
-                // Fallback sur API externe
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                img.style.display = 'block';
-            }
-            
-            document.getElementById('qrName').textContent = name;
-            openModal('qrModal');
-        }
+        // === SCANNER QR WEBCAM (Compatible avec Android) ===
 
+let videoStream = null;
+let scanInterval = null;
+let isScanning = false;
+
+async function startCamera() {
+    if (isScanning) {
+        console.log('⚠️ Scanner déjà actif');
+        return;
+    }
+
+    try {
+        // Demander accès caméra arrière si possible
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: { ideal: 'environment' }, // Caméra arrière préférée
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        
+        const video = document.getElementById('scanner-video');
+        video.srcObject = videoStream;
+        
+        // Attendre que la vidéo soit prête
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
+        });
+        
+        isScanning = true;
+        console.log('📷 Caméra démarrée');
+        
+        // Scanner toutes les 300ms pour meilleure réactivité
+        scanInterval = setInterval(() => scanQRCode(video), 300);
+        
+        document.getElementById('scan-result').innerHTML = 
+            '<p style="color: #10b981; font-weight: 600;">📷 Scanner actif - Présentez un QR Code</p>';
+            
+    } catch (error) {
+        console.error('❌ Erreur caméra:', error);
+        
+        let errorMsg = 'Impossible d\'accéder à la caméra.';
+        if (error.name === 'NotAllowedError') {
+            errorMsg = 'Permission caméra refusée. Autorisez l\'accès dans les paramètres du navigateur.';
+        } else if (error.name === 'NotFoundError') {
+            errorMsg = 'Aucune caméra détectée sur cet appareil.';
+        }
+        
+        document.getElementById('scan-result').innerHTML = 
+            `<p style="color: #ef4444; font-weight: 600;">❌ ${errorMsg}</p>`;
+    }
+}
+
+function stopCamera() { 
+    if (videoStream) { 
+        videoStream.getTracks().forEach(track => track.stop()); 
+        videoStream = null;
+    }
+    
+    if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+    }
+    
+    isScanning = false;
+    
+    const video = document.getElementById('scanner-video');
+    if (video) video.srcObject = null;
+    
+    console.log('📷 Caméra arrêtée');
+    
+    document.getElementById('scan-result').innerHTML = '';
+}
+
+function scanQRCode(video) {
+    if (!window.jsQR || !video.videoWidth || !video.videoHeight) {
+        return;
+    }
+    
+    try {
+        // Créer canvas temporaire pour analyser l'image
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth; 
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext('2d'); 
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, canvas.width, canvas.height, {
+            inversionAttempts: "dontInvert" // Optimisation
+        });
+        
+        if (code && code.data) { 
+            console.log('✅ QR Code détecté:', code.data);
+            handleQRScan(code.data); 
+            stopCamera(); // Arrêter après scan réussi
+        }
+    } catch (error) {
+        console.error('❌ Erreur analyse QR:', error);
+    }
+}
+
+// ✅ Fonction corrigée - Compatible avec format Android
+async function handleQRScan(qrData) {
+    showLoading();
+    
+    try {
+        // 1️⃣ Parser le JSON du QR Code (format Android)
+        let employeeData;
+        try {
+            employeeData = JSON.parse(qrData);
+        } catch (e) {
+            throw new Error('QR Code invalide - format JSON attendu');
+        }
+        
+        const employeeId = employeeData.id;
+        const employeeName = employeeData.name;
+        
+        if (!employeeId || !employeeName) {
+            throw new Error('QR Code incomplet - ID ou nom manquant');
+        }
+        
+        console.log('📋 Données QR:', { employeeId, employeeName });
+        
+        // 2️⃣ Récupérer l'employé depuis la BDD
+        const empResponse = await fetch(`${API_URL}/employees`);
+        const empData = await empResponse.json();
+        
+        if (!empData.success || !empData.employees) {
+            throw new Error('Impossible de récupérer les employés');
+        }
+        
+        const employee = empData.employees.find(e => e.id === employeeId);
+        
+        if (!employee) {
+            throw new Error(`Employé ${employeeName} non trouvé dans la base de données`);
+        }
+        
+        console.log('✅ Employé trouvé:', employee);
+        
+        // 3️⃣ Récupérer l'historique des pointages pour déterminer le type
+        const pointagesResponse = await fetch(`${API_URL}/pointages/history`);
+        const pointagesData = await pointagesResponse.json();
+        
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Trouver le dernier pointage de cet employé aujourd'hui
+        const todayPointages = pointagesData.pointages
+            .filter(p => 
+                p.employee_id === employeeId && 
+                new Date(p.timestamp).toISOString().split('T')[0] === today
+            )
+            .sort((a, b) => b.timestamp - a.timestamp);
+        
+        const lastPointage = todayPointages[0];
+        
+        // 4️⃣ Déterminer le type de pointage (comme Android)
+        let pointageType;
+        if (!lastPointage || lastPointage.type === 'SORTIE') {
+            pointageType = 'ENTREE';
+        } else {
+            pointageType = 'SORTIE';
+        }
+        
+        console.log('📍 Type de pointage déterminé:', pointageType);
+        
+        // 5️⃣ Créer le pointage
+        const timestamp = Date.now();
+        const pointage = {
+            employeeId: employeeId,
+            employeeName: employeeName,
+            type: pointageType,
+            timestamp: timestamp,
+            date: today
+        };
+        
+        // 6️⃣ Envoyer au serveur
+        const response = await fetch(`${API_URL}/pointages`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(pointage) 
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Erreur serveur lors de l\'enregistrement');
+        }
+        
+        // 7️⃣ Afficher le résultat (comme Android)
+        const time = new Date(timestamp).toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        const statusColor = pointageType === 'ENTREE' ? '#10b981' : '#ef4444';
+        const statusEmoji = pointageType === 'ENTREE' ? '✅' : '👋';
+        const statusText = pointageType === 'ENTREE' ? 'Arrivée enregistrée' : 'Sortie enregistrée';
+        
+        document.getElementById('scan-result').innerHTML = `
+            <div style="
+                background: ${statusColor}; 
+                color: white; 
+                padding: 1.5rem; 
+                border-radius: 1rem; 
+                text-align: center;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+                animation: fadeInUp 0.4s ease;
+            ">
+                <div style="font-size: 3rem; margin-bottom: 0.5rem;">${statusEmoji}</div>
+                <h3 style="font-size: 1.4rem; font-weight: 700; margin-bottom: 0.5rem;">
+                    ${employeeName}
+                </h3>
+                <p style="font-size: 1.2rem; font-weight: 600; margin-bottom: 0.25rem;">
+                    ${statusText}
+                </p>
+                <p style="font-size: 1rem; opacity: 0.9;">
+                    ${time}
+                </p>
+            </div>
+        `;
+        
+        console.log('✅ Pointage enregistré avec succès');
+        
+        // Actualiser la liste des pointages si la modal est ouverte
+        if (document.getElementById('pointagesModal').style.display === 'block') {
+            loadPointages();
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur handleQRScan:', error);
+        
+        document.getElementById('scan-result').innerHTML = `
+            <div style="
+                background: #ef4444; 
+                color: white; 
+                padding: 1.5rem; 
+                border-radius: 1rem; 
+                text-align: center;
+                box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+            ">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
+                <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">
+                    Erreur de scan
+                </h3>
+                <p style="font-size: 0.95rem; opacity: 0.95;">
+                    ${error.message}
+                </p>
+            </div>
+        `;
+        
+        // Réactiver le scanner après 3 secondes
+        setTimeout(() => {
+            document.getElementById('scan-result').innerHTML = '';
+            startCamera();
+        }, 3000);
+        
+    } finally {
+        hideLoading();
+    }
+}
+
+// ✅ Amélioration de la modal de scan
+function openScanModal() {
+    openModal('scanModal');
+    
+    // Démarrer automatiquement après un court délai
+    setTimeout(() => {
+        startCamera();
+    }, 500);
+}
+
+// ✅ Fermer proprement le scanner
+function closeScanModal() {
+    stopCamera();
+    closeModal('scanModal');
+}
+
+// Animation CSS pour le résultat
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+`;
+document.head.appendChild(style);
+
+console.log('✅ Scanner QR Webcam initialisé (compatible Android)');
         // === SUPPRESSION ===
         async function deleteEmployee(id) {
             if (!confirm('Voulez-vous vraiment supprimer cet employé ?')) return;
