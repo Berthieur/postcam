@@ -869,7 +869,7 @@ def get_active_employees():
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
-    logger.info(f"📥 Pointage reçu: {data}")
+    logger.info(f"Pointage reçu: {data}")
 
     if not data:
         return jsonify({"success": False, "message": "Requête vide"}), 400
@@ -882,66 +882,66 @@ def add_pointage():
     try:
         conn = get_db()
         cur = conn.cursor()
-
         emp_id = data["employeeId"]
 
         # Vérifier que l'employé existe
-        cur.execute(f"SELECT id FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
-        if not cur.fetchone():
+        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+        if not employee:
             conn.close()
             return jsonify({"success": False, "message": "Employé non trouvé"}), 404
 
-        # === NORMALISATION DU TYPE (compatible Android + Web) ===
-        raw_type = str(data["type"]).strip().lower()
+        # Récupérer le vrai nom + prénom depuis la BDD (cohérent partout)
+        true_name = f"{employee[1 if DB_DRIVER == 'sqlite' else 'nom']} {employee[2 if DB_DRIVER == 'sqlite' else 'prenom']}"
 
-        if raw_type in ["arrivee", "entrée", "entree", "in"]:
-            final_type = "arrivee"        # ← Android comprend ça
+        # Récupérer le dernier pointage du jour
+        today = data["date"]
+        cur.execute(f"""
+            SELECT type FROM pointages 
+            WHERE employee_id = {PLACEHOLDER} AND date = {PLACEHOLDER}
+            ORDER BY timestamp DESC LIMIT 1
+        """, (emp_id, today))
+        last = cur.fetchone()
+
+        # DÉTERMINATION DU TYPE COMME L'ANDROID (toujours minuscule)
+        if not last or last[0] in ["sortie", "SORTIE", "depart"]:
+            final_type = "arrivee"
             is_active = 1
-        elif raw_type in ["sortie", "depart", "départ", "out"]:
-            final_type = "sortie"         # ← Android comprend ça
-            is_active = 0
         else:
-            conn.close()
-            return jsonify({"success": False, "message": f"Type invalide: {data['type']}"}), 400
+            final_type = "sortie"
+            is_active = 0
 
         timestamp = int(data["timestamp"])
 
-        # Mise à jour du statut actif de l'employé
+        # Mise à jour is_active
         cur.execute(f"""
-            UPDATE employees 
-            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+            UPDATE employees SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
             WHERE id = {PLACEHOLDER}
         """, (is_active, timestamp, emp_id))
 
-        # Insertion du pointage avec le format que l'Android attend
+        # Insertion avec le BON NOM et le BON TYPE
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, (
-            pointage_id,
-            emp_id,
-            data["employeeName"],
-            final_type,        # ← "arrivee" ou "sortie" (minuscule)
-            timestamp,
-            data["date"]
-        ))
+        """, (pointage_id, emp_id, true_name, final_ty
+pe, timestamp, today))
 
         conn.commit()
-        cur.close()
         conn.close()
 
-        logger.info(f"✅ Pointage web → {data['employeeName']} : {final_type}")
+        logger.info(f"Pointage enregistré → {true_name} : {final_type}")
 
         return jsonify({
             "success": True,
             "message": "Pointage enregistré",
             "type": final_type,
+            "employeeName": true_name,
             "is_active": is_active
         }), 201
 
     except Exception as e:
-        logger.error(f"❌ add_pointage: {e}", exc_info=True)
+        logger.error(f"Erreur pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": "Erreur serveur"}), 500
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
