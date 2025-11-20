@@ -1186,12 +1186,13 @@
                 const lastPointage = todayPointages[0];
                 
                 // 4️⃣ Déterminer le type de pointage (comme Android)
-                let pointageType;
-                if (!lastPointage || lastPointage.type === 'SORTIE') {
-                    pointageType = 'ENTREE';
-                } else {
-                    pointageType = 'SORTIE';
-                }
+                // === NOUVEAU : envoie "arrivee" ou "sortie" pour être 100% compatible Android ===
+               let pointageType;
+               if (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE') {
+                   pointageType = 'arrivee';   // ← format que l'Android attend
+               } else {
+                  pointageType = 'sortie';    // ← format que l'Android attend
+               }
                 
                 console.log('📍 Type de pointage déterminé:', pointageType);
                 
@@ -1224,9 +1225,9 @@
                     minute: '2-digit' 
                 });
                 
-                const statusColor = pointageType === 'ENTREE' ? '#10b981' : '#ef4444';
-                const statusEmoji = pointageType === 'ENTREE' ? '✅' : '👋';
-                const statusText = pointageType === 'ENTREE' ? 'Arrivée enregistrée' : 'Sortie enregistrée';
+                const statusColor = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
+                const statusEmoji = pointageType === 'arrivee' ? '✅' : '👋';
+                const statusText = pointageType === 'arrivee' ? 'Arrivée enregistrée' : 'Sortie enregistrée';
                 
                 document.getElementById('scan-result').innerHTML = `
                     <div style="
