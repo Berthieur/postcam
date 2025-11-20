@@ -866,7 +866,6 @@ def get_active_employees():
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-# === Modifier la route POST /api/pointages pour ajouter la source ===
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -910,52 +909,32 @@ def add_pointage():
             WHERE id = {PLACEHOLDER}
         """, [new_is_active, int(data.get("timestamp")), emp_id])
         
-        # ✅ IMPORTANT: Récupérer la source (WEB ou ANDROID)
-        source = data.get("source", "WEB")  # Par défaut WEB si non spécifié
-        
-        pointage_id = data.get("id", str(uuid.uuid4()))  # Utiliser l'ID fourni ou en créer un
-        
-        # ✅ Vérifier si le pointage existe déjà (éviter les doublons)
-        cur.execute(f"SELECT id FROM pointages WHERE id = {PLACEHOLDER}", (pointage_id,))
-        existing = cur.fetchone()
-        
-        if existing:
-            logger.warning(f"⚠️ Pointage {pointage_id} existe déjà, ignoré")
-            cur.close()
-            conn.close()
-            return jsonify({
-                "success": True,
-                "message": "Pointage déjà enregistré",
-                "pointageId": pointage_id,
-                "duplicate": True
-            }), 200
-        
-        # Insertion du pointage avec la source
+        pointage_id = str(uuid.uuid4())
         cur.execute(f"""
-            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date, source)
-            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
             pointage_id, emp_id, data.get("employeeName"),
-            pointage_type, int(data.get("timestamp")), data.get("date"), source
+            pointage_type, int(data.get("timestamp")), data.get("date")
         ])
         
         conn.commit()
         cur.close()
         conn.close()
         
-        logger.info(f"✅ Pointage: {emp_prenom} {emp_nom} - {pointage_type} (source={source}, is_active={new_is_active})")
+        logger.info(f"✅ Pointage: {emp_prenom} {emp_nom} - {pointage_type} (is_active={new_is_active})")
         
         return jsonify({
             "success": True,
             "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
             "pointageId": pointage_id,
-            "is_active": new_is_active,
-            "source": source
+            "is_active": new_is_active
         }), 201
         
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}", exc_info=True)
         return jsonify({"success": False, "message": str(e)}), 500
+
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
@@ -981,135 +960,6 @@ def get_pointage_history():
     except Exception as e:
         logger.error(f"❌ get_pointage_history: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-# === Route pour synchronisation temps réel ===
-@app.route("/api/realtime/events", methods=["GET"])
-def get_latest_events():
-    """
-    Retourne tous les événements (pointages) depuis un timestamp donné.
-    L'APK appelle cette route toutes les 5 secondes.
-    """
-    since_timestamp = request.args.get("since", type=int, default=0)
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Récupérer les pointages créés après le timestamp
-        cur.execute(f"""
-            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date, p.source
-            FROM pointages p
-            WHERE p.timestamp > {PLACEHOLDER}
-            ORDER BY p.timestamp ASC
-        """, (since_timestamp,))
-        
-        rows = cur.fetchall()
-        events = []
-        
-        for row in rows:
-            if DB_DRIVER == "sqlite":
-                event = {
-                    "type": "POINTAGE_UPDATE",
-                    "timestamp": row[4],  # timestamp
-                    "data": {
-                        "id": row[0],
-                        "employeeId": row[1],
-                        "employeeName": row[2],
-                        "type": row[3],
-                        "timestamp": row[4],
-                        "date": row[5],
-                        "source": row[6] if len(row) > 6 else "WEB"
-                    }
-                }
-            else:
-                event = {
-                    "type": "POINTAGE_UPDATE",
-                    "timestamp": row['timestamp'],
-                    "data": {
-                        "id": row['id'],
-                        "employeeId": row['employee_id'],
-                        "employeeName": row['employee_name'],
-                        "type": row['type'],
-                        "timestamp": row['timestamp'],
-                        "date": row['date'],
-                        "source": row.get('source', 'WEB')
-                    }
-                }
-            events.append(event)
-        
-        cur.close()
-        conn.close()
-        
-        current_timestamp = int(datetime.now().timestamp() * 1000)
-        
-        logger.info(f"🔄 Événements temps réel: {len(events)} depuis {since_timestamp}")
-        
-        return jsonify({
-            "success": True,
-            "events": events,
-            "timestamp": current_timestamp
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"❌ get_latest_events: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-# === NOUVELLE Route pour historique complet des pointages ===
-@app.route("/api/pointages/all", methods=["GET"])
-def get_all_pointages():
-    """
-    Retourne TOUS les pointages pour synchronisation initiale complète.
-    """
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        cur.execute(f"""
-            SELECT p.id, p.employee_id, p.employee_name, p.type, p.timestamp, p.date, p.source
-            FROM pointages p
-            ORDER BY p.timestamp DESC
-        """)
-        
-        rows = cur.fetchall()
-        pointages = []
-        
-        for row in rows:
-            if DB_DRIVER == "sqlite":
-                pointage = {
-                    "id": row[0],
-                    "employeeId": row[1],
-                    "employeeName": row[2],
-                    "type": row[3],
-                    "timestamp": row[4],
-                    "date": row[5],
-                    "source": row[6] if len(row) > 6 else "WEB"
-                }
-            else:
-                pointage = {
-                    "id": row['id'],
-                    "employeeId": row['employee_id'],
-                    "employeeName": row['employee_name'],
-                    "type": row['type'],
-                    "timestamp": row['timestamp'],
-                    "date": row['date'],
-                    "source": row.get('source', 'WEB')
-                }
-            pointages.append(pointage)
-        
-        cur.close()
-        conn.close()
-        
-        logger.info(f"📤 Tous les pointages envoyés: {len(pointages)}")
-        
-        return jsonify({
-            "success": True,
-            "pointages": pointages
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"❌ get_all_pointages: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
-
 
 # --- Démarrage ---
 if __name__ == "__main__":
