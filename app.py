@@ -870,71 +870,82 @@ def get_active_employees():
 def add_pointage():
     data = request.get_json(silent=True)
     logger.info(f"📥 Pointage reçu: {data}")
-    
+
     if not data:
         return jsonify({"success": False, "message": "Requête vide"}), 400
-    
+
+    # Champs requis
     required = ["employeeId", "employeeName", "type", "timestamp", "date"]
     for field in required:
-        if field not in data or not data[field]:
-            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
-    
+        if field not in data or data[field] in [None, ""]:
+            return jsonify({"success": False, "message": f"Champ manquant ou vide: {field}"}), 400
+
     try:
         conn = get_db()
         cur = conn.cursor()
-        
-        emp_id = data.get("employeeId")
+
+        emp_id = str(data["employeeId"]).strip()
+
+        # Vérifier que l'employé existe
         cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
-        
+
         if not employee:
-            cur.close()
             conn.close()
-            return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
-        
-        emp_nom = employee[1] if DB_DRIVER == "sqlite" else employee['nom']
-        emp_prenom = employee[2] if DB_DRIVER == "sqlite" else employee['prenom']
-        
-        pointage_type = data.get("type").upper()
-        if pointage_type.lower() == "arrivee":
+            return jsonify({"success": False, "message": f"Employé non trouvé: {emp_id}"}), 404
+
+        # Normalisation du type de pointage (accepte tout format imaginable)
+        raw_type = str(data["type"]).strip().lower()
+        if raw_type in ["arrivee", "entrée", "entree", "in", "checkin", "arrival"]:
             pointage_type = "ENTREE"
-        elif pointage_type.lower() == "depart":
+        elif raw_type in ["sortie", "depart", "départ", "out", "checkout", "departure"]:
             pointage_type = "SORTIE"
-        
+        else:
+            conn.close()
+            return jsonify({"success": False, "message": f"Type de pointage invalide: {data['type']}. Utilisez 'arrivee'/'entree' ou 'sortie'/'depart'"}), 400
+
+        # Mise à jour du statut is_active de l'employé
         new_is_active = 1 if pointage_type == "ENTREE" else 0
-        
+        timestamp = int(data["timestamp"])
+
         cur.execute(f"""
             UPDATE employees 
             SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
             WHERE id = {PLACEHOLDER}
-        """, [new_is_active, int(data.get("timestamp")), emp_id])
-        
+        """, (new_is_active, timestamp, emp_id))
+
+        # Insertion du pointage
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-        """, [
-            pointage_id, emp_id, data.get("employeeName"),
-            pointage_type, int(data.get("timestamp")), data.get("date")
-        ])
-        
+        """, (
+            pointage_id,
+            emp_id,
+            str(data["employeeName"]).strip(),
+            pointage_type,
+            timestamp,
+            str(data["date"])
+        ))
+
         conn.commit()
         cur.close()
         conn.close()
-        
-        logger.info(f"✅ Pointage: {emp_prenom} {emp_nom} - {pointage_type} (is_active={new_is_active})")
-        
+
+        logger.info(f"✅ Pointage enregistré → {data['employeeName']} ({pointage_type}) | is_active={new_is_active}")
+
         return jsonify({
             "success": True,
-            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
+            "message": "Pointage enregistré avec succès",
             "pointageId": pointage_id,
+            "employeeId": emp_id,
+            "type": pointage_type,
             "is_active": new_is_active
         }), 201
-        
-    except Exception as e:
-        logger.error(f"❌ add_pointage: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
 
+    except Exception as e:
+        logger.error(f"❌ Erreur add_pointage: {e}", exc_info=True)
+        return jsonify({"success": False, "message": "Erreur serveur interne"}), 500
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
