@@ -337,16 +337,31 @@ def delete_employee(id):
         conn = get_db()
         cur = conn.cursor()
 
+        # ✅ Supprimer d'abord toutes les dépendances dans l'ordre
+        cur.execute(f"DELETE FROM pointages WHERE employee_id = {PLACEHOLDER}", [id])
+        cur.execute(f"DELETE FROM rssi_measurements WHERE employee_id = {PLACEHOLDER}", [id])
         cur.execute(f"DELETE FROM salaries WHERE employee_id = {PLACEHOLDER}", [id])
+        
+        # ✅ Enfin, supprimer l'employé
         cur.execute(f"DELETE FROM employees WHERE id = {PLACEHOLDER}", [id])
 
         conn.commit()
+        
+        # Vérifier combien de lignes ont été supprimées
+        if cur.rowcount == 0:
+            cur.close()
+            conn.close()
+            return jsonify({"success": False, "message": "Employé non trouvé"}), 404
+        
         cur.close()
         conn.close()
-        return jsonify({"success": True, "message": "Employé supprimé"}), 200
+        
+        logger.info(f"✅ Employé {id} et toutes ses données supprimés")
+        return jsonify({"success": True, "message": "Employé supprimé avec succès"}), 200
+        
     except Exception as e:
-        logger.error(f"❌ delete_employee: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+        logger.error(f"❌ delete_employee: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"Erreur lors de la suppression: {str(e)}"}), 500
 
 # === GET historique salaires ===
 @app.route("/api/salary/history", methods=["GET"])
