@@ -881,6 +881,7 @@ def get_active_employees():
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+# === POST ajouter pointage (CORRIGÉ) ===
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -889,7 +890,8 @@ def add_pointage():
     if not data:
         return jsonify({"success": False, "message": "Requête vide"}), 400
     
-    required = ["employeeId", "employeeName", "type", "timestamp", "date"]
+    # ✅ Vérifier les champs requis
+    required = ["employeeId", "type", "timestamp", "date"]
     for field in required:
         if field not in data or not data[field]:
             return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
@@ -899,24 +901,37 @@ def add_pointage():
         cur = conn.cursor()
         
         emp_id = data.get("employeeId")
+        
+        # ✅ RÉCUPÉRER L'EMPLOYÉ DEPUIS LA BDD
         cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
         
         if not employee:
             cur.close()
             conn.close()
+            logger.error(f"❌ Employé {emp_id} non trouvé")
             return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
         
+        # ✅ CONSTRUIRE LE NOM EXACT COMME ANDROID: "Nom Prénom"
         emp_nom = employee[1] if DB_DRIVER == "sqlite" else employee['nom']
         emp_prenom = employee[2] if DB_DRIVER == "sqlite" else employee['prenom']
+        employee_name = f"{emp_nom} {emp_prenom}"
         
-        pointage_type = data.get("type").upper()
-        if pointage_type.lower() == "arrivee":
-            pointage_type = "ENTREE"
-        elif pointage_type.lower() == "depart":
-            pointage_type = "SORTIE"
+        # ✅ Normaliser le type de pointage
+        pointage_type = data.get("type").lower()
+        if pointage_type not in ['arrivee', 'sortie']:
+            # Gérer les anciens formats
+            if pointage_type in ['entree', 'ENTREE']:
+                pointage_type = 'arrivee'
+            elif pointage_type in ['sortie', 'SORTIE']:
+                pointage_type = 'sortie'
+            else:
+                cur.close()
+                conn.close()
+                return jsonify({"success": False, "message": "Type de pointage invalide"}), 400
         
-        new_is_active = 1 if pointage_type == "ENTREE" else 0
+        # ✅ Mettre à jour is_active selon le type
+        new_is_active = 1 if pointage_type == 'arrivee' else 0
         
         cur.execute(f"""
             UPDATE employees 
@@ -924,25 +939,31 @@ def add_pointage():
             WHERE id = {PLACEHOLDER}
         """, [new_is_active, int(data.get("timestamp")), emp_id])
         
+        # ✅ Insérer le pointage avec le nom correct
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
             VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
         """, [
-            pointage_id, emp_id, data.get("employeeName"),
-            pointage_type, int(data.get("timestamp")), data.get("date")
+            pointage_id, 
+            emp_id, 
+            employee_name,  # ✅ NOM CORRIGÉ: "Razafiarinirina Angela"
+            pointage_type,   # ✅ FORMAT: "arrivee" ou "sortie"
+            int(data.get("timestamp")), 
+            data.get("date")
         ])
         
         conn.commit()
         cur.close()
         conn.close()
         
-        logger.info(f"✅ Pointage: {emp_prenom} {emp_nom} - {pointage_type} (is_active={new_is_active})")
+        logger.info(f"✅ Pointage: {employee_name} - {pointage_type} (is_active={new_is_active})")
         
         return jsonify({
             "success": True,
             "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
             "pointageId": pointage_id,
+            "employeeName": employee_name,  # ✅ Retourner le nom correct
             "is_active": new_is_active
         }), 201
         
