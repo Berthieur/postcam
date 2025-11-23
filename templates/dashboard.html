@@ -476,7 +476,7 @@
     </div>
 
     <script>
-        let API_URL = 'https://postcam-1.onrender.com/api';
+        let API_URL = 'https://postcam.onrender.com/api';
         let videoStream = null, scanInterval = null, currentEditId = null;
         let charts = {};
         let isScanning = false;
@@ -1348,7 +1348,7 @@
                     const s = JSON.parse(saved);
                     document.getElementById('wifiSSID').value = s.wifiSSID || 'OPPO';
                     document.getElementById('wifiPassword').value = s.wifiPassword || '1234567809';
-                    document.getElementById('serverURL').value = s.serverURL || 'https://postcam-1.onrender.com';
+                    document.getElementById('serverURL').value = s.serverURL || 'https://postcam.onrender.com';
                     document.getElementById('adminUser').value = s.adminUser || 'admin';
                     document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
                     API_URL = s.serverURL + '/api';
