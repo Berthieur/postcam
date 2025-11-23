@@ -1131,87 +1131,165 @@
             }
         }
 
-     // ========== SCANNER QR + POINTAGE CORRIGÉ (arrivee/sortie + nom correct) ==========
-        async function handleQRScan(qrData) {
-            showLoading();
-            try {
-                let employeeData = JSON.parse(qrData);
-
-                const employeeId = employeeData.id;
-                if (!employeeId) throw new Error("ID employé manquant");
-
-                // Récupérer l'employé depuis la BDD pour avoir le bon ordre nom + prénom
-                const empRes = await fetch(`${API_URL}/employees`);
-                const empJson = await empRes.json();
-                const employee = empJson.employees.find(e => e.id === employeeId);
-                if (!employee) throw new Error("Employé non trouvé");
-
-                // NOM TOUJOURS AU FORMAT "Nom Prénom" (comme Android)
-                const fullName = `${employee.nom} ${employee.prenom}`;
-
-                // Récupérer le dernier pointage du jour
-                const histRes = await fetch(`${API_URL}/pointages/history`);
-                const hist = await histRes.json();
-
-                const today = new Date().toISOString().split('T')[0];
-                const todayPointages = (hist.pointages || [])
-                    .filter(p => (p.employee_id || p.employeeId) === employeeId)
-                    .filter(p => new Date((p.timestamp || p.date) * 1000).toISOString().split('T')[0] === today)
-                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-                const last = todayPointages[0];
-
-                // DÉTERMINATION DU TYPE COMME L'ANDROID (minuscule)
-                const pointageType = (!last || last.type === 'sortie' || last.type === 'SORTIE')
-                    ? 'arrivee'
-                    : 'sortie';
-
-                const timestamp = Date.now();
-                const payload = {
-                    employeeId: employeeId,
-                    employeeName: fullName,        // ← Toujours "Razafiarinirina Angela"
-                    type: pointageType,           // ← "arrivee" ou "sortie"
-                    timestamp: timestamp,
-                    date: today
-                };
-
-                const res = await fetch(`${API_URL}/pointages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const result = await res.json();
-                if (!res.ok || !result.success) throw new Error(result.message || "Échec enregistrement");
-
-                // Affichage beau et cohérent
-                const time = new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
-                const emoji = pointageType === 'arrivee' ? 'Entrée' : 'Sortie';
-
-                document.getElementById('scan-result').innerHTML = `
-                    <div style="background:${color}; color:white; padding:1.5rem; border-radius:1rem; text-align:center;">
-                        <div style="font-size:3rem;">${emoji}</div>
-                        <h3 style="margin:0.5rem 0;font-size:1.4rem;">${fullName}</h3>
-                        <p style="font-size:1.2rem;margin:0.25rem 0;">${pointageType === 'arrivee' ? 'Arrivée' : 'Sortie'} enregistrée</p>
-                        <p style="opacity:0.9;">${time}</p>
-                    </div>
-                `;
-
-                if (document.getElementById('pointagesModal').style.display === 'block') loadPointages();
-
-            } catch (err) {
-                document.getElementById('scan-result').innerHTML = `
-                    <div style="background:#ef4444;color:white;padding:1.5rem;border-radius:1rem;text-align:center;">
-                        <div style="font-size:2.5rem;">Erreur</div>
-                        <p>${err.message}</p>
-                    </div>
-                `;
-                setTimeout(() => { document.getElementById('scan-result').innerHTML = ''; startCamera(); }, 3000);
-            } finally {
-                hideLoading();
-            }
+     / ========== SCANNER QR + POINTAGE CORRIGÉ (100% compatible Android) ==========
+async function handleQRScan(qrData) {
+    showLoading();
+    try {
+        // ✅ Parser le JSON du QR Code
+        let employeeData = JSON.parse(qrData);
+        const employeeId = employeeData.id;
+        
+        if (!employeeId) {
+            throw new Error("ID employé manquant dans le QR Code");
         }
+
+        // ✅ ÉTAPE 1: Récupérer l'employé depuis la BDD pour avoir les bonnes données
+        const empRes = await fetch(`${API_URL}/employees`);
+        const empJson = await empRes.json();
+        
+        if (!empJson.success || !empJson.employees) {
+            throw new Error("Impossible de récupérer les employés");
+        }
+        
+        const employee = empJson.employees.find(e => e.id === employeeId);
+        if (!employee) {
+            throw new Error("Employé non trouvé dans la base de données");
+        }
+
+        // ✅ ÉTAPE 2: Construire le nom EXACTEMENT comme Android: "Nom Prénom"
+        const fullName = `${employee.nom} ${employee.prenom}`;
+        console.log(`✅ Employé trouvé: ${fullName}`);
+
+        // ✅ ÉTAPE 3: Déterminer le type de pointage (arrivee/sortie)
+        const histRes = await fetch(`${API_URL}/pointages/history`);
+        const hist = await histRes.json();
+
+        const today = new Date().toISOString().split('T')[0];
+        const todayPointages = (hist.pointages || [])
+            .filter(p => (p.employee_id || p.employeeId) === employeeId)
+            .filter(p => {
+                const pointageDate = p.date || new Date(p.timestamp).toISOString().split('T')[0];
+                return pointageDate === today;
+            })
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        const lastPointage = todayPointages[0];
+
+        // ✅ LOGIQUE: Si pas de pointage ou dernier = sortie → arrivee, sinon → sortie
+        const pointageType = (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE')
+            ? 'arrivee'
+            : 'sortie';
+
+        console.log(`📋 Dernier pointage: ${lastPointage ? lastPointage.type : 'aucun'} → Nouveau: ${pointageType}`);
+
+        // ✅ ÉTAPE 4: Créer le payload EXACTEMENT comme Android
+        const timestamp = Date.now();
+        const payload = {
+            employeeId: employeeId,
+            employeeName: fullName,        // ✅ "Razafiarinirina Angela"
+            type: pointageType,           // ✅ "arrivee" ou "sortie" (minuscule)
+            timestamp: timestamp,
+            date: today
+        };
+
+        console.log('📤 Envoi pointage:', payload);
+
+        // ✅ ÉTAPE 5: Envoyer au serveur
+        const res = await fetch(`${API_URL}/pointages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        
+        if (!res.ok || !result.success) {
+            throw new Error(result.message || `Erreur serveur: ${res.status}`);
+        }
+
+        console.log('✅ Pointage enregistré avec succès');
+
+        // ✅ ÉTAPE 6: Affichage visuel élégant
+        const time = new Date(timestamp).toLocaleTimeString('fr-FR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
+        const emoji = pointageType === 'arrivee' ? '✅' : '🚪';
+        const label = pointageType === 'arrivee' ? 'Arrivée' : 'Sortie';
+
+        document.getElementById('scan-result').innerHTML = `
+            <div style="
+                background: ${color}; 
+                color: white; 
+                padding: 1.5rem; 
+                border-radius: 1rem; 
+                text-align: center;
+                animation: fadeInUp 0.5s ease;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            ">
+                <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${emoji}</div>
+                <h3 style="margin: 0.5rem 0; font-size: 1.5rem; font-weight: 700;">${fullName}</h3>
+                <p style="font-size: 1.3rem; margin: 0.5rem 0; opacity: 0.95;">${label} enregistrée</p>
+                <p style="font-size: 1.1rem; opacity: 0.9;">${time}</p>
+            </div>
+        `;
+
+        // ✅ Rafraîchir l'historique si la modal est ouverte
+        if (document.getElementById('pointagesModal').style.display === 'block') {
+            setTimeout(() => loadPointages(), 500);
+        }
+
+        // ✅ Reprendre le scan après 3 secondes
+        setTimeout(() => {
+            document.getElementById('scan-result').innerHTML = '';
+            startCamera();
+        }, 3000);
+
+    } catch (err) {
+        console.error('❌ Erreur handleQRScan:', err);
+        
+        document.getElementById('scan-result').innerHTML = `
+            <div style="
+                background: #ef4444;
+                color: white;
+                padding: 1.5rem;
+                border-radius: 1rem;
+                text-align: center;
+                animation: fadeInUp 0.5s ease;
+            ">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
+                <h3 style="margin: 0.5rem 0;">Erreur</h3>
+                <p style="font-size: 0.95rem;">${err.message}</p>
+            </div>
+        `;
+        
+        // Reprendre le scan après 3 secondes
+        setTimeout(() => {
+            document.getElementById('scan-result').innerHTML = '';
+            startCamera();
+        }, 3000);
+    } finally {
+        hideLoading();
+    }
+}
+
+// ✅ Animation CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+`;
+document.head.appendChild(style);
         // ✅ Amélioration de la modal de scan
         function openScanModal() {
             openModal('scanModal');
