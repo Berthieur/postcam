@@ -80,6 +80,12 @@
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
+        }
         .modal-content { background: white; margin: 3rem auto; padding: 2rem; border-radius: 1.5rem;
             max-width: 950px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.3);
             animation: slideUp 0.4s ease;
@@ -149,7 +155,6 @@
         .message { margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 1rem; max-width: 80%; line-height: 1.5;
             animation: fadeInUp 0.3s ease;
         }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .message-user { background: var(--primary); color: white; margin-left: auto; border-bottom-right-radius: 0.25rem; }
         .message-ai { background: white; border: 1px solid var(--gray-200); border-bottom-left-radius: 0.25rem; color: var(--gray-800); }
         .chat-input-container { display: flex; gap: 0.75rem; padding: 1rem; background: white; border-top: 1px solid var(--gray-200); }
@@ -178,11 +183,6 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(0, 255, 0, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 255, 0, 0); }
-        }
         @media (max-width: 768px) {
             .header { flex-direction: column; gap: 1rem; text-align: center; }
             .main-grid { grid-template-columns: 1fr; }
@@ -228,8 +228,6 @@
                 <div class="card-title">Statistiques</div>
                 <div class="card-desc">Tableaux de bord et analyses</div>
             </div>
-          
-            <!-- NOUVELLE CARTE AJOUTÉE -->
             <div class="card" onclick="openModal('trackingModal')">
                 <div class="card-icon"><i class="fas fa-map-marked-alt"></i></div>
                 <div class="card-title">Suivi Temps Réel</div>
@@ -248,7 +246,7 @@
         </div>
     </div>
 
-    <!-- Modals (Scanner, Employés, Pointages, etc.) -->
+    <!-- Modals -->
     <div id="scanModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -445,51 +443,43 @@
             <p style="margin-top: 1rem;"><strong id="qrName" style="color: var(--gray-800);"></strong></p>
         </div>
     </div>
- <div id="trackingModal" class="modal">
-    <div class="modal-content" style="max-width: 1000px;">
-        <div class="modal-header">
-            <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel (Triangulation)</h2>
-            <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
-        </div>
 
-        <!-- Carte de localisation -->
-        <div style="position: relative; width: 100%; height: 500px; background: #0f172a; border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;">
-            <!-- Fond grille -->
-            <div style="position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px);"></div>
-
-            <!-- 3 Ancres fixes -->
-            <div id="anchorsContainer" style="position: relative; width: 100%; height: 100%;"></div>
-
-            <!-- Badges détectés -->
-            <div id="badgesContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
-        </div>
-
-        <!-- Légende -->
-        <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
-                <i class="fas fa-broadcast-tower" style="font-size: 1.5rem; color: #00d4ff;"></i>
-                <span>Ancre</span>
+    <div id="trackingModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <div class="modal-header">
+                <h2 class="modal-title"><i class="fas fa-map-marked-alt"></i> Suivi Temps Réel (Triangulation)</h2>
+                <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
-                <i class="fas fa-id-badge" style="font-size: 1.5rem; color: #00ff00;"></i>
-                <span>Badge actif</span>
+            <div style="position: relative; width: 100%; height: 500px; background: #0f172a; border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;">
+                <div style="position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px);"></div>
+                <div id="anchorsContainer" style="position: relative; width: 100%; height: 100%;"></div>
+                <div id="badgesContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.5rem; color: #ef4444;">
-                <i class="fas fa-circle" style="font-size: 0.8rem; color: #ef4444;"></i>
-                <span>Hors zone</span>
+            <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
+                    <i class="fas fa-broadcast-tower" style="font-size: 1.5rem; color: #00d4ff;"></i>
+                    <span>Ancre</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: #10b981;">
+                    <i class="fas fa-id-badge" style="font-size: 1.5rem; color: #00ff00;"></i>
+                    <span>Badge actif</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: #ef4444;">
+                    <i class="fas fa-circle" style="font-size: 0.8rem; color: #ef4444;"></i>
+                    <span>Hors zone</span>
+                </div>
             </div>
-        </div>
-
-        <!-- Liste des employés en temps réel -->
-        <div id="trackingList" style="margin-top: 1.5rem; max-height: 200px; overflow-y: auto;">
-            <p style="text-align: center; color: #94a3b8;">Chargement des positions...</p>
+            <div id="trackingList" style="margin-top: 1.5rem; max-height: 200px; overflow-y: auto;">
+                <p style="text-align: center; color: #94a3b8;">Chargement des positions...</p>
+            </div>
         </div>
     </div>
-</div> 
+
     <script>
         let API_URL = 'https://postcam-1.onrender.com/api';
         let videoStream = null, scanInterval = null, currentEditId = null;
         let charts = {};
+        let isScanning = false;
 
         // === UTILITAIRES ===
         function showLoading() {
@@ -513,7 +503,7 @@
             }
         }
 
-        // === GÉNÉRATION BADGE MODERNE TYPE CIRCUIT IMPRIMÉ ===
+        // === GÉNÉRATION BADGE MODERNE ===
         async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
             console.log('🎫 Génération badge pour:', prenom, nom, empId);
             showLoading();
@@ -524,260 +514,105 @@
                 }
                 
                 const { jsPDF } = window.jspdf;
-                
-                // Créer le badge style carte à puce
                 const badge = document.createElement('div');
                 badge.style.cssText = `
                     position: absolute; left: -9999px; top: 0; 
                     width: 340px; height: 210px;
                     background: linear-gradient(135deg, #0d4d3d 0%, #1a5a4a 50%, #0d4d3d 100%);
-                    border-radius: 15px; 
-                    padding: 0;
-                    color: white; 
+                    border-radius: 15px; padding: 0; color: white; 
                     font-family: 'Arial', sans-serif;
                     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
                     border: 2px solid rgba(255, 255, 255, 0.1);
-                    overflow: hidden;
-                    position: relative;
+                    overflow: hidden; position: relative;
                 `;
                 document.body.appendChild(badge);
 
-                // Circuit board pattern SVG
                 const circuitPattern = `
                     <svg width="340" height="210" style="position: absolute; top: 0; left: 0; opacity: 0.3;">
-                        <!-- Pistes de circuit -->
                         <line x1="50" y1="30" x2="150" y2="30" stroke="#00d4ff" stroke-width="1.5"/>
                         <line x1="150" y1="30" x2="150" y2="80" stroke="#00d4ff" stroke-width="1.5"/>
                         <line x1="200" y1="50" x2="300" y2="50" stroke="#00d4ff" stroke-width="1.5"/>
-                        <line x1="250" y1="50" x2="250" y2="100" stroke="#00d4ff" stroke-width="1.5"/>
-                        <line x1="250" y1="100" x2="320" y2="100" stroke="#00d4ff" stroke-width="1.5"/>
-                        
-                        <line x1="50" y1="150" x2="120" y2="150" stroke="#00d4ff" stroke-width="1.5"/>
-                        <line x1="120" y1="150" x2="120" y2="180" stroke="#00d4ff" stroke-width="1.5"/>
-                        <line x1="180" y1="160" x2="280" y2="160" stroke="#00d4ff" stroke-width="1.5"/>
-                        
-                        <!-- Vias (points de connexion) -->
                         <circle cx="50" cy="30" r="3" fill="#00d4ff"/>
                         <circle cx="150" cy="30" r="3" fill="#00d4ff"/>
-                        <circle cx="150" cy="80" r="3" fill="#00d4ff"/>
                         <circle cx="200" cy="50" r="3" fill="#00d4ff"/>
-                        <circle cx="250" cy="50" r="3" fill="#00d4ff"/>
-                        <circle cx="250" cy="100" r="3" fill="#00d4ff"/>
-                        <circle cx="320" cy="100" r="3" fill="#00d4ff"/>
-                        
-                        <circle cx="50" cy="150" r="3" fill="#00d4ff"/>
-                        <circle cx="120" cy="150" r="3" fill="#00d4ff"/>
-                        <circle cx="120" cy="180" r="3" fill="#00d4ff"/>
-                        <circle cx="180" cy="160" r="3" fill="#00d4ff"/>
-                        <circle cx="280" cy="160" r="3" fill="#00d4ff"/>
-                        
-                        <!-- Composants -->
-                        <rect x="140" y="70" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
-                        <rect x="240" y="90" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
-                        <rect x="110" y="170" width="20" height="15" rx="2" fill="#00d4ff" opacity="0.5"/>
-                        
-                        <!-- Pads dorés -->
                         <circle cx="290" cy="180" r="4" fill="#ffd700"/>
                         <circle cx="300" cy="180" r="4" fill="#ffd700"/>
-                        <circle cx="310" cy="180" r="4" fill="#ffd700"/>
-                        <circle cx="320" cy="180" r="4" fill="#ffd700"/>
-                        <circle cx="290" cy="190" r="4" fill="#ffd700"/>
-                        <circle cx="300" cy="190" r="4" fill="#ffd700"/>
-                        <circle cx="310" cy="190" r="4" fill="#ffd700"/>
-                        <circle cx="320" cy="190" r="4" fill="#ffd700"/>
                     </svg>
                 `;
                 badge.innerHTML = circuitPattern;
 
-                // Container principal
                 const mainContainer = document.createElement('div');
-                mainContainer.style.cssText = `
-                    position: relative;
-                    z-index: 2;
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    padding: 20px;
-                `;
+                mainContainer.style.cssText = `position: relative; z-index: 2; width: 100%; height: 100%; display: flex; padding: 20px;`;
                 badge.appendChild(mainContainer);
 
-                // Section gauche avec QR code
                 const leftSection = document.createElement('div');
-                leftSection.style.cssText = `
-                    flex: 0 0 120px;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                `;
+                leftSection.style.cssText = `flex: 0 0 120px; display: flex; flex-direction: column; align-items: center; justify-content: center;`;
                 mainContainer.appendChild(leftSection);
 
-                // QR Code container avec bordure blanche
                 const qrContainer = document.createElement('div');
                 qrContainer.id = 'badgeQR';
-                qrContainer.style.cssText = `
-                    background: white;
-                    padding: 8px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                `;
+                qrContainer.style.cssText = `background: white; padding: 8px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);`;
                 leftSection.appendChild(qrContainer);
 
-                // Section droite avec ESP01S et infos
                 const rightSection = document.createElement('div');
-                rightSection.style.cssText = `
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                    padding-left: 20px;
-                `;
+                rightSection.style.cssText = `flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding-left: 20px;`;
                 mainContainer.appendChild(rightSection);
 
-                // Top: Icône puce + ESP01S
                 const topSection = document.createElement('div');
-                topSection.style.cssText = `
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                `;
+                topSection.style.cssText = `display: flex; align-items: center; gap: 10px;`;
                 topSection.innerHTML = `
-                    <div style="
-                        width: 50px;
-                        height: 50px;
-                        background: rgba(0,0,0,0.3);
-                        border-radius: 8px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        border: 2px solid #00d4ff;
-                        box-shadow: 0 0 15px rgba(0,212,255,0.3);
-                    ">
+                    <div style="width: 50px; height: 50px; background: rgba(0,0,0,0.3); border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 2px solid #00d4ff; box-shadow: 0 0 15px rgba(0,212,255,0.3);">
                         <svg width="35" height="35" viewBox="0 0 24 24" fill="#00d4ff">
                             <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/>
-                            <rect x="6" y="9" width="12" height="1" fill="#00d4ff"/>
-                            <rect x="6" y="14" width="12" height="1" fill="#00d4ff"/>
                         </svg>
                     </div>
-                    <div style="
-                        background: rgba(0,0,0,0.5);
-                        padding: 5px 12px;
-                        border-radius: 5px;
-                        border: 1px solid #00d4ff;
-                        font-size: 11px;
-                        color: #00ff00;
-                        font-weight: bold;
-                        letter-spacing: 1px;
-                        font-family: 'Courier New', monospace;
-                    ">ESP01S</div>
+                    <div style="background: rgba(0,0,0,0.5); padding: 5px 12px; border-radius: 5px; border: 1px solid #00d4ff; font-size: 11px; color: #00ff00; font-weight: bold; letter-spacing: 1px; font-family: 'Courier New', monospace;">ESP01S</div>
                 `;
                 rightSection.appendChild(topSection);
 
-                // Middle: Infos employé
                 const infoSection = document.createElement('div');
-                infoSection.style.cssText = `
-                    flex: 1;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                `;
+                infoSection.style.cssText = `flex: 1; display: flex; flex-direction: column; justify-content: center;`;
                 infoSection.innerHTML = `
-                    <div style="
-                        font-size: 18px;
-                        font-weight: bold;
-                        color: white;
-                        text-transform: uppercase;
-                        margin-bottom: 5px;
-                        letter-spacing: 0.5px;
-                        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                    ">${prenom} ${nom}</div>
-                    <div style="
-                        font-size: 11px;
-                        color: #00d4ff;
-                        text-transform: uppercase;
-                        font-weight: 600;
-                        letter-spacing: 1px;
-                    ">${poste}</div>
+                    <div style="font-size: 18px; font-weight: bold; color: white; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">${prenom} ${nom}</div>
+                    <div style="font-size: 11px; color: #00d4ff; text-transform: uppercase; font-weight: 600; letter-spacing: 1px;">${poste}</div>
                 `;
                 rightSection.appendChild(infoSection);
 
-                // Bottom: LED indicateur + ID
                 const bottomSection = document.createElement('div');
-                bottomSection.style.cssText = `
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-end;
-                `;
+                bottomSection.style.cssText = `display: flex; justify-content: space-between; align-items: flex-end;`;
                 bottomSection.innerHTML = `
                     <div style="display: flex; gap: 5px; align-items: center;">
-                        <div style="
-                            width: 10px;
-                            height: 10px;
-                            background: #00ff00;
-                            border-radius: 50%;
-                            box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
-                        "></div>
-                        <div style="
-                            font-size: 8px;
-                            color: rgba(255,255,255,0.6);
-                            font-family: 'Courier New', monospace;
-                        ">ACTIVE</div>
+                        <div style="width: 10px; height: 10px; background: #00ff00; border-radius: 50%; box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;"></div>
+                        <div style="font-size: 8px; color: rgba(255,255,255,0.6); font-family: 'Courier New', monospace;">ACTIVE</div>
                     </div>
-                    <div style="
-                        font-size: 9px;
-                        color: rgba(255,255,255,0.5);
-                        font-family: 'Courier New', monospace;
-                    ">ID: ${empId.slice(-8)}</div>
+                    <div style="font-size: 9px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace;">ID: ${empId.slice(-8)}</div>
                 `;
                 rightSection.appendChild(bottomSection);
 
-                // Générer QR Code au format JSON
-                const qrData = JSON.stringify({
-                    id: empId,
-                    name: `${prenom} ${nom}`
-                });
+                const qrData = JSON.stringify({ id: empId, name: `${nom} ${prenom}` });
                 
                 if (window.QRCode) {
                     new QRCode(qrContainer, {
-                        text: qrData,
-                        width: 90,
-                        height: 90,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
+                        text: qrData, width: 90, height: 90,
+                        colorDark: "#000000", colorLight: "#ffffff",
                         correctLevel: QRCode.CorrectLevel.H
                     });
-                    console.log('✅ QR Badge généré:', qrData);
                 }
 
-                // Attendre le rendu
                 await new Promise(r => setTimeout(r, 1000));
                 
-                // Convertir en canvas
-                if (!window.html2canvas) {
-                    throw new Error('html2canvas non chargé');
-                }
+                if (!window.html2canvas) throw new Error('html2canvas non chargé');
                 
                 const canvas = await html2canvas(badge, { 
-                    scale: 4,
-                    backgroundColor: null,
-                    logging: false,
-                    useCORS: true
+                    scale: 4, backgroundColor: null, logging: false, useCORS: true
                 });
                 const imgData = canvas.toDataURL('image/png');
                 
-                // Créer PDF format carte de crédit (85.6 x 53.98 mm)
-                const pdf = new jsPDF({ 
-                    orientation: 'landscape', 
-                    unit: 'mm', 
-                    format: [85.6, 53.98] 
-                });
+                const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 53.98] });
                 pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98);
                 pdf.save(`Badge_${prenom}_${nom}.pdf`);
                 
-                // Nettoyer
                 document.body.removeChild(badge);
-                
-                console.log('✅ Badge généré avec succès');
                 alert('Badge généré avec succès !');
                 
             } catch (error) {
@@ -797,17 +632,11 @@
                 const response = await fetch(`${API_URL}/employees`);
                 const data = await response.json();
                 
-                if (!data.success || !data.employees) {
-                    throw new Error('Impossible de récupérer les employés');
-                }
+                if (!data.success || !data.employees) throw new Error('Impossible de récupérer les employés');
                 
                 const emp = data.employees.find(e => e.id === id);
+                if (!emp) throw new Error('Employé non trouvé');
                 
-                if (!emp) {
-                    throw new Error('Employé non trouvé');
-                }
-                
-                // Remplir le formulaire
                 currentEditId = id;
                 document.getElementById('formTitle').textContent = 'Modifier Employé';
                 document.getElementById('employeeType').value = emp.type || 'employe';
@@ -820,11 +649,7 @@
                 
                 toggleFinancialFields();
                 document.getElementById('addEmployeeForm').style.display = 'block';
-                
-                // Scroll vers le formulaire
                 document.getElementById('addEmployeeForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                
-                console.log('✅ Formulaire d\'édition chargé');
                 
             } catch (error) {
                 console.error('❌ Erreur édition:', error);
@@ -834,43 +659,27 @@
             }
         }
 
-        // === QR CODE (CORRIGÉ POUR ANDROID) ===
+        // === QR CODE ===
         function showQRCode(id, name) {
-            console.log('📸 Affichage QR pour:', name, id);
-            
             const container = document.getElementById('qrCodeContainer');
             const img = document.getElementById('qrImage');
-            
-            // Nettoyer le conteneur
             container.innerHTML = '';
             img.style.display = 'none';
             
-            // ✅ FORMAT JSON POUR ANDROID (comme dans le code Java)
-            const qrData = JSON.stringify({
-                id: id,
-                name: name
-            });
+            const qrData = JSON.stringify({ id: id, name: name });
             
-            // Essayer de générer avec QRCode.js
             if (window.QRCode) {
                 try {
                     new QRCode(container, {
-                        text: qrData,
-                        width: 300,
-                        height: 300,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff"
+                        text: qrData, width: 300, height: 300,
+                        colorDark: "#000000", colorLight: "#ffffff"
                     });
-                    console.log('✅ QR généré avec QRCode.js:', qrData);
                 } catch (error) {
-                    console.error('❌ Erreur QRCode.js:', error);
-                    // Fallback sur API externe
                     img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
                     img.style.display = 'block';
                     container.style.display = 'none';
                 }
             } else {
-                // Fallback sur API externe
                 img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
                 img.style.display = 'block';
             }
@@ -904,9 +713,7 @@
 
         // === CHARGEMENT EMPLOYÉS ===
         async function loadEmployees() {
-            console.log('📥 Chargement employés...');
             showLoading();
-            
             try {
                 const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
                 const list = document.getElementById('employeesList');
@@ -919,11 +726,11 @@
                 list.innerHTML = data.employees.map(e => `
                     <div class="employee-item">
                         <div>
-                            <div class="employee-name">${e.prenom} ${e.nom}</div>
+                            <div class="employee-name">${e.nom} ${e.prenom}</div>
                             <span class="employee-type">${e.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
                         </div>
                         <div class="employee-actions">
-                            <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.prenom} ${e.nom}')" title="QR Code">
+                            <button class="btn-qr" onclick="showQRCode('${e.id}', '${e.nom} ${e.prenom}')" title="QR Code">
                                 <i class="fas fa-qrcode"></i>
                             </button>
                             <button class="btn-badge" onclick="generateBadgePDF('${e.id}', '${e.prenom}', '${e.nom}', '${e.profession || 'Employé'}')" title="Générer Badge">
@@ -939,12 +746,8 @@
                     </div>
                 `).join('');
                 
-                console.log(`✅ ${data.employees.length} employés chargés`);
-                
             } catch (error) {
                 console.error('❌ Erreur chargement employés:', error);
-                document.getElementById('employeesList').innerHTML = 
-                    '<p style="color:#ef4444;">Erreur de chargement. Vérifiez la connexion au serveur.</p>';
             } finally {
                 hideLoading();
             }
@@ -964,9 +767,7 @@
             document.getElementById('formTitle').textContent = 'Nouvel Employé/Étudiant';
         }
         
-        function hideAddEmployeeForm() { 
-            resetForm(); 
-        }
+        function hideAddEmployeeForm() { resetForm(); }
         
         function resetForm() {
             document.getElementById('addEmployeeForm').style.display = 'none';
@@ -990,8 +791,7 @@
             
             try {
                 const emp = {
-                    nom,
-                    prenom,
+                    nom, prenom,
                     type: document.getElementById('employeeType').value,
                     email: document.getElementById('employeeEmail').value.trim() || null,
                     telephone: document.getElementById('employeeTelephone').value.trim() || null,
@@ -1026,30 +826,18 @@
             }
         }
 
-        // === SCANNER QR WEBCAM (Compatible avec Android) ===
-
-        let isScanning = false;
-
+        // === SCANNER QR ===
         async function startCamera() {
-            if (isScanning) {
-                console.log('⚠️ Scanner déjà actif');
-                return;
-            }
+            if (isScanning) return;
 
             try {
-                // Demander accès caméra arrière si possible
                 videoStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: { ideal: 'environment' }, // Caméra arrière préférée
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } 
                 });
                 
                 const video = document.getElementById('scanner-video');
                 video.srcObject = videoStream;
                 
-                // Attendre que la vidéo soit prête
                 await new Promise((resolve) => {
                     video.onloadedmetadata = () => {
                         video.play();
@@ -1058,269 +846,140 @@
                 });
                 
                 isScanning = true;
-                console.log('📷 Caméra démarrée');
-                
-                // Scanner toutes les 300ms pour meilleure réactivité
                 scanInterval = setInterval(() => scanQRCode(video), 300);
-                
-                document.getElementById('scan-result').innerHTML = 
-                    '<p style="color: #10b981; font-weight: 600;">📷 Scanner actif - Présentez un QR Code</p>';
+                document.getElementById('scan-result').innerHTML = '<p style="color: #10b981; font-weight: 600;">📷 Scanner actif</p>';
                     
             } catch (error) {
                 console.error('❌ Erreur caméra:', error);
-                
                 let errorMsg = 'Impossible d\'accéder à la caméra.';
-                if (error.name === 'NotAllowedError') {
-                    errorMsg = 'Permission caméra refusée. Autorisez l\'accès dans les paramètres du navigateur.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg = 'Aucune caméra détectée sur cet appareil.';
-                }
-                
-                document.getElementById('scan-result').innerHTML = 
-                    `<p style="color: #ef4444; font-weight: 600;">❌ ${errorMsg}</p>`;
+                if (error.name === 'NotAllowedError') errorMsg = 'Permission caméra refusée.';
+                document.getElementById('scan-result').innerHTML = `<p style="color: #ef4444; font-weight: 600;">❌ ${errorMsg}</p>`;
             }
         }
 
         function stopCamera() { 
-            if (videoStream) { 
-                videoStream.getTracks().forEach(track => track.stop()); 
-                videoStream = null;
-            }
-            
-            if (scanInterval) {
-                clearInterval(scanInterval);
-                scanInterval = null;
-            }
-            
+            if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+            if (scanInterval) clearInterval(scanInterval);
             isScanning = false;
-            
             const video = document.getElementById('scanner-video');
             if (video) video.srcObject = null;
-            
-            console.log('📷 Caméra arrêtée');
-            
             document.getElementById('scan-result').innerHTML = '';
         }
 
         function scanQRCode(video) {
-            if (!window.jsQR || !video.videoWidth || !video.videoHeight) {
-                return;
-            }
+            if (!window.jsQR || !video.videoWidth || !video.videoHeight) return;
             
             try {
-                // Créer canvas temporaire pour analyser l'image
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth; 
                 canvas.height = video.videoHeight;
-                
                 const ctx = canvas.getContext('2d'); 
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height, {
-                    inversionAttempts: "dontInvert" // Optimisation
-                });
+                const code = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
                 
                 if (code && code.data) { 
-                    console.log('✅ QR Code détecté:', code.data);
                     handleQRScan(code.data); 
-                    stopCamera(); // Arrêter après scan réussi
+                    stopCamera();
                 }
             } catch (error) {
                 console.error('❌ Erreur analyse QR:', error);
             }
         }
 
-     / ========== SCANNER QR + POINTAGE CORRIGÉ (100% compatible Android) ==========
-async function handleQRScan(qrData) {
-    showLoading();
-    try {
-        // ✅ Parser le JSON du QR Code
-        let employeeData = JSON.parse(qrData);
-        const employeeId = employeeData.id;
-        
-        if (!employeeId) {
-            throw new Error("ID employé manquant dans le QR Code");
-        }
+        /* ===== SCANNER QR + POINTAGE CORRIGÉ (100% compatible Android) ===== */
+        async function handleQRScan(qrData) {
+            showLoading();
+            try {
+                let employeeData = JSON.parse(qrData);
+                const employeeId = employeeData.id;
+                
+                if (!employeeId) throw new Error("ID employé manquant");
 
-        // ✅ ÉTAPE 1: Récupérer l'employé depuis la BDD pour avoir les bonnes données
-        const empRes = await fetch(`${API_URL}/employees`);
-        const empJson = await empRes.json();
-        
-        if (!empJson.success || !empJson.employees) {
-            throw new Error("Impossible de récupérer les employés");
-        }
-        
-        const employee = empJson.employees.find(e => e.id === employeeId);
-        if (!employee) {
-            throw new Error("Employé non trouvé dans la base de données");
-        }
+                const empRes = await fetch(`${API_URL}/employees`);
+                const empJson = await empRes.json();
+                
+                if (!empJson.success || !empJson.employees) throw new Error("Impossible de récupérer les employés");
+                
+                const employee = empJson.employees.find(e => e.id === employeeId);
+                if (!employee) throw new Error("Employé non trouvé");
 
-        // ✅ ÉTAPE 2: Construire le nom EXACTEMENT comme Android: "Nom Prénom"
-        const fullName = `${employee.nom} ${employee.prenom}`;
-        console.log(`✅ Employé trouvé: ${fullName}`);
+                const fullName = `${employee.nom} ${employee.prenom}`;
 
-        // ✅ ÉTAPE 3: Déterminer le type de pointage (arrivee/sortie)
-        const histRes = await fetch(`${API_URL}/pointages/history`);
-        const hist = await histRes.json();
+                const histRes = await fetch(`${API_URL}/pointages/history`);
+                const hist = await histRes.json();
 
-        const today = new Date().toISOString().split('T')[0];
-        const todayPointages = (hist.pointages || [])
-            .filter(p => (p.employee_id || p.employeeId) === employeeId)
-            .filter(p => {
-                const pointageDate = p.date || new Date(p.timestamp).toISOString().split('T')[0];
-                return pointageDate === today;
-            })
-            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                const today = new Date().toISOString().split('T')[0];
+                const todayPointages = (hist.pointages || [])
+                    .filter(p => (p.employee_id || p.employeeId) === employeeId)
+                    .filter(p => {
+                        const pointageDate = p.date || new Date(p.timestamp).toISOString().split('T')[0];
+                        return pointageDate === today;
+                    })
+                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-        const lastPointage = todayPointages[0];
+                const lastPointage = todayPointages[0];
+                const pointageType = (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE') ? 'arrivee' : 'sortie';
 
-        // ✅ LOGIQUE: Si pas de pointage ou dernier = sortie → arrivee, sinon → sortie
-        const pointageType = (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE')
-            ? 'arrivee'
-            : 'sortie';
+                const timestamp = Date.now();
+                const payload = {
+                    employeeId: employeeId,
+                    employeeName: fullName,
+                    type: pointageType,
+                    timestamp: timestamp,
+                    date: today
+                };
 
-        console.log(`📋 Dernier pointage: ${lastPointage ? lastPointage.type : 'aucun'} → Nouveau: ${pointageType}`);
+                const res = await fetch(`${API_URL}/pointages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
 
-        // ✅ ÉTAPE 4: Créer le payload EXACTEMENT comme Android
-        const timestamp = Date.now();
-        const payload = {
-            employeeId: employeeId,
-            employeeName: fullName,        // ✅ "Razafiarinirina Angela"
-            type: pointageType,           // ✅ "arrivee" ou "sortie" (minuscule)
-            timestamp: timestamp,
-            date: today
-        };
+                const result = await res.json();
+                if (!res.ok || !result.success) throw new Error(result.message || `Erreur serveur: ${res.status}`);
 
-        console.log('📤 Envoi pointage:', payload);
+                const time = new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
+                const emoji = pointageType === 'arrivee' ? '✅' : '🚪';
+                const label = pointageType === 'arrivee' ? 'Arrivée' : 'Sortie';
 
-        // ✅ ÉTAPE 5: Envoyer au serveur
-        const res = await fetch(`${API_URL}/pointages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+                document.getElementById('scan-result').innerHTML = `
+                    <div style="background: ${color}; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                        <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${emoji}</div>
+                        <h3 style="margin: 0.5rem 0; font-size: 1.5rem; font-weight: 700;">${fullName}</h3>
+                        <p style="font-size: 1.3rem; margin: 0.5rem 0; opacity: 0.95;">${label} enregistrée</p>
+                        <p style="font-size: 1.1rem; opacity: 0.9;">${time}</p>
+                    </div>
+                `;
 
-        const result = await res.json();
-        
-        if (!res.ok || !result.success) {
-            throw new Error(result.message || `Erreur serveur: ${res.status}`);
-        }
-
-        console.log('✅ Pointage enregistré avec succès');
-
-        // ✅ ÉTAPE 6: Affichage visuel élégant
-        const time = new Date(timestamp).toLocaleTimeString('fr-FR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
-        
-        const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
-        const emoji = pointageType === 'arrivee' ? '✅' : '🚪';
-        const label = pointageType === 'arrivee' ? 'Arrivée' : 'Sortie';
-
-        document.getElementById('scan-result').innerHTML = `
-            <div style="
-                background: ${color}; 
-                color: white; 
-                padding: 1.5rem; 
-                border-radius: 1rem; 
-                text-align: center;
-                animation: fadeInUp 0.5s ease;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            ">
-                <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${emoji}</div>
-                <h3 style="margin: 0.5rem 0; font-size: 1.5rem; font-weight: 700;">${fullName}</h3>
-                <p style="font-size: 1.3rem; margin: 0.5rem 0; opacity: 0.95;">${label} enregistrée</p>
-                <p style="font-size: 1.1rem; opacity: 0.9;">${time}</p>
-            </div>
-        `;
-
-        // ✅ Rafraîchir l'historique si la modal est ouverte
-        if (document.getElementById('pointagesModal').style.display === 'block') {
-            setTimeout(() => loadPointages(), 500);
-        }
-
-        // ✅ Reprendre le scan après 3 secondes
-        setTimeout(() => {
-            document.getElementById('scan-result').innerHTML = '';
-            startCamera();
-        }, 3000);
-
-    } catch (err) {
-        console.error('❌ Erreur handleQRScan:', err);
-        
-        document.getElementById('scan-result').innerHTML = `
-            <div style="
-                background: #ef4444;
-                color: white;
-                padding: 1.5rem;
-                border-radius: 1rem;
-                text-align: center;
-                animation: fadeInUp 0.5s ease;
-            ">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
-                <h3 style="margin: 0.5rem 0;">Erreur</h3>
-                <p style="font-size: 0.95rem;">${err.message}</p>
-            </div>
-        `;
-        
-        // Reprendre le scan après 3 secondes
-        setTimeout(() => {
-            document.getElementById('scan-result').innerHTML = '';
-            startCamera();
-        }, 3000);
-    } finally {
-        hideLoading();
-    }
-}
-
-// ✅ Animation CSS
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-`;
-document.head.appendChild(style);
-        // ✅ Amélioration de la modal de scan
-        function openScanModal() {
-            openModal('scanModal');
-            
-            // Démarrer automatiquement après un court délai
-            setTimeout(() => {
-                startCamera();
-            }, 500);
-        }
-
-        // ✅ Fermer proprement le scanner
-        function closeScanModal() {
-            stopCamera();
-            closeModal('scanModal');
-        }
-
-        // Animation CSS pour le résultat
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeInUp {
-                from {
-                    opacity: 0;
-                    transform: translateY(20px);
+                if (document.getElementById('pointagesModal').style.display === 'block') {
+                    setTimeout(() => loadPointages(), 500);
                 }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
+
+                setTimeout(() => {
+                    document.getElementById('scan-result').innerHTML = '';
+                    startCamera();
+                }, 3000);
+
+            } catch (err) {
+                console.error('❌ Erreur handleQRScan:', err);
+                document.getElementById('scan-result').innerHTML = `
+                    <div style="background: #ef4444; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
+                        <h3 style="margin: 0.5rem 0;">Erreur</h3>
+                        <p style="font-size: 0.95rem;">${err.message}</p>
+                    </div>
+                `;
+                
+                setTimeout(() => {
+                    document.getElementById('scan-result').innerHTML = '';
+                    startCamera();
+                }, 3000);
+            } finally {
+                hideLoading();
             }
-        `;
-        document.head.appendChild(style);
+        }
 
         // === POINTAGES ===
         async function loadPointages() {
@@ -1340,7 +999,7 @@ document.head.appendChild(style);
                         <tbody>${data.pointages.map(p => `
                             <tr>
                                 <td>${p.employee_name || 'N/A'}</td>
-                                <td><span style="color: ${p.type === 'ENTREE' ? '#10b981' : '#ef4444'}; font-weight: 600;">${p.type}</span></td>
+                                <td><span style="color: ${(p.type === 'arrivee' || p.type === 'ENTREE') ? '#10b981' : '#ef4444'}; font-weight: 600;">${p.type.toUpperCase()}</span></td>
                                 <td>${new Date(p.timestamp).toLocaleDateString('fr-FR')}</td>
                                 <td>${new Date(p.timestamp).toLocaleTimeString('fr-FR')}</td>
                             </tr>
@@ -1407,7 +1066,7 @@ document.head.appendChild(style);
                 
                 const today = new Date().toISOString().split('T')[0];
                 const todayEntries = pointData.pointages.filter(p => 
-                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'ENTREE' || p.type === 'arrivee')
                 ).length;
                 
                 const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
@@ -1415,41 +1074,31 @@ document.head.appendChild(style);
                 document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
                 const todayExits = pointData.pointages.filter(p => 
-                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'SORTIE'
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'SORTIE' || p.type === 'sortie')
                 ).length;
 
-                // Bar Chart
                 const barCtx = document.getElementById('barChart').getContext('2d');
                 if (charts.bar) charts.bar.destroy();
                 charts.bar = new Chart(barCtx, { 
                     type: 'bar', 
                     data: { 
                         labels: ['Entrées', 'Sorties'], 
-                        datasets: [{ 
-                            label: 'Aujourd\'hui',
-                            data: [todayEntries, todayExits], 
-                            backgroundColor: ['#10b981', '#ef4444'] 
-                        }] 
+                        datasets: [{ label: 'Aujourd\'hui', data: [todayEntries, todayExits], backgroundColor: ['#10b981', '#ef4444'] }] 
                     }, 
                     options: { responsive: true, maintainAspectRatio: true } 
                 });
 
-                // Pie Chart
                 const pieCtx = document.getElementById('pieChart').getContext('2d');
                 if (charts.pie) charts.pie.destroy();
                 charts.pie = new Chart(pieCtx, { 
                     type: 'doughnut', 
                     data: { 
                         labels: ['Présents', 'Absents'], 
-                        datasets: [{ 
-                            data: [todayEntries, employees - todayEntries], 
-                            backgroundColor: ['#10b981', '#ef4444'] 
-                        }] 
+                        datasets: [{ data: [todayEntries, employees - todayEntries], backgroundColor: ['#10b981', '#ef4444'] }] 
                     }, 
                     options: { responsive: true, maintainAspectRatio: true } 
                 });
 
-                // Line Chart
                 const last7Days = Array(7).fill().map((_, i) => {
                     const d = new Date(); 
                     d.setDate(d.getDate() - i); 
@@ -1458,7 +1107,7 @@ document.head.appendChild(style);
                 
                 const lineData = last7Days.map(date => 
                     pointData.pointages.filter(p => 
-                        new Date(p.timestamp).toISOString().split('T')[0] === date && p.type === 'ENTREE'
+                        new Date(p.timestamp).toISOString().split('T')[0] === date && (p.type === 'ENTREE' || p.type === 'arrivee')
                     ).length
                 );
                 
@@ -1468,13 +1117,7 @@ document.head.appendChild(style);
                     type: 'line', 
                     data: { 
                         labels: last7Days.map(d => new Date(d).toLocaleDateString('fr-FR')), 
-                        datasets: [{ 
-                            label: 'Entrées (7 derniers jours)', 
-                            data: lineData, 
-                            borderColor: '#6366f1', 
-                            tension: 0.4, 
-                            fill: false 
-                        }] 
+                        datasets: [{ label: 'Entrées (7 derniers jours)', data: lineData, borderColor: '#6366f1', tension: 0.4, fill: false }] 
                     }, 
                     options: { responsive: true, maintainAspectRatio: true } 
                 });
@@ -1485,129 +1128,114 @@ document.head.appendChild(style);
                 hideLoading();
             }
         }
-    // === CONSTANTES CORRECTES ===
-const ANCHORS = [
-    { id: 1, x: 0.2, y: 0.2, label: "Ancre 1" },
-    { id: 2, x: 0.2, y: 4.8, label: "Ancre 2" },
-    { id: 3, x: 5.8, y: 4.8, label: "Ancre 3" }
-];
 
-const ROOM_WIDTH = 6;   // mètres
-const ROOM_HEIGHT = 5;  // mètres
+        // === TRACKING ===
+        const ANCHORS = [
+            { id: 1, x: 0.2, y: 0.2, label: "Ancre 1" },
+            { id: 2, x: 0.2, y: 4.8, label: "Ancre 2" },
+            { id: 3, x: 5.8, y: 4.8, label: "Ancre 3" }
+        ];
+        const ROOM_WIDTH = 6;
+        const ROOM_HEIGHT = 5;
+        let trackingInterval = null;
 
-let trackingInterval = null;
+        function initTrackingMap() {
+            const container = document.getElementById('anchorsContainer');
+            const badgesContainer = document.getElementById('badgesContainer');
+            container.innerHTML = '';
+            badgesContainer.innerHTML = '';
 
-function initTrackingMap() {
-    const container = document.getElementById('anchorsContainer');
-    const badgesContainer = document.getElementById('badgesContainer');
-    container.innerHTML = '';
-    badgesContainer.innerHTML = '';
-
-    // Ajouter les 3 ancres avec VRAIES positions
-    ANCHORS.forEach(anchor => {
-        const el = document.createElement('div');
-        el.style.position = 'absolute';
-        el.style.left = `${(anchor.x / ROOM_WIDTH) * 100}%`;
-        el.style.top = `${(anchor.y / ROOM_HEIGHT) * 100}%`;
-        el.style.transform = 'translate(-50%, -50%)';
-        el.style.textAlign = 'center';
-        el.style.color = '#00d4ff';
-        el.style.fontWeight = 'bold';
-        el.style.zIndex = '5';
-        el.innerHTML = `
-            <div style="width: 50px; height: 50px; background: rgba(0,212,255,0.2); border: 3px solid #00d4ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px #00d4ff;">
-                <i class="fas fa-broadcast-tower" style="font-size: 1.8rem; color: #00d4ff;"></i>
-            </div>
-            <div style="margin-top: 8px; font-size: 0.9rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">${anchor.label}</div>
-            <div style="font-size: 0.7rem; color: rgba(255,255,255,0.6);">(${anchor.x}, ${anchor.y})</div>
-        `;
-        container.appendChild(el);
-    });
-    
-    console.log('🗺️ Carte initialisée avec', ANCHORS.length, 'ancres');
-}
-
-async function updateTracking() {
-    try {
-        const res = await fetch(`${API_URL}/employees/active`);
-        const data = await res.json();
-
-        if (!data.success || !data.employees) {
-            document.getElementById('trackingList').innerHTML = 
-                '<p style="color:#ef4444;">Erreur de connexion au serveur.</p>';
-            return;
-        }
-
-        const badgesContainer = document.getElementById('badgesContainer');
-        const listContainer = document.getElementById('trackingList');
-        badgesContainer.innerHTML = '';
-        listContainer.innerHTML = '';
-
-        const now = Date.now();
-        let activeCount = 0;
-
-        data.employees.forEach(emp => {
-            const x = emp.last_position_x;
-            const y = emp.last_position_y;
-            const lastSeen = emp.last_seen;
-
-            // Employé actif si vu dans les 10 dernières secondes
-            const isActive = lastSeen && (now - lastSeen) < 10000;
-
-            // ✅ Badge sur la carte (UNIQUEMENT si position valide)
-            if (isActive && x !== null && y !== null && x >= 0 && y >= 0) {
-                const badgeEl = document.createElement('div');
-                badgeEl.style.position = 'absolute';
-                badgeEl.style.left = `${(x / ROOM_WIDTH) * 100}%`;
-                badgeEl.style.top = `${(y / ROOM_HEIGHT) * 100}%`;
-                badgeEl.style.transform = 'translate(-50%, -50%)';
-                badgeEl.style.textAlign = 'center';
-                badgeEl.style.zIndex = '10';
-                badgeEl.style.animation = 'pulse 2s infinite';
-                badgeEl.innerHTML = `
-                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #00ff00; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 25px #00ff00;">
-                        <i class="fas fa-id-badge" style="font-size: 1.5rem; color: white;"></i>
-                        <div style="font-size: 0.7rem; color: white; font-weight: bold; margin-top: 2px;">${emp.prenom}</div>
+            ANCHORS.forEach(anchor => {
+                const el = document.createElement('div');
+                el.style.position = 'absolute';
+                el.style.left = `${(anchor.x / ROOM_WIDTH) * 100}%`;
+                el.style.top = `${(anchor.y / ROOM_HEIGHT) * 100}%`;
+                el.style.transform = 'translate(-50%, -50%)';
+                el.style.textAlign = 'center';
+                el.style.color = '#00d4ff';
+                el.style.fontWeight = 'bold';
+                el.style.zIndex = '5';
+                el.innerHTML = `
+                    <div style="width: 50px; height: 50px; background: rgba(0,212,255,0.2); border: 3px solid #00d4ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px #00d4ff;">
+                        <i class="fas fa-broadcast-tower" style="font-size: 1.8rem; color: #00d4ff;"></i>
                     </div>
-                    <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: bold; text-shadow: 0 1px 2px black; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px;">
-                        ${x.toFixed(1)}m, ${y.toFixed(1)}m
-                    </div>
+                    <div style="margin-top: 8px; font-size: 0.9rem; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">${anchor.label}</div>
+                    <div style="font-size: 0.7rem; color: rgba(255,255,255,0.6);">(${anchor.x}, ${anchor.y})</div>
                 `;
-                badgesContainer.appendChild(badgeEl);
-                activeCount++;
-                
-                console.log(`📍 ${emp.prenom} ${emp.nom}: (${x.toFixed(2)}, ${y.toFixed(2)})`);
-            }
-
-            // ✅ Liste textuelle
-            const status = isActive && x !== null && y !== null
-                ? `<span style="color:#10b981; font-weight:600;">● En ligne</span> → (${x.toFixed(1)}m, ${y.toFixed(1)}m)`
-                : `<span style="color:#ef4444;">○ Hors ligne</span>`;
-
-            const item = document.createElement('div');
-            item.className = 'employee-item';
-            item.innerHTML = `
-                <div>
-                    <div class="employee-name">${emp.prenom} ${emp.nom}</div>
-                    <span class="employee-type">${emp.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
-                </div>
-                <div style="font-size: 0.9rem; color: #e2e8f0;">${status}</div>
-            `;
-            listContainer.appendChild(item);
-        });
-
-        if (data.employees.length === 0) {
-            listContainer.innerHTML = '<p style="text-align:center; color:#94a3b8;">Aucun employé enregistré.</p>';
-        } else {
-            console.log(`🎯 Tracking: ${activeCount}/${data.employees.length} employés visibles`);
+                container.appendChild(el);
+            });
         }
 
-    } catch (error) {
-        console.error('❌ Erreur tracking:', error);
-        document.getElementById('trackingList').innerHTML = 
-            '<p style="color:#ef4444;">Erreur de chargement.</p>';
-    }
-}
+        async function updateTracking() {
+            try {
+                const res = await fetch(`${API_URL}/employees/active`);
+                const data = await res.json();
+
+                if (!data.success || !data.employees) {
+                    document.getElementById('trackingList').innerHTML = '<p style="color:#ef4444;">Erreur de connexion.</p>';
+                    return;
+                }
+
+                const badgesContainer = document.getElementById('badgesContainer');
+                const listContainer = document.getElementById('trackingList');
+                badgesContainer.innerHTML = '';
+                listContainer.innerHTML = '';
+
+                const now = Date.now();
+                let activeCount = 0;
+
+                data.employees.forEach(emp => {
+                    const x = emp.last_position_x;
+                    const y = emp.last_position_y;
+                    const lastSeen = emp.last_seen;
+                    const isActive = lastSeen && (now - lastSeen) < 10000;
+
+                    if (isActive && x !== null && y !== null && x >= 0 && y >= 0) {
+                        const badgeEl = document.createElement('div');
+                        badgeEl.style.position = 'absolute';
+                        badgeEl.style.left = `${(x / ROOM_WIDTH) * 100}%`;
+                        badgeEl.style.top = `${(y / ROOM_HEIGHT) * 100}%`;
+                        badgeEl.style.transform = 'translate(-50%, -50%)';
+                        badgeEl.style.textAlign = 'center';
+                        badgeEl.style.zIndex = '10';
+                        badgeEl.style.animation = 'pulse 2s infinite';
+                        badgeEl.innerHTML = `
+                            <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #10b981, #059669); border: 3px solid #00ff00; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 25px #00ff00;">
+                                <i class="fas fa-id-badge" style="font-size: 1.5rem; color: white;"></i>
+                                <div style="font-size: 0.7rem; color: white; font-weight: bold; margin-top: 2px;">${emp.prenom}</div>
+                            </div>
+                            <div style="margin-top: 8px; font-size: 0.8rem; color: #10b981; font-weight: bold; text-shadow: 0 1px 2px black; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px;">
+                                ${x.toFixed(1)}m, ${y.toFixed(1)}m
+                            </div>
+                        `;
+                        badgesContainer.appendChild(badgeEl);
+                        activeCount++;
+                    }
+
+                    const status = isActive && x !== null && y !== null
+                        ? `<span style="color:#10b981; font-weight:600;">● En ligne</span> → (${x.toFixed(1)}m, ${y.toFixed(1)}m)`
+                        : `<span style="color:#ef4444;">○ Hors ligne</span>`;
+
+                    const item = document.createElement('div');
+                    item.className = 'employee-item';
+                    item.innerHTML = `
+                        <div>
+                            <div class="employee-name">${emp.nom} ${emp.prenom}</div>
+                            <span class="employee-type">${emp.type === 'employe' ? 'Employé' : 'Étudiant'}</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: #e2e8f0;">${status}</div>
+                    `;
+                    listContainer.appendChild(item);
+                });
+
+                if (data.employees.length === 0) {
+                    listContainer.innerHTML = '<p style="text-align:center; color:#94a3b8;">Aucun employé enregistré.</p>';
+                }
+            } catch (error) {
+                console.error('❌ Erreur tracking:', error);
+            }
+        }
+
         // === EXPORT EXCEL ===
         function exportToExcel(data, filename) {
             try {
@@ -1615,7 +1243,6 @@ async function updateTracking() {
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Données");
                 XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
-                console.log('✅ Export Excel:', filename);
             } catch (error) {
                 console.error('❌ Erreur export:', error);
                 alert('Erreur lors de l\'export');
@@ -1627,18 +1254,12 @@ async function updateTracking() {
             try {
                 const data = await safeFetch(`${API_URL}/employees`, { employees: [] });
                 const exportData = data.employees.map(e => ({
-                    ID: e.id,
-                    Type: e.type === 'employe' ? 'Employé' : 'Étudiant',
-                    Nom: e.nom,
-                    Prénom: e.prenom,
-                    Email: e.email || '',
-                    Téléphone: e.telephone || '',
-                    'Taux Horaire': e.taux_horaire || '',
-                    'Frais Écolage': e.frais_ecolage || ''
+                    ID: e.id, Type: e.type === 'employe' ? 'Employé' : 'Étudiant',
+                    Nom: e.nom, Prénom: e.prenom, Email: e.email || '', Téléphone: e.telephone || '',
+                    'Taux Horaire': e.taux_horaire || '', 'Frais Écolage': e.frais_ecolage || ''
                 }));
                 exportToExcel(exportData, "Employes_RH");
             } catch (error) {
-                console.error('❌ Erreur export employés:', error);
                 alert('Erreur lors de l\'export');
             } finally {
                 hideLoading();
@@ -1650,15 +1271,11 @@ async function updateTracking() {
             try {
                 const data = await safeFetch(`${API_URL}/pointages/history`, { pointages: [] });
                 const exportData = data.pointages.map(p => ({
-                    Employé: p.employee_name || 'N/A',
-                    Type: p.type,
+                    Employé: p.employee_name || 'N/A', Type: p.type,
                     Date: new Date(p.timestamp).toLocaleDateString('fr-FR'),
                     Heure: new Date(p.timestamp).toLocaleTimeString('fr-FR')
                 }));
                 exportToExcel(exportData, "Pointages_Historique");
-            } catch (error) {
-                console.error('❌ Erreur export pointages:', error);
-                alert('Erreur lors de l\'export');
             } finally {
                 hideLoading();
             }
@@ -1669,15 +1286,11 @@ async function updateTracking() {
             try {
                 const data = await safeFetch(`${API_URL}/salary/history`, { salaries: [] });
                 const exportData = data.salaries.map(s => ({
-                    Employé: s.employee_name || 'N/A',
-                    Type: s.type,
+                    Employé: s.employee_name || 'N/A', Type: s.type,
                     Montant: parseFloat(s.amount).toFixed(2) + ' Ar',
                     Date: new Date(s.date).toLocaleDateString('fr-FR')
                 }));
                 exportToExcel(exportData, "Salaires_Historique");
-            } catch (error) {
-                console.error('❌ Erreur export salaires:', error);
-                alert('Erreur lors de l\'export');
             } finally {
                 hideLoading();
             }
@@ -1693,7 +1306,7 @@ async function updateTracking() {
                 
                 const today = new Date().toISOString().split('T')[0];
                 const todayEntries = ptData.pointages.filter(p => 
-                    new Date(p.timestamp).toISOString().split('T')[0] === today && p.type === 'ENTREE'
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'ENTREE' || p.type === 'arrivee')
                 ).length;
                 const employees = empData.employees.filter(e => e.type === 'employe').length;
                 const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
@@ -1701,14 +1314,10 @@ async function updateTracking() {
                 const exportData = [{
                     'Total Employés': employees,
                     'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
-                    'Taux Présence': rate + '%',
-                    'Taux Absence': (100 - rate) + '%',
+                    'Taux Présence': rate + '%', 'Taux Absence': (100 - rate) + '%',
                     Date: new Date().toLocaleDateString('fr-FR')
                 }];
                 exportToExcel(exportData, "Statistiques_RH");
-            } catch (error) {
-                console.error('❌ Erreur export stats:', error);
-                alert('Erreur lors de l\'export');
             } finally {
                 hideLoading();
             }
@@ -1743,7 +1352,6 @@ async function updateTracking() {
                     document.getElementById('adminUser').value = s.adminUser || 'admin';
                     document.getElementById('adminPassword').value = s.adminPassword || 'admin123';
                     API_URL = s.serverURL + '/api';
-                    console.log('⚙️ Paramètres chargés');
                 } catch (error) {
                     console.error('❌ Erreur chargement paramètres:', error);
                 }
@@ -1800,7 +1408,6 @@ async function updateTracking() {
         // === MODALES ===
         function openModal(id) {
             document.getElementById(id).style.display = 'block';
-            console.log('📂 Ouverture modal:', id);
             
             if (id === 'employeesModal') loadEmployees();
             if (id === 'pointagesModal') loadPointages();
@@ -1811,17 +1418,15 @@ async function updateTracking() {
                 updateTracking();
                 trackingInterval = setInterval(updateTracking, 3000);
             }
-            // AJOUTER CE BLOC POUR LE SCANNER AMÉLIORÉ
             if (id === 'scanModal') {
-                openScanModal(); // Utiliser la nouvelle fonction améliorée
+                setTimeout(() => startCamera(), 500);
             }
         }
         
         function closeModal(id) {
             document.getElementById(id).style.display = 'none';
-            console.log('📁 Fermeture modal:', id);
             
-            if (id === 'scanModal') closeScanModal(); // Utiliser la nouvelle fonction
+            if (id === 'scanModal') stopCamera();
             if (id === 'employeesModal') resetForm();
             if (id === 'trackingModal') {
                 if (trackingInterval) {
@@ -1841,8 +1446,7 @@ async function updateTracking() {
         // === ÉVÉNEMENTS GLOBAUX ===
         window.onclick = e => { 
             if (e.target.classList.contains('modal')) {
-                const modalId = e.target.id;
-                closeModal(modalId);
+                closeModal(e.target.id);
             }
         };
 
@@ -1850,35 +1454,19 @@ async function updateTracking() {
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             
-            // Chat input - Entrée
             const chatInput = document.getElementById('chatInput');
             if (chatInput) {
                 chatInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        sendMessage();
-                    }
+                    if (e.key === 'Enter') sendMessage();
                 });
             }
             
-            // Message de bienvenue du chat
             document.getElementById('chatMessages').innerHTML = `
-                <div class="message message-ai">
-                    Bonjour ! Je suis votre assistant RH. Comment puis-je vous aider aujourd'hui ?
-                </div>
+                <div class="message message-ai">Bonjour ! Je suis votre assistant RH. Comment puis-je vous aider aujourd'hui ?</div>
             `;
             
             console.log('✅ Application RH Pro initialisée');
             console.log('🔗 API URL:', API_URL);
-            
-            // Vérifier les dépendances
-            if (!window.jspdf) console.warn('⚠️ jsPDF non chargé');
-            if (!window.html2canvas) console.warn('⚠️ html2canvas non chargé');
-            if (!window.QRCode) console.warn('⚠️ QRCode.js non chargé');
-            if (!window.XLSX) console.warn('⚠️ XLSX non chargé');
-            if (!window.jsQR) console.warn('⚠️ jsQR non chargé');
-            if (!window.Chart) console.warn('⚠️ Chart.js non chargé');
-            
-            console.log('✅ Scanner QR Webcam initialisé (compatible Android)');
         });
     </script>
 </body>
