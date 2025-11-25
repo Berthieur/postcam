@@ -362,17 +362,41 @@
             <div class="export-btns">
                 <button class="btn btn-excel" onclick="exportStatsToExcel()"><i class="fas fa-file-excel"></i> Exporter Excel</button>
             </div>
+            
+            <!-- AJOUT: Statistiques financières comme dans l'APK -->
+            <div class="stats-grid">
+                <div class="stat-card" style="background: linear-gradient(135deg, #38A03E 0%, #2E8B57 100%);">
+                    <div class="stat-value" id="totalRevenueStats">0 Ar</div>
+                    <div class="stat-label">Revenus (Écolage)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #FF4500 0%, #DC143C 100%);">
+                    <div class="stat-value" id="totalExpensesStats">0 Ar</div>
+                    <div class="stat-label">Dépenses (Salaires)</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <div class="stat-value" id="netProfitStats">0 Ar</div>
+                    <div class="stat-label">Bénéfice Net</div>
+                </div>
+            </div>
+
+            <!-- Statistiques existantes employés/étudiants -->
             <div class="stats-grid">
                 <div class="stat-card"><div class="stat-value" id="totalEmployees">0</div><div class="stat-label">Employés</div></div>
                 <div class="stat-card"><div class="stat-value" id="totalStudents">0</div><div class="stat-label">Étudiants</div></div>
                 <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);"><div class="stat-value" id="presenceRate">0%</div><div class="stat-label">Taux Présence</div></div>
                 <div class="stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);"><div class="stat-value" id="absenceRate">0%</div><div class="stat-label">Taux Absence</div></div>
             </div>
+            
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:20px;">
                 <div class="chart-container"><canvas id="barChart"></canvas></div>
                 <div class="chart-container"><canvas id="pieChart"></canvas></div>
             </div>
             <div class="chart-container" style="margin-top:20px;"><canvas id="lineChart"></canvas></div>
+            
+            <!-- AJOUT: Graphique financier comme dans l'APK -->
+            <div class="chart-container" style="margin-top:20px; height: 400px;">
+                <canvas id="financialChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -478,7 +502,12 @@
     <script>
         let API_URL = 'https://postcam.onrender.com/api';
         let videoStream = null, scanInterval = null, currentEditId = null;
-        let charts = {};
+        let charts = {
+            bar: null,
+            pie: null, 
+            line: null,
+            financial: null  // AJOUT
+        };
         let isScanning = false;
 
         // === UTILITAIRES ===
@@ -1049,24 +1078,29 @@
             }
         }
 
-        // === STATISTIQUES ===
+        // === STATISTIQUES COMPLÈTES (comme l'APK Android) ===
         async function loadStatistics() {
             showLoading();
             try {
-                const [empData, pointData] = await Promise.all([
+                // Charger toutes les données nécessaires
+                const [empData, pointData, salaryData] = await Promise.all([
                     safeFetch(`${API_URL}/employees`, { employees: [] }),
-                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] }),
+                    safeFetch(`${API_URL}/salary/history`, { salaries: [] })
                 ]);
                 
+                // === STATISTIQUES EMPLOYÉS/ÉTUDIANTS ===
                 const employees = empData.employees.filter(e => e.type === 'employe').length;
                 const students = empData.employees.filter(e => e.type === 'etudiant').length;
                 
                 document.getElementById('totalEmployees').textContent = employees;
                 document.getElementById('totalStudents').textContent = students;
                 
+                // === STATISTIQUES DE PRÉSENCE ===
                 const today = new Date().toISOString().split('T')[0];
                 const todayEntries = pointData.pointages.filter(p => 
-                    new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'ENTREE' || p.type === 'arrivee')
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && 
+                    (p.type === 'ENTREE' || p.type === 'arrivee')
                 ).length;
                 
                 const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
@@ -1074,31 +1108,96 @@
                 document.getElementById('absenceRate').textContent = (100 - rate) + '%';
 
                 const todayExits = pointData.pointages.filter(p => 
-                    new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'SORTIE' || p.type === 'sortie')
+                    new Date(p.timestamp).toISOString().split('T')[0] === today && 
+                    (p.type === 'SORTIE' || p.type === 'sortie')
                 ).length;
 
+                // === STATISTIQUES FINANCIÈRES (comme l'APK) ===
+                let totalRevenue = 0;
+                let totalExpenses = 0;
+
+                salaryData.salaries.forEach(record => {
+                    const amount = parseFloat(record.amount) || 0;
+                    if (record.type === 'ecolage') {
+                        totalRevenue += amount;
+                    } else if (record.type === 'salaire') {
+                        totalExpenses += amount;
+                    }
+                });
+
+                const netProfit = totalRevenue - totalExpenses;
+
+                // Formater les montants
+                const formatter = new Intl.NumberFormat('fr-MG', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                });
+
+                document.getElementById('totalRevenueStats').textContent = formatter.format(totalRevenue) + ' Ar';
+                document.getElementById('totalExpensesStats').textContent = formatter.format(totalExpenses) + ' Ar';
+                document.getElementById('netProfitStats').textContent = formatter.format(netProfit) + ' Ar';
+
+                // Changer la couleur du bénéfice selon le résultat
+                const netProfitElement = document.getElementById('netProfitStats');
+                if (netProfit >= 0) {
+                    netProfitElement.parentElement.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                } else {
+                    netProfitElement.parentElement.style.background = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                }
+
+                // === GRAPHIQUES ===
+
+                // Graphique à barres (Entrées/Sorties aujourd'hui)
                 const barCtx = document.getElementById('barChart').getContext('2d');
                 if (charts.bar) charts.bar.destroy();
                 charts.bar = new Chart(barCtx, { 
                     type: 'bar', 
                     data: { 
                         labels: ['Entrées', 'Sorties'], 
-                        datasets: [{ label: 'Aujourd\'hui', data: [todayEntries, todayExits], backgroundColor: ['#10b981', '#ef4444'] }] 
+                        datasets: [{ 
+                            label: 'Aujourd\'hui', 
+                            data: [todayEntries, todayExits], 
+                            backgroundColor: ['#10b981', '#ef4444'] 
+                        }] 
                     }, 
-                    options: { responsive: true, maintainAspectRatio: true } 
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Activité Aujourd\'hui'
+                            }
+                        }
+                    } 
                 });
 
+                // Graphique camembert (Présence/Absence)
                 const pieCtx = document.getElementById('pieChart').getContext('2d');
                 if (charts.pie) charts.pie.destroy();
                 charts.pie = new Chart(pieCtx, { 
                     type: 'doughnut', 
                     data: { 
                         labels: ['Présents', 'Absents'], 
-                        datasets: [{ data: [todayEntries, employees - todayEntries], backgroundColor: ['#10b981', '#ef4444'] }] 
+                        datasets: [{ 
+                            data: [todayEntries, employees - todayEntries], 
+                            backgroundColor: ['#10b981', '#ef4444'],
+                            borderWidth: 2
+                        }] 
                     }, 
-                    options: { responsive: true, maintainAspectRatio: true } 
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Taux de Présence'
+                            }
+                        }
+                    } 
                 });
 
+                // Graphique linéaire (7 derniers jours)
                 const last7Days = Array(7).fill().map((_, i) => {
                     const d = new Date(); 
                     d.setDate(d.getDate() - i); 
@@ -1107,7 +1206,8 @@
                 
                 const lineData = last7Days.map(date => 
                     pointData.pointages.filter(p => 
-                        new Date(p.timestamp).toISOString().split('T')[0] === date && (p.type === 'ENTREE' || p.type === 'arrivee')
+                        new Date(p.timestamp).toISOString().split('T')[0] === date && 
+                        (p.type === 'ENTREE' || p.type === 'arrivee')
                     ).length
                 );
                 
@@ -1117,10 +1217,108 @@
                     type: 'line', 
                     data: { 
                         labels: last7Days.map(d => new Date(d).toLocaleDateString('fr-FR')), 
-                        datasets: [{ label: 'Entrées (7 derniers jours)', data: lineData, borderColor: '#6366f1', tension: 0.4, fill: false }] 
+                        datasets: [{ 
+                            label: 'Entrées (7 derniers jours)', 
+                            data: lineData, 
+                            borderColor: '#6366f1', 
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            tension: 0.4, 
+                            fill: true 
+                        }] 
                     }, 
-                    options: { responsive: true, maintainAspectRatio: true } 
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Activité sur 7 Jours'
+                            }
+                        }
+                    } 
                 });
+
+                // === NOUVEAU: GRAPHIQUE FINANCIER (comme l'APK) ===
+                if (salaryData.salaries && salaryData.salaries.length > 0) {
+                    // Grouper par mois comme dans l'APK
+                    const monthlyData = {};
+                    
+                    salaryData.salaries.forEach(record => {
+                        const date = new Date(record.date);
+                        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        
+                        if (!monthlyData[monthKey]) {
+                            monthlyData[monthKey] = { revenue: 0, expenses: 0 };
+                        }
+                        
+                        const amount = parseFloat(record.amount) || 0;
+                        if (record.type === 'ecolage') {
+                            monthlyData[monthKey].revenue += amount;
+                        } else if (record.type === 'salaire') {
+                            monthlyData[monthKey].expenses += amount;
+                        }
+                    });
+
+                    // Trier les mois
+                    const sortedMonths = Object.keys(monthlyData).sort();
+                    const revenueData = sortedMonths.map(month => monthlyData[month].revenue);
+                    const expensesData = sortedMonths.map(month => monthlyData[month].expenses);
+
+                    const financialCtx = document.getElementById('financialChart').getContext('2d');
+                    if (charts.financial) charts.financial.destroy();
+                    
+                    charts.financial = new Chart(financialCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: sortedMonths.map(month => {
+                                const [year, monthNum] = month.split('-');
+                                return `${monthNum}/${year}`;
+                            }),
+                            datasets: [
+                                {
+                                    label: 'Revenus (Écolage)',
+                                    data: revenueData,
+                                    backgroundColor: '#38A03E',
+                                    borderColor: '#2E8B57',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Dépenses (Salaires)',
+                                    data: expensesData,
+                                    backgroundColor: '#FF4500',
+                                    borderColor: '#DC143C',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Évolution Financière Mensuelle'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return new Intl.NumberFormat('fr-MG', {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 0
+                                            }).format(value) + ' Ar';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    document.getElementById('financialChart').innerHTML = 
+                        '<p style="text-align: center; color: #6b7280; margin-top: 50px;">Aucune donnée financière disponible</p>';
+                }
                 
             } catch (error) {
                 console.error('❌ Erreur statistiques:', error);
@@ -1299,25 +1497,43 @@
         async function exportStatsToExcel() {
             showLoading();
             try {
-                const [empData, ptData] = await Promise.all([
+                const [empData, ptData, salaryData] = await Promise.all([
                     safeFetch(`${API_URL}/employees`, { employees: [] }),
-                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] })
+                    safeFetch(`${API_URL}/pointages/history`, { pointages: [] }),
+                    safeFetch(`${API_URL}/salary/history`, { salaries: [] })
                 ]);
                 
                 const today = new Date().toISOString().split('T')[0];
                 const todayEntries = ptData.pointages.filter(p => 
                     new Date(p.timestamp).toISOString().split('T')[0] === today && (p.type === 'ENTREE' || p.type === 'arrivee')
                 ).length;
-                const employees = empData.employees.filter(e => e.type === 'employe').length;
-                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
                 
+                const employees = empData.employees.filter(e => e.type === 'employe').length;
+                const students = empData.employees.filter(e => e.type === 'etudiant').length;
+                const rate = employees > 0 ? Math.round((todayEntries / employees) * 100) : 0;
+
+                // Calcul des données financières
+                let totalRevenue = 0;
+                let totalExpenses = 0;
+                salaryData.salaries.forEach(record => {
+                    const amount = parseFloat(record.amount) || 0;
+                    if (record.type === 'ecolage') totalRevenue += amount;
+                    if (record.type === 'salaire') totalExpenses += amount;
+                });
+                const netProfit = totalRevenue - totalExpenses;
+
                 const exportData = [{
                     'Total Employés': employees,
-                    'Total Étudiants': empData.employees.filter(e => e.type === 'etudiant').length,
-                    'Taux Présence': rate + '%', 'Taux Absence': (100 - rate) + '%',
-                    Date: new Date().toLocaleDateString('fr-FR')
+                    'Total Étudiants': students,
+                    'Taux Présence': rate + '%', 
+                    'Taux Absence': (100 - rate) + '%',
+                    'Revenus (Écolage)': totalRevenue + ' Ar',
+                    'Dépenses (Salaires)': totalExpenses + ' Ar',
+                    'Bénéfice Net': netProfit + ' Ar',
+                    'Date Export': new Date().toLocaleDateString('fr-FR')
                 }];
-                exportToExcel(exportData, "Statistiques_RH");
+                
+                exportToExcel(exportData, "Statistiques_RH_Completes");
             } finally {
                 hideLoading();
             }
