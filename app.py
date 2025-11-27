@@ -880,8 +880,7 @@ def get_active_employees():
     except Exception as e:
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
-# === POST ajouter pointage (CORRIGÉ) ===
+# === POST ajouter pointage (✅ CORRIGÉ POUR ANDROID) ===
 @app.route("/api/pointages", methods=["POST"])
 def add_pointage():
     data = request.get_json(silent=True)
@@ -890,56 +889,72 @@ def add_pointage():
     if not data:
         return jsonify({"success": False, "message": "Requête vide"}), 400
     
+    # ✅ VALIDATION FLEXIBLE DES CHAMPS
+    emp_id = data.get("employeeId")
+    pointage_type = data.get("type", "").lower().strip()
+    timestamp = data.get("timestamp")
+    date = data.get("date")
+    
     # ✅ Vérifier les champs requis
-    required = ["employeeId", "type", "timestamp", "date"]
-    for field in required:
-        if field not in data or not data[field]:
-            return jsonify({"success": False, "message": f"Champ manquant: {field}"}), 400
+    if not emp_id:
+        return jsonify({"success": False, "message": "Champ manquant: employeeId"}), 400
+    
+    if not pointage_type:
+        return jsonify({"success": False, "message": "Champ manquant: type"}), 400
+    
+    if not timestamp or not date:
+        return jsonify({"success": False, "message": "Champs manquants: timestamp ou date"}), 400
     
     try:
         conn = get_db()
         cur = conn.cursor()
         
-        emp_id = data.get("employeeId")
-        
         # ✅ RÉCUPÉRER L'EMPLOYÉ DEPUIS LA BDD
-        cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        cur.execute(f"SELECT id, nom, prenom, type FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
         employee = cur.fetchone()
         
         if not employee:
             cur.close()
             conn.close()
-            logger.error(f"❌ Employé {emp_id} non trouvé")
-            return jsonify({"success": False, "message": f"Employé {emp_id} non trouvé"}), 404
+            logger.error(f"❌ Employé {emp_id} non trouvé en base")
+            return jsonify({
+                "success": False, 
+                "message": f"Employé {emp_id} non trouvé. Veuillez synchroniser les employés."
+            }), 404
         
-        # ✅ CONSTRUIRE LE NOM EXACT COMME ANDROID: "Nom Prénom"
+        # ✅ CONSTRUIRE LE NOM EXACT : "Nom Prénom"
         emp_nom = employee[1] if DB_DRIVER == "sqlite" else employee['nom']
         emp_prenom = employee[2] if DB_DRIVER == "sqlite" else employee['prenom']
+        emp_type = employee[3] if DB_DRIVER == "sqlite" else employee['type']
         employee_name = f"{emp_nom} {emp_prenom}"
         
-        # ✅ Normaliser le type de pointage
-        pointage_type = data.get("type").lower()
-        if pointage_type not in ['arrivee', 'sortie']:
-            # Gérer les anciens formats
-            if pointage_type in ['entree', 'ENTREE']:
-                pointage_type = 'arrivee'
-            elif pointage_type in ['sortie', 'SORTIE']:
-                pointage_type = 'sortie'
-            else:
-                cur.close()
-                conn.close()
-                return jsonify({"success": False, "message": "Type de pointage invalide"}), 400
+        # ✅ NORMALISER LE TYPE DE POINTAGE (accepter plusieurs formats)
+        pointage_type_normalized = pointage_type.lower()
         
-        # ✅ Mettre à jour is_active selon le type
-        new_is_active = 1 if pointage_type == 'arrivee' else 0
+        if pointage_type_normalized in ['entree', 'entrée', 'entry', 'in']:
+            pointage_type_normalized = 'arrivee'
+        elif pointage_type_normalized in ['sortie', 'exit', 'out']:
+            pointage_type_normalized = 'sortie'
+        elif pointage_type_normalized not in ['arrivee', 'sortie']:
+            cur.close()
+            conn.close()
+            return jsonify({
+                "success": False, 
+                "message": f"Type de pointage invalide: '{pointage_type}'. Utilisez 'arrivee' ou 'sortie'."
+            }), 400
+        
+        logger.info(f"✅ Type normalisé: '{pointage_type}' → '{pointage_type_normalized}'")
+        
+        # ✅ METTRE À JOUR is_active SELON LE TYPE
+        new_is_active = 1 if pointage_type_normalized == 'arrivee' else 0
         
         cur.execute(f"""
             UPDATE employees 
             SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
             WHERE id = {PLACEHOLDER}
-        """, [new_is_active, int(data.get("timestamp")), emp_id])
+        """, [new_is_active, int(timestamp), emp_id])
         
-        # ✅ Insérer le pointage avec le nom correct
+        # ✅ INSÉRER LE POINTAGE AVEC LE NOM CORRECT
         pointage_id = str(uuid.uuid4())
         cur.execute(f"""
             INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
@@ -947,30 +962,34 @@ def add_pointage():
         """, [
             pointage_id, 
             emp_id, 
-            employee_name,  # ✅ NOM CORRIGÉ: "Razafiarinirina Angela"
-            pointage_type,   # ✅ FORMAT: "arrivee" ou "sortie"
-            int(data.get("timestamp")), 
-            data.get("date")
+            employee_name,           # ✅ Format: "Razafiarinirina Angela"
+            pointage_type_normalized, # ✅ Format: "arrivee" ou "sortie"
+            int(timestamp), 
+            date
         ])
         
         conn.commit()
         cur.close()
         conn.close()
         
-        logger.info(f"✅ Pointage: {employee_name} - {pointage_type} (is_active={new_is_active})")
+        logger.info(f"✅ Pointage enregistré: {employee_name} ({emp_type}) - {pointage_type_normalized} (is_active={new_is_active})")
         
         return jsonify({
             "success": True,
-            "message": f"Pointage enregistré - Employé {'activé' if new_is_active == 1 else 'désactivé'}",
+            "message": f"Pointage {pointage_type_normalized} enregistré avec succès",
             "pointageId": pointage_id,
-            "employeeName": employee_name,  # ✅ Retourner le nom correct
+            "employeeName": employee_name,
+            "employeeType": emp_type,
+            "type": pointage_type_normalized,
             "is_active": new_is_active
         }), 201
         
     except Exception as e:
         logger.error(f"❌ add_pointage: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
-
+        return jsonify({
+            "success": False, 
+            "message": f"Erreur serveur: {str(e)}"
+        }), 500
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
