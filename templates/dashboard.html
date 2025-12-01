@@ -957,100 +957,119 @@
             }
         }
 
-        /* ===== SCANNER QR + POINTAGE CORRIGÉ (100% compatible Android) ===== */
-        async function handleQRScan(qrData) {
-            showLoading();
-            try {
-                let employeeData = JSON.parse(qrData);
-                const employeeId = employeeData.id;
-                
-                if (!employeeId) throw new Error("ID employé manquant");
+        /* ===== SCANNER QR WEBCAM CORRIGÉ (Compatible LCD ESP32) ===== */
+async function handleQRScan(qrData) {
+    showLoading();
+    try {
+        let employeeData = JSON.parse(qrData);
+        const employeeId = employeeData.id;
+        
+        if (!employeeId) throw new Error("ID employé manquant");
 
-                const empRes = await fetch(`${API_URL}/employees`);
-                const empJson = await empRes.json();
-                
-                if (!empJson.success || !empJson.employees) throw new Error("Impossible de récupérer les employés");
-                
-                const employee = empJson.employees.find(e => e.id === employeeId);
-                if (!employee) throw new Error("Employé non trouvé");
+        // ✅ Récupérer les infos complètes de l'employé
+        const empRes = await fetch(`${API_URL}/employees`);
+        const empJson = await empRes.json();
+        
+        if (!empJson.success || !empJson.employees) throw new Error("Impossible de récupérer les employés");
+        
+        const employee = empJson.employees.find(e => e.id === employeeId);
+        if (!employee) throw new Error("Employé non trouvé");
 
-                const fullName = `${employee.nom} ${employee.prenom}`;
+        // ✅ FORMAT EXACT : "Nom Prénom" (comme l'APK)
+        const fullName = `${employee.nom} ${employee.prenom}`;
 
-                const histRes = await fetch(`${API_URL}/pointages/history`);
-                const hist = await histRes.json();
+        // ✅ Récupérer l'historique des pointages
+        const histRes = await fetch(`${API_URL}/pointages/history`);
+        const hist = await histRes.json();
 
-                const today = new Date().toISOString().split('T')[0];
-                const todayPointages = (hist.pointages || [])
-                    .filter(p => (p.employee_id || p.employeeId) === employeeId)
-                    .filter(p => {
-                        const pointageDate = p.date || new Date(p.timestamp).toISOString().split('T')[0];
-                        return pointageDate === today;
-                    })
-                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const today = new Date().toISOString().split('T')[0];
+        const todayPointages = (hist.pointages || [])
+            .filter(p => (p.employee_id || p.employeeId) === employeeId)
+            .filter(p => {
+                const pointageDate = p.date || new Date(p.timestamp).toISOString().split('T')[0];
+                return pointageDate === today;
+            })
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-                const lastPointage = todayPointages[0];
-                const pointageType = (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE') ? 'arrivee' : 'sortie';
+        const lastPointage = todayPointages[0];
+        
+        // ✅ Déterminer le type : "arrivee" ou "sortie" (MINUSCULE comme l'APK)
+        const pointageType = (!lastPointage || lastPointage.type === 'sortie' || lastPointage.type === 'SORTIE') 
+            ? 'arrivee' 
+            : 'sortie';
 
-                const timestamp = Date.now();
-                const payload = {
-                    employeeId: employeeId,
-                    employeeName: fullName,
-                    type: pointageType,
-                    timestamp: timestamp,
-                    date: today
-                };
+        const timestamp = Date.now();
+        
+        // ✅ Payload EXACT comme l'APK
+        const payload = {
+            employeeId: employeeId,
+            employeeName: fullName,  // ✅ "Nom Prénom"
+            type: pointageType,      // ✅ "arrivee" ou "sortie" (minuscule)
+            timestamp: timestamp,
+            date: today
+        };
 
-                const res = await fetch(`${API_URL}/pointages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+        console.log("📤 Envoi du pointage:", payload);
 
-                const result = await res.json();
-                if (!res.ok || !result.success) throw new Error(result.message || `Erreur serveur: ${res.status}`);
+        // ✅ Envoyer au serveur
+        const res = await fetch(`${API_URL}/pointages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-                const time = new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-                const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
-                const emoji = pointageType === 'arrivee' ? '✅' : '🚪';
-                const label = pointageType === 'arrivee' ? 'Arrivée' : 'Sortie';
-
-                document.getElementById('scan-result').innerHTML = `
-                    <div style="background: ${color}; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-                        <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${emoji}</div>
-                        <h3 style="margin: 0.5rem 0; font-size: 1.5rem; font-weight: 700;">${fullName}</h3>
-                        <p style="font-size: 1.3rem; margin: 0.5rem 0; opacity: 0.95;">${label} enregistrée</p>
-                        <p style="font-size: 1.1rem; opacity: 0.9;">${time}</p>
-                    </div>
-                `;
-
-                if (document.getElementById('pointagesModal').style.display === 'block') {
-                    setTimeout(() => loadPointages(), 500);
-                }
-
-                setTimeout(() => {
-                    document.getElementById('scan-result').innerHTML = '';
-                    startCamera();
-                }, 3000);
-
-            } catch (err) {
-                console.error('❌ Erreur handleQRScan:', err);
-                document.getElementById('scan-result').innerHTML = `
-                    <div style="background: #ef4444; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease;">
-                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
-                        <h3 style="margin: 0.5rem 0;">Erreur</h3>
-                        <p style="font-size: 0.95rem;">${err.message}</p>
-                    </div>
-                `;
-                
-                setTimeout(() => {
-                    document.getElementById('scan-result').innerHTML = '';
-                    startCamera();
-                }, 3000);
-            } finally {
-                hideLoading();
-            }
+        const result = await res.json();
+        if (!res.ok || !result.success) {
+            throw new Error(result.message || `Erreur serveur: ${res.status}`);
         }
 
+        console.log("✅ Pointage enregistré avec succès");
+        console.log("📺 L'ESP32 affichera automatiquement dans 3 secondes max");
+
+        const time = new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const color = pointageType === 'arrivee' ? '#10b981' : '#ef4444';
+        const emoji = pointageType === 'arrivee' ? '✅' : '🚪';
+        const label = pointageType === 'arrivee' ? 'Arrivée' : 'Sortie';
+
+        document.getElementById('scan-result').innerHTML = `
+            <div style="background: ${color}; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                <div style="font-size: 3.5rem; margin-bottom: 0.5rem;">${emoji}</div>
+                <h3 style="margin: 0.5rem 0; font-size: 1.5rem; font-weight: 700;">${fullName}</h3>
+                <p style="font-size: 1.3rem; margin: 0.5rem 0; opacity: 0.95;">${label} enregistrée</p>
+                <p style="font-size: 1.1rem; opacity: 0.9;">${time}</p>
+                <p style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;">📺 Affichage LCD automatique</p>
+            </div>
+        `;
+
+        // ✅ Recharger l'historique si ouvert
+        if (document.getElementById('pointagesModal').style.display === 'block') {
+            setTimeout(() => loadPointages(), 500);
+        }
+
+        // ✅ Reprendre le scan après 3 secondes
+        setTimeout(() => {
+            document.getElementById('scan-result').innerHTML = '';
+            startCamera();
+        }, 3000);
+
+    } catch (err) {
+        console.error('❌ Erreur handleQRScan:', err);
+        document.getElementById('scan-result').innerHTML = `
+            <div style="background: #ef4444; color: white; padding: 1.5rem; border-radius: 1rem; text-align: center; animation: fadeInUp 0.5s ease;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">❌</div>
+                <h3 style="margin: 0.5rem 0;">Erreur</h3>
+                <p style="font-size: 0.95rem;">${err.message}</p>
+            </div>
+        `;
+        
+        setTimeout(() => {
+            document.getElementById('scan-result').innerHTML = '';
+            startCamera();
+        }, 3000);
+    } finally {
+        hideLoading();
+    }
+}
         // === POINTAGES ===
         async function loadPointages() {
             showLoading();
