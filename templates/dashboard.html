@@ -573,9 +573,9 @@
             }
         }
 
-   // === GÉNÉRATION BADGE MODERNE HAUTE RÉSOLUTION ===
+        // === GÉNÉRATION BADGE MODERNE ===
         async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
-            console.log('🎫 Génération badge HD pour:', prenom, nom, empId);
+            console.log('🎫 Génération badge pour:', prenom, nom, empId);
             showLoading();
             
             try {
@@ -584,19 +584,19 @@
                 }
                 
                 const { jsPDF } = window.jspdf;
-                // Dimensions plus grandes pour meilleure résolution (x3)
                 const badge = document.createElement('div');
                 badge.style.cssText = `
                     position: absolute; left: -9999px; top: 0; 
-                    width: 1020px; height: 630px;
+                    width: 340px; height: 210px;
                     background: linear-gradient(135deg, #0d4d3d 0%, #1a5a4a 50%, #0d4d3d 100%);
-                    border-radius: 45px; padding: 0; color: white; 
+                    border-radius: 15px; padding: 0; color: white; 
                     font-family: 'Arial', sans-serif;
-                    box-shadow: 0 30px 120px rgba(0,0,0,0.5);
-                    border: 6px solid rgba(255, 255, 255, 0.1);
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                    border: 2px solid rgba(255, 255, 255, 0.1);
                     overflow: hidden; position: relative;
                 `;
                 document.body.appendChild(badge);
+
                 const circuitPattern = `
                     <svg width="340" height="210" style="position: absolute; top: 0; left: 0; opacity: 0.3;">
                         <line x1="50" y1="30" x2="150" y2="30" stroke="#00d4ff" stroke-width="1.5"/>
