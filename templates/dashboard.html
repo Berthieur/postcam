@@ -573,7 +573,7 @@
             }
         }
 
-     // === GÉNÉRATION BADGE MODERNE HAUTE RÉSOLUTION ===
+   // === GÉNÉRATION BADGE MODERNE HAUTE RÉSOLUTION ===
         async function generateBadgePDF(empId, prenom, nom, poste = 'Employé') {
             console.log('🎫 Génération badge HD pour:', prenom, nom, empId);
             showLoading();
@@ -597,7 +597,6 @@
                     overflow: hidden; position: relative;
                 `;
                 document.body.appendChild(badge);
-
                 const circuitPattern = `
                     <svg width="340" height="210" style="position: absolute; top: 0; left: 0; opacity: 0.3;">
                         <line x1="50" y1="30" x2="150" y2="30" stroke="#00d4ff" stroke-width="1.5"/>
