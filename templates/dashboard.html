@@ -736,23 +736,72 @@
             container.innerHTML = '';
             img.style.display = 'none';
             
-            const qrData = JSON.stringify({ id: id, name: name });
-            
-            if (window.QRCode) {
-                try {
-                    new QRCode(container, {
-                        text: qrData, width: 300, height: 300,
-                        colorDark: "#000000", colorLight: "#ffffff"
-                    });
-                } catch (error) {
-                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                    img.style.display = 'block';
-                    container.style.display = 'none';
-                }
-            } else {
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                img.style.display = 'block';
+            // Version corrigée du QR code dans generateBadgePDF()
+const qrData = JSON.stringify({ 
+    id: empId, 
+    name: `${prenom} ${nom}`  // Format: "Prénom Nom" comme sur l'image
+});
+
+// Vider d'abord le conteneur
+qrContainer.innerHTML = '';
+
+// Créer un canvas pour un QR code de meilleure qualité
+const qrCanvas = document.createElement('canvas');
+qrCanvas.width = 200;
+qrCanvas.height = 200;
+qrContainer.appendChild(qrCanvas);
+
+// Générer le QR code avec des paramètres optimisés
+if (window.QRCode) {
+    try {
+        // Créer un div temporaire pour QRCode
+        const tempDiv = document.createElement('div');
+        tempDiv.style.display = 'none';
+        document.body.appendChild(tempDiv);
+        
+        new QRCode(tempDiv, {
+            text: qrData,
+            width: 200,
+            height: 200,
+            colorDark: "#000000",
+            colorLight: "#FFFFFF",
+            correctLevel: QRCode.CorrectLevel.H, // Haute correction d'erreur
+            useSVG: false
+        });
+        
+        // Copier l'image du QR code généré
+        setTimeout(() => {
+            const qrImg = tempDiv.querySelector('img');
+            if (qrImg) {
+                qrContainer.innerHTML = '';
+                qrContainer.appendChild(qrImg.cloneNode());
+                qrImg.style.width = '100%';
+                qrImg.style.height = '100%';
+                qrImg.style.borderRadius = '5px';
             }
+            document.body.removeChild(tempDiv);
+        }, 100);
+        
+    } catch (error) {
+        console.error('Erreur génération QR:', error);
+        // Fallback vers l'API en ligne
+        const fallbackImg = document.createElement('img');
+        fallbackImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}&format=png&ecc=H&margin=5`;
+        fallbackImg.style.width = '100%';
+        fallbackImg.style.height = '100%';
+        fallbackImg.style.borderRadius = '5px';
+        qrContainer.innerHTML = '';
+        qrContainer.appendChild(fallbackImg);
+    }
+} else {
+    // Fallback si QRCode.js n'est pas chargé
+    const fallbackImg = document.createElement('img');
+    fallbackImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}&format=png&ecc=H&margin=5`;
+    fallbackImg.style.width = '100%';
+    fallbackImg.style.height = '100%';
+    fallbackImg.style.borderRadius = '5px';
+    qrContainer.appendChild(fallbackImg);
+}
             
             document.getElementById('qrName').textContent = name;
             openModal('qrModal');
