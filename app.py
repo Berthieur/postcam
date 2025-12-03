@@ -880,133 +880,116 @@ def get_active_employees():
     except Exception as e:
         logger.error(f"❌ get_active_employees: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-# === POST ajouter salaire ===
-@app.route("/api/salary", methods=["POST"])
-def add_salary():
+# === POST ajouter pointage (✅ CORRIGÉ POUR ANDROID) ===
+@app.route("/api/pointages", methods=["POST"])
+def add_pointage():
     data = request.get_json(silent=True)
-    logger.info(f"📥 Données reçues: {data}")
-
+    logger.info(f"📥 Pointage reçu: {data}")
+    
     if not data:
-        logger.error("❌ Requête vide")
         return jsonify({"success": False, "message": "Requête vide"}), 400
-
-    employee_id = data.get("employeeId") or data.get("employee_id")
-    employee_name = data.get("employeeName") or data.get("employee_name")
-    amount = data.get("amount")
-    record_type = data.get("type")
-    hours_worked = data.get("hoursWorked") or data.get("hours_worked", 0.0)
-
-    if not employee_name or not isinstance(employee_name, str) or not employee_name.strip():
-        logger.error(f"❌ employeeName manquant ou vide: {repr(employee_name)}")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: employeeName"}), 400
-
-    if not amount:
-        logger.error(f"❌ amount manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: amount"}), 400
-
-    if not record_type:
-        logger.error(f"❌ type manquant")
-        return jsonify({"success": False, "message": "Champ manquant ou vide: type"}), 400
-
-    try:
-        amount = float(amount)
-        if amount <= 0:
-            logger.error(f"❌ Montant invalide: {amount}")
-            return jsonify({"success": False, "message": "Le montant doit être supérieur à 0"}), 400
-    except (ValueError, TypeError):
-        logger.error(f"❌ Montant non numérique: {data.get('amount')}")
-        return jsonify({"success": False, "message": "Le montant doit être un nombre valide"}), 400
-
+    
+    # ✅ VALIDATION FLEXIBLE DES CHAMPS
+    emp_id = data.get("employeeId")
+    pointage_type = data.get("type", "").lower().strip()
+    timestamp = data.get("timestamp")
+    date = data.get("date")
+    
+    # ✅ Vérifier les champs requis
+    if not emp_id:
+        return jsonify({"success": False, "message": "Champ manquant: employeeId"}), 400
+    
+    if not pointage_type:
+        return jsonify({"success": False, "message": "Champ manquant: type"}), 400
+    
+    if not timestamp or not date:
+        return jsonify({"success": False, "message": "Champs manquants: timestamp ou date"}), 400
+    
     try:
         conn = get_db()
         cur = conn.cursor()
-
-        employee_name = employee_name.strip()
-
-        if employee_id:
-            cur.execute(f"SELECT id, nom, prenom FROM employees WHERE id = {PLACEHOLDER}", (employee_id,))
-            employee = cur.fetchone()
-
-            if not employee:
-                logger.warning(f"⚠️ Employé {employee_id} non trouvé")
-        else:
-            cur.execute(f"""
-                SELECT id FROM employees 
-                WHERE CONCAT(nom, ' ', prenom) = {PLACEHOLDER} 
-                   OR CONCAT(prenom, ' ', nom) = {PLACEHOLDER}
-                LIMIT 1
-            """, (employee_name, employee_name))
-            
-            employee = cur.fetchone()
-            
-            if employee:
-                employee_id = employee[0] if DB_DRIVER == "sqlite" else employee['id']
-                logger.info(f"✅ Employé trouvé par nom: {employee_id}")
-            else:
-                logger.warning(f"⚠️ Employé '{employee_name}' non trouvé, création automatique")
-                emp_name_parts = employee_name.split(" ", 1)
-                prenom = emp_name_parts[0] if len(emp_name_parts) > 0 else "Inconnu"
-                nom = emp_name_parts[1] if len(emp_name_parts) > 1 else employee_name
-                
-                employee_id = str(uuid.uuid4())
-                
-                cur.execute(f"""
-                    INSERT INTO employees (id, nom, prenom, type, is_active, created_at)
-                    VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-                """, [employee_id, nom, prenom, "employe", 1, int(datetime.now().timestamp() * 1000)])
-                
-                logger.info(f"✅ Nouvel employé créé: {employee_id}")
-
-        salary_date = int(data.get("date", datetime.now().timestamp() * 1000))
-        period = data.get("period") or datetime.now().strftime("%Y-%m")
-        salary_id = data.get("id") or str(uuid.uuid4())
-
-        cur.execute(f"SELECT id FROM salaries WHERE id = {PLACEHOLDER}", (salary_id,))
-        existing = cur.fetchone()
-
-        if existing:
-            logger.warning(f"⚠️ Salaire {salary_id} existe déjà, mise à jour au lieu d'insertion")
-            
-            cur.execute(f"""
-                UPDATE salaries 
-                SET employee_id = {PLACEHOLDER}, employee_name = {PLACEHOLDER}, 
-                    amount = {PLACEHOLDER}, hours_worked = {PLACEHOLDER}, 
-                    type = {PLACEHOLDER}, period = {PLACEHOLDER}, date = {PLACEHOLDER}
-                WHERE id = {PLACEHOLDER}
-            """, [
-                employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date, salary_id
-            ])
-            
-            action = "mis à jour"
-        else:
-            cur.execute(f"""
-                INSERT INTO salaries (id, employee_id, employee_name, amount, hours_worked, type, period, date)
-                VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
-            """, [
-                salary_id, employee_id, employee_name, amount, hours_worked,
-                record_type, period, salary_date
-            ])
-            
-            action = "créé"
-
+        
+        # ✅ RÉCUPÉRER L'EMPLOYÉ DEPUIS LA BDD
+        cur.execute(f"SELECT id, nom, prenom, type FROM employees WHERE id = {PLACEHOLDER}", (emp_id,))
+        employee = cur.fetchone()
+        
+        if not employee:
+            cur.close()
+            conn.close()
+            logger.error(f"❌ Employé {emp_id} non trouvé en base")
+            return jsonify({
+                "success": False, 
+                "message": f"Employé {emp_id} non trouvé. Veuillez synchroniser les employés."
+            }), 404
+        
+        # ✅ CONSTRUIRE LE NOM EXACT : "Nom Prénom"
+        emp_nom = employee[1] if DB_DRIVER == "sqlite" else employee['nom']
+        emp_prenom = employee[2] if DB_DRIVER == "sqlite" else employee['prenom']
+        emp_type = employee[3] if DB_DRIVER == "sqlite" else employee['type']
+        employee_name = f"{emp_nom} {emp_prenom}"
+        
+        # ✅ NORMALISER LE TYPE DE POINTAGE (accepter plusieurs formats)
+        pointage_type_normalized = pointage_type.lower()
+        
+        if pointage_type_normalized in ['entree', 'entrée', 'entry', 'in']:
+            pointage_type_normalized = 'arrivee'
+        elif pointage_type_normalized in ['sortie', 'exit', 'out']:
+            pointage_type_normalized = 'sortie'
+        elif pointage_type_normalized not in ['arrivee', 'sortie']:
+            cur.close()
+            conn.close()
+            return jsonify({
+                "success": False, 
+                "message": f"Type de pointage invalide: '{pointage_type}'. Utilisez 'arrivee' ou 'sortie'."
+            }), 400
+        
+        logger.info(f"✅ Type normalisé: '{pointage_type}' → '{pointage_type_normalized}'")
+        
+        # ✅ METTRE À JOUR is_active SELON LE TYPE
+        new_is_active = 1 if pointage_type_normalized == 'arrivee' else 0
+        
+        cur.execute(f"""
+            UPDATE employees 
+            SET is_active = {PLACEHOLDER}, last_seen = {PLACEHOLDER}
+            WHERE id = {PLACEHOLDER}
+        """, [new_is_active, int(timestamp), emp_id])
+        
+        # ✅ INSÉRER LE POINTAGE AVEC LE NOM CORRECT
+        pointage_id = str(uuid.uuid4())
+        cur.execute(f"""
+            INSERT INTO pointages (id, employee_id, employee_name, type, timestamp, date)
+            VALUES ({PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER}, {PLACEHOLDER})
+        """, [
+            pointage_id, 
+            emp_id, 
+            employee_name,           # ✅ Format: "Razafiarinirina Angela"
+            pointage_type_normalized, # ✅ Format: "arrivee" ou "sortie"
+            int(timestamp), 
+            date
+        ])
+        
         conn.commit()
-        logger.info(f"✅ Salaire {action}: ID={salary_id}, employee_id={employee_id}, amount={amount}, type={record_type}")
-
         cur.close()
         conn.close()
         
+        logger.info(f"✅ Pointage enregistré: {employee_name} ({emp_type}) - {pointage_type_normalized} (is_active={new_is_active})")
+        
         return jsonify({
-            "success": True, 
-            "message": f"Salaire {action} avec succès", 
-            "id": salary_id,
-            "employeeId": employee_id,
-            "action": action
-        }), 201 if action == "créé" else 200
-
+            "success": True,
+            "message": f"Pointage {pointage_type_normalized} enregistré avec succès",
+            "pointageId": pointage_id,
+            "employeeName": employee_name,
+            "employeeType": emp_type,
+            "type": pointage_type_normalized,
+            "is_active": new_is_active
+        }), 201
+        
     except Exception as e:
-        logger.error(f"❌ add_salary: {e}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
+        logger.error(f"❌ add_pointage: {e}", exc_info=True)
+        return jsonify({
+            "success": False, 
+            "message": f"Erreur serveur: {str(e)}"
+        }), 500
 @app.route("/api/pointages/history", methods=["GET"])
 def get_pointage_history():
     try:
