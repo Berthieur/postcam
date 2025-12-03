@@ -729,34 +729,41 @@
             }
         }
 
-        // === QR CODE ===
-        function showQRCode(id, name) {
-            const container = document.getElementById('qrCodeContainer');
-            const img = document.getElementById('qrImage');
-            container.innerHTML = '';
-            img.style.display = 'none';
-            
-            const qrData = JSON.stringify({ id: id, name: name });
-            
-            if (window.QRCode) {
-                try {
-                    new QRCode(container, {
-                        text: qrData, width: 300, height: 300,
-                        colorDark: "#000000", colorLight: "#ffffff"
-                    });
-                } catch (error) {
-                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                    img.style.display = 'block';
-                    container.style.display = 'none';
-                }
-            } else {
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
+       // === QR CODE ===
+    function showQRCode(id, name) {
+        const container = document.getElementById('qrCodeContainer');
+        const img = document.getElementById('qrImage');
+        container.innerHTML = '';
+        img.style.display = 'none';
+        
+        const qrData = JSON.stringify({ id: id, name: name });
+        
+        // --- 1. Génération avec QRCode.js (prioritaire) ---
+        if (window.QRCode) {
+            try {
+                new QRCode(container, {
+                    text: qrData, 
+                    width: 512,      // <<--- RECTIFICATION
+                    height: 512,     // <<--- RECTIFICATION
+                    colorDark: "#000000", 
+                    colorLight: "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H // Ajout du niveau de correction élevé pour la robustesse
+                });
+            } catch (error) {
+                // --- 2. Fallback avec QR Server API ---
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(qrData)}`; // <<--- RECTIFICATION
                 img.style.display = 'block';
+                container.style.display = 'none';
             }
-            
-            document.getElementById('qrName').textContent = name;
-            openModal('qrModal');
+        } else {
+            // --- 2. Fallback avec QR Server API (si QRCode.js n'est pas chargé) ---
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=512x512&data=${encodeURIComponent(qrData)}`; // <<--- RECTIFICATION
+            img.style.display = 'block';
         }
+        
+        document.getElementById('qrName').textContent = name;
+        openModal('qrModal');
+    }
 
         // === SUPPRESSION ===
         async function deleteEmployee(id) {
