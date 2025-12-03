@@ -737,22 +737,26 @@
             img.style.display = 'none';
             
             const qrData = JSON.stringify({ id: id, name: name });
-            
-            if (window.QRCode) {
-                try {
-                    new QRCode(container, {
-                        text: qrData, width: 300, height: 300,
-                        colorDark: "#000000", colorLight: "#ffffff"
+            // ✅ FORMAT EXACT comme dans showQRCode (compatible scan)
+                const qrData = JSON.stringify({ id: empId, name: `${nom} ${prenom}` });
+                
+                if (window.QRCode) {
+                    new QRCode(qrContainer, {
+                        text: qrData, 
+                        width: 100,  // ✅ Plus grand pour meilleure lecture
+                        height: 100,
+                        colorDark: "#000000", 
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H  // ✅ Haute correction d'erreurs
                     });
-                } catch (error) {
-                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                    img.style.display = 'block';
-                    container.style.display = 'none';
+                } else {
+                    // ✅ Fallback API externe avec haute qualité
+                    const img = document.createElement('img');
+                    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrData)}&format=png&margin=0`;
+                    img.style.width = '100px';
+                    img.style.height = '100px';
+                    qrContainer.appendChild(img);
                 }
-            } else {
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrData)}`;
-                img.style.display = 'block';
-            }
             
             document.getElementById('qrName').textContent = name;
             openModal('qrModal');
