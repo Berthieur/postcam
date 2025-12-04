@@ -348,30 +348,43 @@ def calculate_and_broadcast_positions(cursor):
         
         old_pos = cursor.fetchone()
         
-        if old_pos and old_pos[0] is not None:
-            # ✅ Conversion explicite float pour compatibilité PostgreSQL
-            old_x = float(old_pos[0] if DB_DRIVER == "sqlite" else old_pos['last_position_x'])
-            old_y = float(old_pos[1] if DB_DRIVER == "sqlite" else old_pos['last_position_y'])
+        # ✅ Gestion compatible SQLite ET PostgreSQL
+        if old_pos:
+            if DB_DRIVER == "sqlite":
+                old_x = old_pos[0]
+                old_y = old_pos[1]
+            else:  # PostgreSQL
+                old_x = old_pos['last_position_x']
+                old_y = old_pos['last_position_y']
             
-            # Filtre de lissage exponentiel : pos = α*nouveau + (1-α)*ancien
-            pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
-            pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
-            
-            # Calculer distance de déplacement
-            distance_moved = math.sqrt((pos_x - old_x)**2 + (pos_y - old_y)**2)
-            
-            # ✅ Seuil adaptatif : ignorer micro-mouvements
-            if distance_moved < movement_threshold:
-                logger.debug(
-                    f"   🔒 {emp_id}: mouvement {distance_moved:.2f}m < {movement_threshold}m "
-                    f"(RSSI={avg_rssi:.0f}dBm) → position maintenue"
+            # Vérifier que les valeurs existent
+            if old_x is not None and old_y is not None:
+                # ✅ Conversion explicite float
+                old_x = float(old_x)
+                old_y = float(old_y)
+                # Filtre de lissage exponentiel : pos = α*nouveau + (1-α)*ancien
+                pos_x = round(alpha * new_x + (1 - alpha) * old_x, 2)
+                pos_y = round(alpha * new_y + (1 - alpha) * old_y, 2)
+                
+                # Calculer distance de déplacement
+                distance_moved = math.sqrt((pos_x - old_x)**2 + (pos_y - old_y)**2)
+                
+                # ✅ Seuil adaptatif : ignorer micro-mouvements
+                if distance_moved < movement_threshold:
+                    logger.debug(
+                        f"   🔒 {emp_id}: mouvement {distance_moved:.2f}m < {movement_threshold}m "
+                        f"(RSSI={avg_rssi:.0f}dBm) → position maintenue"
+                    )
+                    continue
+                
+                logger.info(
+                    f"   📍 {emp_id}: ({pos_x}, {pos_y}) "
+                    f"[Δ={distance_moved:.2f}m, RSSI={avg_rssi:.0f}dBm, α={alpha}]"
                 )
-                continue
-            
-            logger.info(
-                f"   📍 {emp_id}: ({pos_x}, {pos_y}) "
-                f"[Δ={distance_moved:.2f}m, RSSI={avg_rssi:.0f}dBm, α={alpha}]"
-            )
+            else:
+                # Ancienne position nulle ou invalide
+                pos_x, pos_y = new_x, new_y
+                logger.info(f"   📍 {emp_id}: Position réinitialisée ({pos_x}, {pos_y})")
         else:
             # Première position pour cet employé
             pos_x, pos_y = new_x, new_y
