@@ -514,10 +514,7 @@
                 <span class="close-btn" onclick="closeModal('trackingModal')">&times;</span>
             </div>
             <div style="position: relative; width: 100%; height: 500px; background: #0f172a; border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 1.5rem;">
-<div style="position: absolute; inset: 0; background: 
-     repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, transparent 1px, transparent 100px, rgba(255,255,255,0.05) 101px),
-     repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, transparent 1px, transparent 100px, rgba(255,255,255,0.05) 101px);
-     background-size: 100px 100px;"></div>
+                <div style="position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px), repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0px, transparent 1px, transparent 50px, rgba(255,255,255,0.03) 51px);"></div>
                 <div id="anchorsContainer" style="position: relative; width: 100%; height: 100%;"></div>
                 <div id="badgesContainer" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
             </div>
@@ -1430,13 +1427,13 @@ async function handleQRScan(qrData) {
         }
 
         // === TRACKING ===
-       const ANCHORS = [
-    { id: 1, x: 0.00, y: 0.00, label: "Ancre 1" },
-    { id: 2, x: 0.00, y: 1.00, label: "Ancre 2" },
-    { id: 3, x: 1.00, y: 0.50, label: "Ancre 3" }
-];
-     const ROOM_WIDTH = 1.0;
-     const ROOM_HEIGHT = 1.0;
+        const ANCHORS = [
+            { id: 1, x: 0.2, y: 0.2, label: "Ancre 1" },
+            { id: 2, x: 0.2, y: 4.8, label: "Ancre 2" },
+            { id: 3, x: 5.8, y: 4.8, label: "Ancre 3" }
+        ];
+        const ROOM_WIDTH = 6;
+        const ROOM_HEIGHT = 5;
         let trackingInterval = null;
 
         function initTrackingMap() {
