@@ -268,16 +268,14 @@
 
         <script>
         // ================================================
-        //  HydroSmart — Interface Web
-        //  WebSocket vers https://hydrosmart-groupe5.onrender.com
-        //  Sans Firebase
+        //  HydroSmart — Client WebSocket temps réel
+        //  https://hydrosmart-groupe5.onrender.com
         // ================================================
 
         let ws             = null;
         let forcedWatering = false;
         let sessionActive  = false;
 
-        // ── Éléments ────────────────────────────────────
         const loginBtn  = document.getElementById('login-btn');
         const spinner   = document.getElementById('btn-spinner');
         const btnText   = document.getElementById('btn-text');
@@ -285,7 +283,7 @@
         const passInput = document.getElementById('pass');
         const eyeBtn    = document.getElementById('toggle-eye');
 
-        // ── Afficher/masquer mot de passe ────────────────
+        // ── Mot de passe show/hide ───────────────────────
         passInput.addEventListener('input', () => {
             eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none';
         });
@@ -295,7 +293,7 @@
             eyeBtn.style.opacity = isPass ? '1' : '0.4';
         });
 
-        // ── Login via API ────────────────────────────────
+        // ── Login ────────────────────────────────────────
         loginBtn.addEventListener('click', async () => {
             const email = document.getElementById('user').value.trim();
             const pass  = passInput.value;
@@ -330,7 +328,6 @@
             }
         });
 
-        // ── Logout ───────────────────────────────────────
         document.getElementById('logout-btn').addEventListener('click', () => {
             sessionActive = false;
             if (ws) ws.close();
@@ -344,54 +341,74 @@
             ws = new WebSocket(proto + '://' + location.host);
 
             ws.onopen = () => {
-                console.log('✅ WebSocket connecté');
-                document.getElementById('status-msg').innerText = 'System connected...';
+                console.log('✅ WebSocket navigateur connecté');
+                document.getElementById('status-msg').innerText = 'Connexion serveur OK...';
             };
+
             ws.onmessage = (e) => {
                 try { handleMsg(JSON.parse(e.data)); }
                 catch(err) { console.error('WS parse:', err); }
             };
+
             ws.onclose = () => {
                 if (!sessionActive) return;
-                console.warn('WS fermé — reconnexion 3s');
+                console.warn('WS perdu — reconnexion 3s...');
                 setTimeout(connectWS, 3000);
             };
+
+            ws.onerror = (e) => console.error('WS erreur:', e);
         }
 
-        // ── Messages serveur ─────────────────────────────
+        // ── Traitement messages serveur ──────────────────
         function handleMsg(msg) {
             switch (msg.type) {
+
                 case 'full_state':
                     if (msg.sensors && msg.sensors.temp !== null)
                         setSensors(msg.sensors.temp, msg.sensors.hum, msg.sensors.soil);
                     setValves(msg.valves?.v1, msg.valves?.v2);
-                    setOnline(msg.lastSeen);
+                    setOnline(msg.lastSeen, msg.esp32Online);
                     break;
+
                 case 'sensors':
                     setSensors(msg.temp, msg.hum, msg.soil);
-                    setOnline(msg.lastSeen);
+                    setOnline(msg.lastSeen, true);
                     checkSoil(msg.soil);
                     break;
+
                 case 'valve_status':
                     setValves(msg.v1, msg.v2);
                     break;
+
+                case 'command_sent':
+                    // Mise à jour immédiate de l'UI sans attendre le feedback
+                    if (msg.valve === 1) document.getElementById('sw1').checked = msg.state;
+                    if (msg.valve === 2) document.getElementById('sw2').checked = msg.state;
+                    break;
+
+                case 'esp32_offline':
+                    setOnline(null, false);
+                    document.getElementById('status-msg').innerText = '⚠️ ESP32 déconnecté du serveur';
+                    break;
+
                 case 'auto_watering_start':
                     document.getElementById('status-msg').innerText = '⏰ ARROSAGE AUTOMATIQUE EN COURS...';
                     break;
+
                 case 'auto_watering_stop':
                     document.getElementById('status-msg').innerText = '✅ ARROSAGE AUTOMATIQUE TERMINÉ';
                     break;
             }
         }
 
-        // ── Affichage capteurs ───────────────────────────
+        // ── Capteurs ─────────────────────────────────────
         function setSensors(temp, hum, soil) {
             if (temp != null) document.getElementById('temp-val').innerText = Math.round(temp) + '°C';
             if (hum  != null) document.getElementById('hum-val').innerText  = Math.round(hum)  + '%';
             if (soil != null) document.getElementById('soil-val').innerText = Math.round(soil) + '%';
         }
 
-        // ── Statut vannes ────────────────────────────────
+        // ── Vannes ───────────────────────────────────────
         function setValves(v1, v2) {
             document.getElementById('v1-status').classList.toggle('active-water', !!v1);
             document.getElementById('v2-status').classList.toggle('active-water', !!v2);
@@ -399,12 +416,13 @@
             document.getElementById('sw2').checked = !!v2;
         }
 
-        // ── Statut ESP32 online / offline ────────────────
-        function setOnline(lastSeen) {
-            const online  = lastSeen && (Date.now() - lastSeen < 12000);
+        // ── Statut ESP32 ─────────────────────────────────
+        function setOnline(lastSeen, esp32Online) {
+            const online  = esp32Online || (lastSeen && Date.now() - lastSeen < 12000);
             const ind     = document.getElementById('status-indicator');
             const txt     = document.getElementById('status-text');
             const content = document.querySelector('.content');
+
             if (online) {
                 txt.innerText = 'ESP32 ACTIVE';
                 ind.classList.add('online');
@@ -419,15 +437,15 @@
             }
         }
 
-        // Vérification offline toutes les 8s si WS silencieux
+        // Vérif offline périodique si WS silencieux
         setInterval(() => {
             fetch('/api/status')
                 .then(r => r.json())
-                .then(d => setOnline(d.lastSeen))
+                .then(d => setOnline(d.lastSeen, d.esp32Online))
                 .catch(() => {});
         }, 8000);
 
-        // ── Alerte sol sec + arrosage secours ────────────
+        // ── Alerte humidité sol basse ────────────────────
         function checkSoil(soil) {
             if (soil < 20 && !forcedWatering) {
                 if (confirm("L'humidité du sol est basse (" + soil + "%). Voulez-vous arroser maintenant ?")) {
@@ -459,7 +477,7 @@
         document.getElementById('sw1').addEventListener('change', function() { cmdValve(1, this.checked); });
         document.getElementById('sw2').addEventListener('change', function() { cmdValve(2, this.checked); });
 
-        // ── Planning arrosage ────────────────────────────
+        // ── Planning ─────────────────────────────────────
         async function syncSchedule() {
             const time     = document.getElementById('sched-time').value;
             const duration = document.getElementById('sched-duration').value;
@@ -476,7 +494,7 @@
             } catch(e) {}
         }
 
-        ['sched-time', 'sched-duration', 'sched-v1', 'sched-v2'].forEach(id => {
+        ['sched-time','sched-duration','sched-v1','sched-v2'].forEach(id => {
             document.getElementById(id).addEventListener('change', syncSchedule);
         });
 
