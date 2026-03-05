@@ -266,151 +266,248 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-database.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+        <script>
+        // ================================================
+        //  HydroSmart — Interface Web
+        //  WebSocket vers https://hydrosmart-groupe5.onrender.com
+        //  Sans Firebase
+        // ================================================
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3p-sFubEGNazkLiVyZFiXiTnO-9hEphY",
-            authDomain: "hydrosmart-fc6a4.firebaseapp.com",
-            databaseURL: "https://hydrosmart-fc6a4-default-rtdb.firebaseio.com",
-            projectId: "hydrosmart-fc6a4",
-            storageBucket: "hydrosmart-fc6a4.firebasestorage.app",
-            messagingSenderId: "410048225901",
-            appId: "1:410048225901:web:477dda53a3cf78b58bd564"
-        };
+        let ws             = null;
+        let forcedWatering = false;
+        let sessionActive  = false;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        let forcedWatering = false; // Suivi arrosage secours
-
-        const loginBtn = document.getElementById('login-btn');
-        const spinner = document.getElementById('btn-spinner');
-        const btnText = document.getElementById('btn-text');
-        const errorDiv = document.getElementById('login-error');
-
-        loginBtn.addEventListener('click', async () => {
-            const email = document.getElementById('user').value;
-            const pass = document.getElementById('pass').value;
-            errorDiv.style.visibility = "hidden";
-            spinner.style.display = "block";
-            btnText.innerText = "VERIFYING...";
-            loginBtn.style.pointerEvents = "none";
-
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) {
-                spinner.style.display = "none";
-                btnText.innerText = "ACCESS SYSTEM";
-                loginBtn.style.pointerEvents = "auto";
-                errorDiv.style.visibility = "visible";
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            signOut(auth).then(() => location.reload());
-        });
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-interface').style.display = 'flex';
-                initSystem();
-            }
-        });
-
-        function initSystem() {
-            setInterval(updateClock, 1000);
-            
-            const statusText = document.getElementById('status-text');
-            const statusIndicator = document.getElementById('status-indicator');
-            const mainContent = document.querySelector('.content');
-
-            onValue(ref(db, 'system/status/lastSeen'), (snap) => {
-                const lastSeen = snap.val();
-                const now = Date.now();
-                const isOnline = lastSeen && (now - lastSeen < 10000);
-
-                if(isOnline) {
-                    statusText.innerText = "ESP32 ACTIVE";
-                    statusIndicator.classList.add('online');
-                    mainContent.classList.remove('system-offline-lock');
-                } else {
-                    statusText.innerText = "ESP32 INACTIVE";
-                    statusIndicator.classList.remove('online');
-                    mainContent.classList.add('system-offline-lock');
-                    
-                    // Reset valeurs quand inactif
-                    document.getElementById('temp-val').innerText = "--°C";
-                    document.getElementById('hum-val').innerText = "--%";
-                    document.getElementById('soil-val').innerText = "--%";
-                }
-            });
-
-            // LECTURE CAPTEURS ET LOGIQUE ARROSAGE
-            onValue(ref(db, 'system/live'), (snap) => {
-                const val = snap.val();
-                const statusStr = statusText.innerText;
-                if(val && statusStr === "ESP32 ACTIVE") {
-                    const soilMoisture = Math.round(val.soil);
-                    document.getElementById('soil-val').innerText = soilMoisture + "%";
-                    document.getElementById('temp-val').innerText = Math.round(val.temp) + "°C";
-                    document.getElementById('hum-val').innerText = Math.round(val.hum) + "%";
-
-                    // Notification si humidité sol < 20%
-                    if (soilMoisture < 20 && !forcedWatering) {
-                        if (confirm("L'humidité du sol est basse (" + soilMoisture + "%). Voulez-vous arroser maintenant ?")) {
-                            forcedWatering = true;
-                            set(ref(db, 'system/manual/sw1'), true);
-                            set(ref(db, 'system/manual/sw2'), true);
-                            document.getElementById('status-msg').innerText = "ARROSAGE DE SECOURS EN COURS...";
-                        }
-                    }
-
-                    // Arrêt automatique quand sol saturé (100%)
-                    if (forcedWatering && soilMoisture >= 100) {
-                        forcedWatering = false;
-                        set(ref(db, 'system/manual/sw1'), false);
-                        set(ref(db, 'system/manual/sw2'), false);
-                        document.getElementById('status-msg').innerText = "SOL SATURÉ : ARROSAGE TERMINÉ";
-                    }
-                }
-            });
-        }
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('current-time').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-            document.getElementById('current-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            
-            const mode = document.querySelector('input[name="m"]:checked').value;
-            if (mode === 'i') {
-                const startTime = document.getElementById('sched-time').value;
-                document.getElementById('status-msg').innerHTML = "NEXT CYCLE AT: <b style='color:var(--accent)'>" + startTime + "</b>";
-            } else if (!forcedWatering) {
-                document.getElementById('status-msg').innerText = "MANUAL OVERRIDE ENABLED";
-            }
-        }
-
+        // ── Éléments ────────────────────────────────────
+        const loginBtn  = document.getElementById('login-btn');
+        const spinner   = document.getElementById('btn-spinner');
+        const btnText   = document.getElementById('btn-text');
+        const errorDiv  = document.getElementById('login-error');
         const passInput = document.getElementById('pass');
-        const eyeBtn = document.getElementById('toggle-eye');
-        passInput.addEventListener('input', () => eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none');
+        const eyeBtn    = document.getElementById('toggle-eye');
+
+        // ── Afficher/masquer mot de passe ────────────────
+        passInput.addEventListener('input', () => {
+            eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none';
+        });
         eyeBtn.addEventListener('click', () => {
             const isPass = passInput.type === 'password';
-            passInput.type = isPass ? 'text' : 'password';
+            passInput.type       = isPass ? 'text' : 'password';
             eyeBtn.style.opacity = isPass ? '1' : '0.4';
         });
 
+        // ── Login via API ────────────────────────────────
+        loginBtn.addEventListener('click', async () => {
+            const email = document.getElementById('user').value.trim();
+            const pass  = passInput.value;
+            if (!email || !pass) return;
+
+            errorDiv.style.visibility    = 'hidden';
+            spinner.style.display        = 'block';
+            btnText.innerText            = 'VERIFYING...';
+            loginBtn.style.pointerEvents = 'none';
+
+            try {
+                const r    = await fetch('/api/login', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ email, password: pass })
+                });
+                const data = await r.json();
+                if (!data.success) throw new Error();
+
+                sessionActive = true;
+                document.getElementById('login-screen').style.display   = 'none';
+                document.getElementById('main-interface').style.display = 'flex';
+                setInterval(updateClock, 1000);
+                updateClock();
+                connectWS();
+
+            } catch {
+                spinner.style.display        = 'none';
+                btnText.innerText            = 'ACCESS SYSTEM';
+                loginBtn.style.pointerEvents = 'auto';
+                errorDiv.style.visibility    = 'visible';
+            }
+        });
+
+        // ── Logout ───────────────────────────────────────
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            sessionActive = false;
+            if (ws) ws.close();
+            document.getElementById('main-interface').style.display = 'none';
+            document.getElementById('login-screen').style.display   = 'block';
+        });
+
+        // ── WebSocket ────────────────────────────────────
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+            ws = new WebSocket(proto + '://' + location.host);
+
+            ws.onopen = () => {
+                console.log('✅ WebSocket connecté');
+                document.getElementById('status-msg').innerText = 'System connected...';
+            };
+            ws.onmessage = (e) => {
+                try { handleMsg(JSON.parse(e.data)); }
+                catch(err) { console.error('WS parse:', err); }
+            };
+            ws.onclose = () => {
+                if (!sessionActive) return;
+                console.warn('WS fermé — reconnexion 3s');
+                setTimeout(connectWS, 3000);
+            };
+        }
+
+        // ── Messages serveur ─────────────────────────────
+        function handleMsg(msg) {
+            switch (msg.type) {
+                case 'full_state':
+                    if (msg.sensors && msg.sensors.temp !== null)
+                        setSensors(msg.sensors.temp, msg.sensors.hum, msg.sensors.soil);
+                    setValves(msg.valves?.v1, msg.valves?.v2);
+                    setOnline(msg.lastSeen);
+                    break;
+                case 'sensors':
+                    setSensors(msg.temp, msg.hum, msg.soil);
+                    setOnline(msg.lastSeen);
+                    checkSoil(msg.soil);
+                    break;
+                case 'valve_status':
+                    setValves(msg.v1, msg.v2);
+                    break;
+                case 'auto_watering_start':
+                    document.getElementById('status-msg').innerText = '⏰ ARROSAGE AUTOMATIQUE EN COURS...';
+                    break;
+                case 'auto_watering_stop':
+                    document.getElementById('status-msg').innerText = '✅ ARROSAGE AUTOMATIQUE TERMINÉ';
+                    break;
+            }
+        }
+
+        // ── Affichage capteurs ───────────────────────────
+        function setSensors(temp, hum, soil) {
+            if (temp != null) document.getElementById('temp-val').innerText = Math.round(temp) + '°C';
+            if (hum  != null) document.getElementById('hum-val').innerText  = Math.round(hum)  + '%';
+            if (soil != null) document.getElementById('soil-val').innerText = Math.round(soil) + '%';
+        }
+
+        // ── Statut vannes ────────────────────────────────
+        function setValves(v1, v2) {
+            document.getElementById('v1-status').classList.toggle('active-water', !!v1);
+            document.getElementById('v2-status').classList.toggle('active-water', !!v2);
+            document.getElementById('sw1').checked = !!v1;
+            document.getElementById('sw2').checked = !!v2;
+        }
+
+        // ── Statut ESP32 online / offline ────────────────
+        function setOnline(lastSeen) {
+            const online  = lastSeen && (Date.now() - lastSeen < 12000);
+            const ind     = document.getElementById('status-indicator');
+            const txt     = document.getElementById('status-text');
+            const content = document.querySelector('.content');
+            if (online) {
+                txt.innerText = 'ESP32 ACTIVE';
+                ind.classList.add('online');
+                content.classList.remove('system-offline-lock');
+            } else {
+                txt.innerText = 'ESP32 INACTIVE';
+                ind.classList.remove('online');
+                content.classList.add('system-offline-lock');
+                document.getElementById('temp-val').innerText = '--°C';
+                document.getElementById('hum-val').innerText  = '--%';
+                document.getElementById('soil-val').innerText = '--%';
+            }
+        }
+
+        // Vérification offline toutes les 8s si WS silencieux
+        setInterval(() => {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(d => setOnline(d.lastSeen))
+                .catch(() => {});
+        }, 8000);
+
+        // ── Alerte sol sec + arrosage secours ────────────
+        function checkSoil(soil) {
+            if (soil < 20 && !forcedWatering) {
+                if (confirm("L'humidité du sol est basse (" + soil + "%). Voulez-vous arroser maintenant ?")) {
+                    forcedWatering = true;
+                    cmdValve(1, true);
+                    cmdValve(2, true);
+                    document.getElementById('status-msg').innerText = 'ARROSAGE DE SECOURS EN COURS...';
+                }
+            }
+            if (forcedWatering && soil >= 100) {
+                forcedWatering = false;
+                cmdValve(1, false);
+                cmdValve(2, false);
+                document.getElementById('status-msg').innerText = 'SOL SATURÉ : ARROSAGE TERMINÉ';
+            }
+        }
+
+        // ── Commande vanne ───────────────────────────────
+        async function cmdValve(valve, state) {
+            try {
+                await fetch('/api/valve', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ valve, state })
+                });
+            } catch(e) { console.error('cmdValve:', e); }
+        }
+
+        document.getElementById('sw1').addEventListener('change', function() { cmdValve(1, this.checked); });
+        document.getElementById('sw2').addEventListener('change', function() { cmdValve(2, this.checked); });
+
+        // ── Planning arrosage ────────────────────────────
+        async function syncSchedule() {
+            const time     = document.getElementById('sched-time').value;
+            const duration = document.getElementById('sched-duration').value;
+            const valves   = [];
+            if (document.getElementById('sched-v1').checked) valves.push(1);
+            if (document.getElementById('sched-v2').checked) valves.push(2);
+            if (!valves.length) return;
+            try {
+                await fetch('/api/schedule', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ time, duration: parseInt(duration), valves })
+                });
+            } catch(e) {}
+        }
+
+        ['sched-time', 'sched-duration', 'sched-v1', 'sched-v2'].forEach(id => {
+            document.getElementById(id).addEventListener('change', syncSchedule);
+        });
+
+        // ── Mode Intelligent / Manuel ────────────────────
         document.querySelectorAll('input[name="m"]').forEach(r => {
             r.addEventListener('change', () => {
                 const isInt = r.value === 'i';
                 document.getElementById('p-int').classList.toggle('disabled', !isInt);
                 document.getElementById('p-man').classList.toggle('disabled', isInt);
+                if (isInt) syncSchedule();
+                else fetch('/api/schedule', { method: 'DELETE' }).catch(() => {});
             });
         });
+
+        // ── Horloge ──────────────────────────────────────
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').innerText =
+                now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('current-date').innerText =
+                now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+            const mode = document.querySelector('input[name="m"]:checked').value;
+            if (mode === 'i') {
+                const t = document.getElementById('sched-time').value;
+                document.getElementById('status-msg').innerHTML =
+                    "NEXT CYCLE AT: <b style='color:var(--accent)'>" + t + "</b>";
+            } else if (!forcedWatering) {
+                document.getElementById('status-msg').innerText = 'MANUAL OVERRIDE ENABLED';
+            }
+        }
     </script>
 </body>
 </html>
