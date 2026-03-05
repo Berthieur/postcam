@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" type="image/png" href="logo.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nature Control System PRO</title>
+    <style>
+        :root {
+            --glass: rgba(30, 50, 30, 0.4); 
+            --glass-border: rgba(255, 255, 255, 0.3);
+            --accent: #a2ff00;
+            --dark-blue: #16243d;
+            --input-bg: #243b55;
+            --gray-icon: #555;
+            --error-red: #ff4d4d;
+        }
+
+        input::-ms-reveal, input::-ms-clear { display: none !important; }
+
+        body, html {
+            margin: 0; padding: 0;
+            height: 100vh; width: 100vw;
+            overflow: hidden; 
+            font-family: 'Segoe UI', sans-serif;
+            background: url('background.png') no-repeat center center fixed;
+            background-size: cover;
+            display: flex; justify-content: center; align-items: center;
+            background-color: #050a05;
+        }
+
+        /* --- VOYANT D'ÉTAT --- */
+        #status-indicator {
+            display: flex; align-items: center; gap: 8px;
+            position: absolute; top: 15px; left: 15px;
+            font-size: 0.75rem; font-weight: bold; color: #ff4d4d;
+            z-index: 100;
+        }
+        .dot { width: 10px; height: 10px; background: #ff4d4d; border-radius: 50%; transition: 0.3s; }
+        .online { color: #a2ff00 !important; }
+        .online .dot { background: #a2ff00; box-shadow: 0 0 10px #a2ff00; }
+
+        /* VERROUILLAGE QUAND INACTIF */
+        .system-offline-lock {
+            filter: grayscale(1) !important;
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+            cursor: not-allowed;
+        }
+
+        /* --- LOGIN DESIGN --- */
+        #login-screen {
+            width: 90%; max-width: 360px;
+            padding: 60px 35px 40px 35px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-radius: 25px; border: 1px solid var(--glass-border);
+            text-align: center; position: relative;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+
+        .profile-logo {
+            width: 95px; height: 95px; 
+            background: transparent;
+            border-radius: 50%;
+            position: absolute; top: -47px; left: 50%; transform: translateX(-50%);
+            display: flex; justify-content: center; align-items: center;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+        
+        .profile-logo img { width: 90%; height: 90%; object-fit: contain; }
+
+        .input-group { background: var(--input-bg); border-radius: 6px; display: flex; align-items: center; margin-bottom: 20px; position: relative; }
+        .login-field { background: transparent; border: none; padding: 14px; color: white; width: 100%; outline: none; }
+        .input-icon { padding: 12px; display: flex; align-items: center; }
+        .input-icon svg { width: 18px; fill: rgba(255,255,255,0.7); }
+        .toggle-pass { position: absolute; right: 10px; cursor: pointer; display: none; align-items: center; height: 100%; }
+        .toggle-pass svg { width: 20px; fill: rgba(255,255,255,0.5); }
+
+        #login-error { color: var(--error-red); font-size: 0.85rem; margin-bottom: 10px; height: 18px; visibility: hidden; font-weight: 500; }
+
+        #login-btn {
+            background: #ffffff; color: var(--dark-blue); border: none; width: 85%; padding: 15px;
+            border-radius: 12px; cursor: pointer; font-weight: bold; position: absolute; 
+            bottom: -25px; left: 50%; transform: translateX(-50%); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4); text-transform: uppercase;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .spinner {
+            width: 18px; height: 18px;
+            border: 3px solid rgba(22, 36, 61, 0.2);
+            border-top: 3px solid var(--dark-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none; margin-right: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- MAIN INTERFACE --- */
+        #main-interface {
+            display: none; width: 95vw; height: 95vh;
+            max-width: 1000px; max-height: 620px;
+            border-radius: 15px; overflow: hidden;
+            flex-direction: column; border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        #logout-btn {
+            position: absolute; top: 15px; right: 15px; cursor: pointer; z-index: 100;
+            padding: 8px; border-radius: 50%; background: rgba(0,0,0,0.3); transition: 0.3s;
+        }
+        #logout-btn:hover { background: rgba(255,0,0,0.4); transform: scale(1.1); }
+
+        .content { 
+            flex: 1; padding: 15px; display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            grid-template-rows: auto auto 1fr auto; 
+            gap: 12px; 
+            background: rgba(8, 20, 8, 0.96);
+            overflow: hidden; 
+        }
+
+        .glass-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; color: white; justify-content: center; }
+
+        #current-date { font-size: 1.1rem; color: var(--accent); text-transform: uppercase; margin-bottom: 2px; }
+        #current-time { font-size: 2.2rem; font-weight: bold; line-height: 1; }
+
+        .stat-val { font-size: 1.6rem; font-weight: bold; }
+        .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
+        .faucet-icon { width: 40px; height: 40px; fill: var(--gray-icon); }
+        .active-water .faucet-icon { fill: var(--accent); }
+        .active-water .water-drop { animation: dropAnim 0.8s infinite; opacity: 1; fill: #4fc3f7; }
+        
+        @keyframes dropAnim { 0% { transform: translateY(-5px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+
+        .mode-row { grid-column: span 2; display: flex; justify-content: center; gap: 15px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 50px; width: fit-content; margin: 0 auto; }
+        .mode-row label { font-size: 0.8rem; font-weight: bold; cursor: pointer; padding: 8px 20px; border-radius: 30px; color: #aaa; }
+        .mode-row input { display: none; }
+        .mode-row label:has(input:checked) { background: var(--accent); color: var(--dark-blue); }
+
+        .section-header { text-align: center; padding: 6px; border-radius: 6px; margin-bottom: 10px; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
+        .sh-int { background: rgba(162, 255, 0, 0.2); color: var(--accent); }
+        .sh-man { background: #333; color: #eee; }
+
+        .input-pro { background: #ffffff; color: #000; border: 2px solid var(--accent); padding: 8px; border-radius: 6px; width: 100px; font-weight: bold; outline: none; }
+
+        .vanne-chip { padding: 6px 14px; border-radius: 20px; border: 1px solid #555; font-size: 0.75rem; cursor: pointer; }
+        .vanne-chip:has(input:checked) { background: var(--accent); color: var(--dark-blue); font-weight: bold; }
+        .vanne-chip input { display: none; }
+
+        .switch { position: relative; width: 42px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #222; border-radius: 20px; transition: .4s; border: 1px solid #444; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background: white; border-radius: 50%; transition: .4s; }
+        input:checked + .slider { background: var(--accent); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .disabled { opacity: 0.25; pointer-events: none; filter: grayscale(1); }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="profile-logo">
+            <img src="logo.png" alt="Logo">
+        </div>
+        <h2 style="color: white; margin-bottom: 25px; font-weight: 300; letter-spacing: 2px;">NATURE CONNECT</h2>
+        
+        <div class="input-group">
+            <div class="input-icon"><svg viewBox="0 0 24 24"><path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/></svg></div>
+            <input type="text" id="user" class="login-field" placeholder="Email Address">
+        </div>
+        
+        <div class="input-group">
+            <div class="input-icon"><svg viewBox="0 0 24 24"><path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.11,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/></svg></div>
+            <input type="password" id="pass" class="login-field" placeholder="Password">
+            <div id="toggle-eye" class="toggle-pass"><svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg></div>
+        </div>
+
+        <div id="login-error">Invalid email or password</div>
+        
+        <button id="login-btn">
+            <div class="spinner" id="btn-spinner"></div>
+            <span id="btn-text">ACCESS SYSTEM</span>
+        </button>
+    </div>
+
+    <div id="main-interface">
+        <div id="status-indicator">
+            <div class="dot"></div> <span id="status-text">ESP32 INACTIVE</span>
+        </div>
+
+        <div id="logout-btn" title="Logout">
+            <svg style="width:24px; fill:white;" viewBox="0 0 24 24"><path d="M16,17V14H9V10H16V7L21,12L16,17M14,2A2,2 0 0,1 16,4V6H14V4H5V20H14V18H16V20A2,2 0 0,1 14,22H5A2,2 0 0,1 3,20V4A2,2 0 0,1 5,2H14Z"/></svg>
+        </div>
+
+        <div class="content">
+            <div class="glass-card" style="grid-column: span 2; flex-direction: row; justify-content: space-around; align-items: center; min-height: 120px;">
+                <div>
+                    <div id="current-date">-- --, ----</div>
+                    <div id="current-time">00:00:00</div>
+                </div>
+                <div style="display: flex; gap: 30px;">
+                    <div style="text-align: center;">
+                        <svg class="icon-dashboard" viewBox="0 0 24 24"><path d="M15 13V5c0-1.7-1.3-3-3-3S9 3.3 9 5v8c-1.2.7-2 2-2 3.5 0 2.5 2 4.5 4.5 4.5s4.5-2 4.5-4.5c0-1.5-.8-2.8-2-3.5z"/></svg>
+                        <div id="temp-val" class="stat-val">--°C</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <svg class="icon-dashboard" viewBox="0 0 512 512">
+                            <g fill="none" stroke="var(--accent)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M40,245 h140 c20,0 35,-15 35,-35 s-15,-35 -35,-35" />
+                                <path d="M40,320 h260" />
+                                <path d="M40,395 h100 m70,0 h160 c20,0 35,15 35,35 s-15,35 -35,35" />
+                                <path d="M370,320 h70 c20,0 35,-15 35,-35 s-15,-35 -35,-35" />
+                                <path fill="var(--accent)" stroke="none" d="M330,70 c0,0 -25,40 -25,60 a25,25 0 0 0 50,0 c0,-20 -25,-60 -25,-60 Z" />
+                                <path fill="var(--accent)" stroke="none" d="M260,170 c0,0 -25,40 -25,60 a25,25 0 0 0 50,0 c0,-20 -25,-60 -25,-60 Z" />
+                                <path fill="var(--accent)" stroke="none" d="M400,170 c0,0 -25,40 -25,60 a25,25 0 0 0 50,0 c0,-20 -25,-60 -25,-60 Z" />
+                            </g>
+                        </svg>
+                        <div id="hum-val" class="stat-val">--%</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <svg class="icon-dashboard" viewBox="0 0 32 32" style="fill: var(--accent);">
+                            <path d="M24.5,30a5.202,5.202,0,0,1-4.626-8.08L23.49,16.5382a1.217,1.217,0,0,1,2.02,0L29.06,21.8154A5.4921,5.4921,0,0,1,30,24.751,5.385,5.385,0,0,1,24.5,30Zm0-11.38-2.9356,4.3672A3.2079,3.2079,0,0,0,24.5,28,3.3855,3.3855,0,0,0,28,24.751a3.4354,3.4354,0,0,0-.63-1.867Z" />
+                            <path d="M11,16V11h1a4.0045,4.0045,0,0,0,4-4V4H13a3.9779,3.9779,0,0,0-2.7468,1.1067A6.0034,6.0034,0,0,0,5,2H2V5a6.0066,6.0066,0,0,0,6,6H9v5H2v2H16V16ZM13,6h1V7a2.002,2.002,0,0,1-2,2H11V8A2.002,2.002,0,0,1,13,6ZM8,9A4.0045,4.0045,0,0,1,4,5V4H5A4.0045,4.0045,0,0,1,9,8V9Z" />
+                            <rect x="2" y="21" width="14" height="2"/>
+                            <rect x="2" y="26" width="14" height="2"/>
+                        </svg>
+                        <div id="soil-val" class="stat-val">--%</div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div id="v1-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
+                    <div id="v2-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
+                </div>
+            </div>
+
+            <div class="mode-row">
+                <label><input type="radio" name="m" value="i" checked> INTELLIGENT</label>
+                <label><input type="radio" name="m" value="m"> MANUAL</label>
+            </div>
+
+            <div id="p-int" class="glass-card">
+                <div class="section-header sh-int">Automated Planning</div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;"><span>Start Time:</span> <input type="time" id="sched-time" class="input-pro" value="18:00"></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;"><span>Duration (min):</span> <input type="number" id="sched-duration" class="input-pro" value="10"></div>
+                    <div style="display: flex; justify-content: center; gap: 10px; margin-top: 5px;">
+                        <label class="vanne-chip"><input type="checkbox" id="sched-v1" checked> VALVE 1</label>
+                        <label class="vanne-chip"><input type="checkbox" id="sched-v2"> VALVE 2</label>
+                    </div>
+                </div>
+            </div>
+
+            <div id="p-man" class="glass-card disabled">
+                <div class="section-header sh-man">Manual Override</div>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;"><span>VALVE 1</span><label class="switch"><input type="checkbox" id="sw1"><span class="slider"></span></label></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;"><span>VALVE 2</span><label class="switch"><input type="checkbox" id="sw2"><span class="slider"></span></label></div>
+                </div>
+            </div>
+
+            <div id="status-msg" style="grid-column: span 2; text-align: center; font-size: 0.85rem; padding: 12px; color: #fff;">System Ready...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3p-sFubEGNazkLiVyZFiXiTnO-9hEphY",
+            authDomain: "hydrosmart-fc6a4.firebaseapp.com",
+            databaseURL: "https://hydrosmart-fc6a4-default-rtdb.firebaseio.com",
+            projectId: "hydrosmart-fc6a4",
+            storageBucket: "hydrosmart-fc6a4.firebasestorage.app",
+            messagingSenderId: "410048225901",
+            appId: "1:410048225901:web:477dda53a3cf78b58bd564"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        let forcedWatering = false; // Suivi arrosage secours
+
+        const loginBtn = document.getElementById('login-btn');
+        const spinner = document.getElementById('btn-spinner');
+        const btnText = document.getElementById('btn-text');
+        const errorDiv = document.getElementById('login-error');
+
+        loginBtn.addEventListener('click', async () => {
+            const email = document.getElementById('user').value;
+            const pass = document.getElementById('pass').value;
+            errorDiv.style.visibility = "hidden";
+            spinner.style.display = "block";
+            btnText.innerText = "VERIFYING...";
+            loginBtn.style.pointerEvents = "none";
+
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) {
+                spinner.style.display = "none";
+                btnText.innerText = "ACCESS SYSTEM";
+                loginBtn.style.pointerEvents = "auto";
+                errorDiv.style.visibility = "visible";
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth).then(() => location.reload());
+        });
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('main-interface').style.display = 'flex';
+                initSystem();
+            }
+        });
+
+        function initSystem() {
+            setInterval(updateClock, 1000);
+            
+            const statusText = document.getElementById('status-text');
+            const statusIndicator = document.getElementById('status-indicator');
+            const mainContent = document.querySelector('.content');
+
+            onValue(ref(db, 'system/status/lastSeen'), (snap) => {
+                const lastSeen = snap.val();
+                const now = Date.now();
+                const isOnline = lastSeen && (now - lastSeen < 10000);
+
+                if(isOnline) {
+                    statusText.innerText = "ESP32 ACTIVE";
+                    statusIndicator.classList.add('online');
+                    mainContent.classList.remove('system-offline-lock');
+                } else {
+                    statusText.innerText = "ESP32 INACTIVE";
+                    statusIndicator.classList.remove('online');
+                    mainContent.classList.add('system-offline-lock');
+                    
+                    // Reset valeurs quand inactif
+                    document.getElementById('temp-val').innerText = "--°C";
+                    document.getElementById('hum-val').innerText = "--%";
+                    document.getElementById('soil-val').innerText = "--%";
+                }
+            });
+
+            // LECTURE CAPTEURS ET LOGIQUE ARROSAGE
+            onValue(ref(db, 'system/live'), (snap) => {
+                const val = snap.val();
+                const statusStr = statusText.innerText;
+                if(val && statusStr === "ESP32 ACTIVE") {
+                    const soilMoisture = Math.round(val.soil);
+                    document.getElementById('soil-val').innerText = soilMoisture + "%";
+                    document.getElementById('temp-val').innerText = Math.round(val.temp) + "°C";
+                    document.getElementById('hum-val').innerText = Math.round(val.hum) + "%";
+
+                    // Notification si humidité sol < 20%
+                    if (soilMoisture < 20 && !forcedWatering) {
+                        if (confirm("L'humidité du sol est basse (" + soilMoisture + "%). Voulez-vous arroser maintenant ?")) {
+                            forcedWatering = true;
+                            set(ref(db, 'system/manual/sw1'), true);
+                            set(ref(db, 'system/manual/sw2'), true);
+                            document.getElementById('status-msg').innerText = "ARROSAGE DE SECOURS EN COURS...";
+                        }
+                    }
+
+                    // Arrêt automatique quand sol saturé (100%)
+                    if (forcedWatering && soilMoisture >= 100) {
+                        forcedWatering = false;
+                        set(ref(db, 'system/manual/sw1'), false);
+                        set(ref(db, 'system/manual/sw2'), false);
+                        document.getElementById('status-msg').innerText = "SOL SATURÉ : ARROSAGE TERMINÉ";
+                    }
+                }
+            });
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').innerText = now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('current-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            
+            const mode = document.querySelector('input[name="m"]:checked').value;
+            if (mode === 'i') {
+                const startTime = document.getElementById('sched-time').value;
+                document.getElementById('status-msg').innerHTML = "NEXT CYCLE AT: <b style='color:var(--accent)'>" + startTime + "</b>";
+            } else if (!forcedWatering) {
+                document.getElementById('status-msg').innerText = "MANUAL OVERRIDE ENABLED";
+            }
+        }
+
+        const passInput = document.getElementById('pass');
+        const eyeBtn = document.getElementById('toggle-eye');
+        passInput.addEventListener('input', () => eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none');
+        eyeBtn.addEventListener('click', () => {
+            const isPass = passInput.type === 'password';
+            passInput.type = isPass ? 'text' : 'password';
+            eyeBtn.style.opacity = isPass ? '1' : '0.4';
+        });
+
+        document.querySelectorAll('input[name="m"]').forEach(r => {
+            r.addEventListener('change', () => {
+                const isInt = r.value === 'i';
+                document.getElementById('p-int').classList.toggle('disabled', !isInt);
+                document.getElementById('p-man').classList.toggle('disabled', isInt);
+            });
+        });
+    </script>
+</body>
+</html>
