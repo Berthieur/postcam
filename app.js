@@ -2,9 +2,9 @@
 
 // ================================================
 //  HydroSmart — app.js
-//  Node.js + NeonDB + WebSocket temps réel
-//  ESP32 et navigateur connectés via WebSocket
-//  CORRECTION : commandes vannes temps réel via WS
+//  CORRECTION TIMEZONE : Fly.io tourne en UTC
+//  - getUTCHours/getUTCMinutes au lieu de toTimeString()
+//  - Le navigateur envoie l'heure convertie en UTC
 // ================================================
 
 const express   = require('express');
@@ -62,7 +62,7 @@ async function initDB() {
       CREATE TABLE IF NOT EXISTS hs_schedule (
         id       SERIAL PRIMARY KEY,
         enabled  BOOLEAN DEFAULT FALSE,
-        time_val TEXT    DEFAULT '18:00',
+        time_val TEXT    DEFAULT '15:00',
         duration INTEGER DEFAULT 10,
         valves   TEXT    DEFAULT '1',
         updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW())*1000)::BIGINT
@@ -75,7 +75,7 @@ async function initDB() {
     await c.query(`
       INSERT INTO hs_commands (sw1,sw2) SELECT false,false WHERE NOT EXISTS (SELECT 1 FROM hs_commands);
       INSERT INTO hs_valves   (v1,v2)  SELECT false,false WHERE NOT EXISTS (SELECT 1 FROM hs_valves);
-      INSERT INTO hs_schedule (enabled,time_val,duration,valves) SELECT false,'18:00',10,'1' WHERE NOT EXISTS (SELECT 1 FROM hs_schedule);
+      INSERT INTO hs_schedule (enabled,time_val,duration,valves) SELECT false,'15:00',10,'1' WHERE NOT EXISTS (SELECT 1 FROM hs_schedule);
       INSERT INTO hs_status   (last_seen) SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM hs_status);
     `);
     console.log('✅ NeonDB OK');
@@ -120,7 +120,6 @@ function broadcastTo(clients, obj) {
 
 function broadcastBrowsers(obj) { broadcastTo(browsers, obj); }
 
-// ── CORRECTION : envoi direct à tous les ESP32 connectés ──
 function sendToESP32(obj) {
   if (esp32s.size === 0) {
     console.warn('⚠️  Aucun ESP32 connecté en WebSocket — commande en DB uniquement');
@@ -135,7 +134,6 @@ function sendToESP32(obj) {
 wss.on('connection', async (ws) => {
   let isESP32 = false;
 
-  // Si pas d'identification en 5s → navigateur
   const identTimer = setTimeout(() => {
     if (!isESP32) {
       browsers.add(ws);
@@ -148,7 +146,6 @@ wss.on('connection', async (ws) => {
     try {
       const msg = JSON.parse(raw);
 
-      // ── Identification ESP32 ──────────────────
       if (msg.type === 'esp32_hello') {
         if (msg.key !== ESP32_KEY) {
           console.warn('❌ ESP32 clé invalide — déconnexion');
@@ -159,23 +156,17 @@ wss.on('connection', async (ws) => {
         isESP32 = true;
         esp32s.add(ws);
         console.log(`📟 ESP32 connecté via WebSocket (total: ${esp32s.size})`);
-
-        // Envoyer l'état actuel des commandes à l'ESP32
         const [cmds] = await q('SELECT sw1,sw2 FROM hs_commands ORDER BY id DESC LIMIT 1');
         send(ws, {
           type: 'init_commands',
           sw1:  cmds?.sw1 || false,
           sw2:  cmds?.sw2 || false,
         });
-
-        // Informer les navigateurs que l'ESP32 est en ligne
         broadcastBrowsers({ type: 'esp32_online' });
         return;
       }
 
-      // ── Messages de l'ESP32 ──────────────────
       if (isESP32) {
-
         if (msg.type === 'sensors') {
           const { temp, hum, soil } = msg;
           const now = Date.now();
@@ -213,7 +204,6 @@ wss.on('connection', async (ws) => {
   ws.on('error', (e) => console.error('WS error:', e.message));
 });
 
-// ── État complet pour un navigateur qui se connecte ──
 async function sendFullState(ws) {
   try {
     const [sensors] = await q('SELECT * FROM hs_sensors  ORDER BY id DESC LIMIT 1');
@@ -236,8 +226,6 @@ async function sendFullState(ws) {
 // ================================================
 //  ROUTES ESP32 — HTTP
 // ================================================
-
-// POST /api/sensors  { temp, hum, soil }
 app.post('/api/sensors', authESP, async (req, res) => {
   const { temp, hum, soil } = req.body;
   if (temp == null || hum == null || soil == null)
@@ -254,7 +242,6 @@ app.post('/api/sensors', authESP, async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// POST /api/valve-feedback  { v1: bool, v2: bool }
 app.post('/api/valve-feedback', authESP, async (req, res) => {
   const { v1, v2 } = req.body;
   try {
@@ -264,7 +251,6 @@ app.post('/api/valve-feedback', authESP, async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// GET /api/commands  — FALLBACK HTTP si WebSocket ESP32 indispo
 app.get('/api/commands', authESP, async (req, res) => {
   try {
     const [cmds] = await q('SELECT sw1,sw2 FROM hs_commands ORDER BY id DESC LIMIT 1');
@@ -275,8 +261,6 @@ app.get('/api/commands', authESP, async (req, res) => {
 // ================================================
 //  ROUTES NAVIGATEUR
 // ================================================
-
-// POST /api/login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const ok_e = process.env.ADMIN_EMAIL    || 'hydrosmart@gmail.com';
@@ -285,8 +269,6 @@ app.post('/api/login', (req, res) => {
   res.status(401).json({ success: false, message: 'Identifiants invalides' });
 });
 
-// POST /api/valve  { valve: 1|2, state: bool }
-// ── CORRECTION PRINCIPALE : envoi WS direct à l'ESP32 ──
 app.post('/api/valve', async (req, res) => {
   const { valve, state } = req.body;
   if (valve !== 1 && valve !== 2)
@@ -294,22 +276,15 @@ app.post('/api/valve', async (req, res) => {
   if (typeof state !== 'boolean')
     return res.status(400).json({ success: false, message: 'state boolean' });
   try {
-    // 1. Sauvegarder en DB
     await q(`UPDATE hs_commands SET sw${valve}=$1, updated_at=$2`, [state, Date.now()]);
     console.log(`🎛️  Vanne ${valve} ${state ? 'ON' : 'OFF'}`);
-
-    // 2. CORRECTION : envoyer directement à l'ESP32 via WebSocket (temps réel <50ms)
-    //    Format : { type: 'command_sent', valve: 1|2, state: bool }
     const wsDelivered = sendToESP32({ type: 'command_sent', valve, state });
-
-    // 3. Mettre à jour l'UI de tous les navigateurs
     broadcastBrowsers({ type: 'command_sent', valve, state });
-
     res.json({ success: true, wsDelivered });
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// POST /api/schedule
+// Le navigateur envoie time déjà converti en UTC
 app.post('/api/schedule', async (req, res) => {
   const { time, duration, valves } = req.body;
   if (!time || !duration || !Array.isArray(valves))
@@ -318,13 +293,12 @@ app.post('/api/schedule', async (req, res) => {
     await q('UPDATE hs_schedule SET enabled=true,time_val=$1,duration=$2,valves=$3,updated_at=$4',
             [time, +duration, valves.join(','), Date.now()]);
     const sched = { enabled: true, time, duration, valves };
-    console.log(`📅 Planning: ${time}  ${duration}min  [${valves}]`);
+    console.log(`📅 Planning UTC: ${time}  ${duration}min  [${valves}]`);
     broadcastBrowsers({ type: 'schedule_updated', schedule: sched });
     res.json({ success: true, schedule: sched });
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// DELETE /api/schedule
 app.delete('/api/schedule', async (req, res) => {
   try {
     await q('UPDATE hs_schedule SET enabled=false');
@@ -333,7 +307,6 @@ app.delete('/api/schedule', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// GET /api/status
 app.get('/api/status', async (req, res) => {
   try {
     const [sensors] = await q('SELECT * FROM hs_sensors  ORDER BY id DESC LIMIT 1');
@@ -349,10 +322,18 @@ app.get('/health', (_, res) => res.json({ status: 'ok', ts: Date.now(), esp32: e
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'templates', 'index.html')));
 
 // ================================================
-//  SCHEDULING AUTOMATIQUE CÔTÉ SERVEUR
-//  CORRECTION : réduit à 1000ms pour précision
+//  SCHEDULING AUTOMATIQUE — CORRECTION TIMEZONE
+//
+//  ❌ AVANT (bugué sur Fly.io) :
+//     new Date().toTimeString().slice(0,5)
+//     → heure système qui peut varier selon config
+//
+//  ✅ APRÈS (correct) :
+//     getUTCHours() + getUTCMinutes()
+//     → toujours UTC garanti
+//     → le navigateur envoie déjà l'heure en UTC
 // ================================================
-let wateringActive = false;
+let wateringActive     = false;
 let lastScheduleMinute = '';
 
 setInterval(async () => {
@@ -360,20 +341,21 @@ setInterval(async () => {
     const [s] = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     if (!s?.enabled) return;
 
-    const now = new Date().toTimeString().slice(0, 5); // HH:MM
+    // ── CORRECTION UTC explicite ──
+    const now    = new Date();
+    const utcH   = String(now.getUTCHours()).padStart(2, '0');
+    const utcM   = String(now.getUTCMinutes()).padStart(2, '0');
+    const utcNow = `${utcH}:${utcM}`;
 
-    // Guard : ne déclencher qu'une seule fois par minute
-    if (now === s.time_val && lastScheduleMinute !== now && !wateringActive) {
-      lastScheduleMinute = now;
-      wateringActive = true;
-      const valves = s.valves.split(',').map(Number);
+    if (utcNow === s.time_val && lastScheduleMinute !== utcNow && !wateringActive) {
+      lastScheduleMinute = utcNow;
+      wateringActive     = true;
+      const valves       = s.valves.split(',').map(Number);
 
       if (valves.includes(1)) await q('UPDATE hs_commands SET sw1=true');
       if (valves.includes(2)) await q('UPDATE hs_commands SET sw2=true');
 
-      console.log(`⏰ Auto ${now} vannes [${valves}]`);
-
-      // Envoi temps réel à l'ESP32 ET aux navigateurs
+      console.log(`⏰ Auto UTC ${utcNow} → vannes [${valves}]`);
       sendToESP32({ type: 'auto_watering_start', valves });
       broadcastBrowsers({ type: 'auto_watering_start', valves });
 
@@ -381,25 +363,22 @@ setInterval(async () => {
         if (valves.includes(1)) await q('UPDATE hs_commands SET sw1=false');
         if (valves.includes(2)) await q('UPDATE hs_commands SET sw2=false');
         wateringActive = false;
-
         sendToESP32({ type: 'auto_watering_stop' });
         broadcastBrowsers({ type: 'auto_watering_stop' });
         console.log('✅ Arrosage automatique terminé');
       }, s.duration * 60 * 1000);
     }
 
-    // Reset guard quand la minute change
-    if (now !== s.time_val) {
-      lastScheduleMinute = '';
-    }
+    if (utcNow !== s.time_val) lastScheduleMinute = '';
 
   } catch(e) { console.error('Schedule error:', e.message); }
-}, 1000); // ← CORRECTION : 1s au lieu de 15s
+}, 1000);
 
 // ── Start ────────────────────────────────────────
 initDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🌿 HydroSmart — https://hydrosmart-groupe-iot.fly.dev`);
+    console.log(`   Timezone serveur : UTC (Fly.io)`);
     console.log(`   WebSocket ESP32 + Navigateurs temps réel\n`);
   });
 }).catch(err => { console.error('Start error:', err); process.exit(1); });
