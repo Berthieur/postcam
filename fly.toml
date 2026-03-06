@@ -1,7 +1,8 @@
-app = "hydrosmart-groupe5"
+app = "hydrosmart-groupe-iot"
 primary_region = "cdg"
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "3000"
