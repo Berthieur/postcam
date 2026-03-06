@@ -129,11 +129,23 @@
 
         .stat-val { font-size: 1.6rem; font-weight: bold; }
         .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
-        .faucet-icon { width: 40px; height: 40px; fill: var(--gray-icon); }
-        .active-water .faucet-icon { fill: var(--accent); }
-        .active-water .water-drop { animation: dropAnim 0.8s infinite; opacity: 1; fill: #4fc3f7; }
-        
-        @keyframes dropAnim { 0% { transform: translateY(-5px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+
+        /* ── ICÔNE ROBINET ── */
+        .faucet-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .faucet-label { font-size: 0.65rem; color: #888; font-weight: bold; letter-spacing: 1px; }
+
+        .faucet-icon { width: 40px; height: 40px; fill: var(--gray-icon); transition: fill 0.3s; }
+
+        /* État actif : icône verte + animation goutte */
+        .active-water .faucet-icon { fill: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
+        .water-drop { opacity: 0; fill: #4fc3f7; }
+        .active-water .water-drop { animation: dropAnim 0.9s ease-in-out infinite; opacity: 1; }
+
+        @keyframes dropAnim {
+            0%   { transform: translateY(-4px); opacity: 0; }
+            40%  { opacity: 1; }
+            100% { transform: translateY(10px); opacity: 0; }
+        }
 
         .mode-row { grid-column: span 2; display: flex; justify-content: center; gap: 15px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 50px; width: fit-content; margin: 0 auto; }
         .mode-row label { font-size: 0.8rem; font-weight: bold; cursor: pointer; padding: 8px 20px; border-radius: 30px; color: #aaa; }
@@ -231,9 +243,23 @@
                         <div id="soil-val" class="stat-val">--%</div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 15px;">
-                    <div id="v1-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
-                    <div id="v2-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
+
+                <!-- ══ ICÔNES VANNES — corrigées ══ -->
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div class="faucet-wrap" id="v1-status">
+                        <svg class="faucet-icon" viewBox="0 0 24 24">
+                            <path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/>
+                            <path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        <span class="faucet-label">V1</span>
+                    </div>
+                    <div class="faucet-wrap" id="v2-status">
+                        <svg class="faucet-icon" viewBox="0 0 24 24">
+                            <path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/>
+                            <path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                        <span class="faucet-label">V2</span>
+                    </div>
                 </div>
             </div>
 
@@ -266,10 +292,9 @@
         </div>
     </div>
 
-        <script>
+    <script>
         // ================================================
         //  HydroSmart — Client WebSocket temps réel
-        //  https://hydrosmart-groupe5.onrender.com
         // ================================================
 
         let ws             = null;
@@ -377,13 +402,16 @@
                     break;
 
                 case 'valve_status':
+                    // Feedback réel de l'ESP32 → met à jour icônes ET toggles
                     setValves(msg.v1, msg.v2);
                     break;
 
                 case 'command_sent':
-                    // Mise à jour immédiate de l'UI sans attendre le feedback
-                    if (msg.valve === 1) document.getElementById('sw1').checked = msg.state;
-                    if (msg.valve === 2) document.getElementById('sw2').checked = msg.state;
+                    // ══ CORRECTION ══
+                    // Met à jour IMMÉDIATEMENT l'icône robinet ET le toggle
+                    // sans attendre le feedback valve_status de l'ESP32
+                    if (msg.valve === 1) setValves(msg.state, document.getElementById('sw2').checked);
+                    if (msg.valve === 2) setValves(document.getElementById('sw1').checked, msg.state);
                     break;
 
                 case 'esp32_offline':
@@ -391,12 +419,21 @@
                     document.getElementById('status-msg').innerText = '⚠️ ESP32 déconnecté du serveur';
                     break;
 
+                case 'esp32_online':
+                    setOnline(Date.now(), true);
+                    break;
+
                 case 'auto_watering_start':
                     document.getElementById('status-msg').innerText = '⏰ ARROSAGE AUTOMATIQUE EN COURS...';
+                    // Allume les icônes des vannes concernées
+                    if (msg.valves) {
+                        setValves(msg.valves.includes(1), msg.valves.includes(2));
+                    }
                     break;
 
                 case 'auto_watering_stop':
                     document.getElementById('status-msg').innerText = '✅ ARROSAGE AUTOMATIQUE TERMINÉ';
+                    setValves(false, false);
                     break;
             }
         }
@@ -408,10 +445,13 @@
             if (soil != null) document.getElementById('soil-val').innerText = Math.round(soil) + '%';
         }
 
-        // ── Vannes ───────────────────────────────────────
+        // ── Vannes — fonction centrale ───────────────────
+        // Gère à la fois l'icône animée ET le toggle switch
         function setValves(v1, v2) {
+            // Icônes robinet (animation active-water)
             document.getElementById('v1-status').classList.toggle('active-water', !!v1);
             document.getElementById('v2-status').classList.toggle('active-water', !!v2);
+            // Toggles manuels
             document.getElementById('sw1').checked = !!v1;
             document.getElementById('sw2').checked = !!v2;
         }
