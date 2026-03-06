@@ -404,6 +404,17 @@
                 sessionActive = true;
                 document.getElementById('login-screen').style.display   = 'none';
                 document.getElementById('main-interface').style.display = 'flex';
+
+                // ── Restaure le dernier mode (intelligent/manuel) ──
+                const savedMode = localStorage.getItem('hs_mode') || 'i';
+                const modeRadio = document.querySelector('input[name="m"][value="' + savedMode + '"]');
+                if (modeRadio) {
+                    modeRadio.checked = true;
+                    const isInt = savedMode === 'i';
+                    document.getElementById('p-int').classList.toggle('disabled', !isInt);
+                    document.getElementById('p-man').classList.toggle('disabled', isInt);
+                }
+
                 setInterval(updateClock, 1000);
                 updateClock();
                 connectWS();
@@ -630,6 +641,7 @@
         document.querySelectorAll('input[name="m"]').forEach(r => {
             r.addEventListener('change', () => {
                 const isInt = r.value === 'i';
+                localStorage.setItem('hs_mode', r.value); // ← sauvegarde le mode
                 document.getElementById('p-int').classList.toggle('disabled', !isInt);
                 document.getElementById('p-man').classList.toggle('disabled', isInt);
                 if (isInt) syncSchedule();
