@@ -426,8 +426,25 @@
                 case 'full_state':
                     if (msg.sensors && msg.sensors.temp !== null)
                         setSensors(msg.sensors.temp, msg.sensors.hum, msg.sensors.soil);
-                    // Utilise l'état réel des vannes (feedback ESP32), pas les commandes DB
-                    setValves(msg.valves?.v1 || false, msg.valves?.v2 || false);
+                    // Restaure la DERNIERE ACTION (commands DB) apres refresh
+                    {
+                        const sw1 = msg.commands?.sw1 || false;
+                        const sw2 = msg.commands?.sw2 || false;
+                        setValves(sw1, sw2);
+                    }
+                    // Restaure le planning si actif
+                    if (msg.schedule?.enabled && msg.schedule?.time_val) {
+                        const [uh, um] = msg.schedule.time_val.split(':').map(Number);
+                        const utcDate  = new Date();
+                        utcDate.setUTCHours(uh, um, 0, 0);
+                        const localH   = String(utcDate.getHours()).padStart(2, '0');
+                        const localM   = String(utcDate.getMinutes()).padStart(2, '0');
+                        document.getElementById('sched-time').value     = localH + ':' + localM;
+                        document.getElementById('sched-duration').value = msg.schedule.duration || 10;
+                        const valves = (msg.schedule.valves || '1').split(',').map(Number);
+                        document.getElementById('sched-v1').checked = valves.includes(1);
+                        document.getElementById('sched-v2').checked = valves.includes(2);
+                    }
                     setOnline(msg.lastSeen, msg.esp32Online);
                     break;
 
