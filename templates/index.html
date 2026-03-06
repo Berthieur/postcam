@@ -374,6 +374,7 @@
                 if (!data.success) throw new Error();
 
                 sessionActive = true;
+                localStorage.setItem('hs_session', 'active');
                 document.getElementById('login-screen').style.display   = 'none';
                 document.getElementById('main-interface').style.display = 'flex';
                 setInterval(updateClock, 1000);
@@ -390,9 +391,23 @@
 
         document.getElementById('logout-btn').addEventListener('click', () => {
             sessionActive = false;
+            localStorage.removeItem('hs_session');
             if (ws) ws.close();
             document.getElementById('main-interface').style.display = 'none';
             document.getElementById('login-screen').style.display   = 'block';
+        });
+
+        // ── Restauration session au chargement ──────────
+        // Si session active → passe directement à l'interface
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('hs_session') === 'active') {
+                sessionActive = true;
+                document.getElementById('login-screen').style.display   = 'none';
+                document.getElementById('main-interface').style.display = 'flex';
+                setInterval(updateClock, 1000);
+                updateClock();
+                connectWS();
+            }
         });
 
         // ── WebSocket ────────────────────────────────────
