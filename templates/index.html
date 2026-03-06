@@ -559,18 +559,34 @@
 
         // ── Planning ─────────────────────────────────────
         async function syncSchedule() {
-            const time     = document.getElementById('sched-time').value;
-            const duration = document.getElementById('sched-duration').value;
-            const valves   = [];
+            const localTime = document.getElementById('sched-time').value; // HH:MM local
+            const duration  = document.getElementById('sched-duration').value;
+            const valves    = [];
             if (document.getElementById('sched-v1').checked) valves.push(1);
             if (document.getElementById('sched-v2').checked) valves.push(2);
             if (!valves.length) return;
+
+            // Detecte si le serveur tourne en UTC (Fly.io) ou en heure locale
+            // On envoie les deux : time = heure locale, timeUTC = heure UTC
+            const [h, m]  = localTime.split(':').map(Number);
+            const now     = new Date();
+            const local   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+            const utcH    = String(local.getUTCHours()).padStart(2, '0');
+            const utcM    = String(local.getUTCMinutes()).padStart(2, '0');
+            const utcTime = utcH + ':' + utcM;
+
             try {
+                // Envoie les deux formats — le serveur utilise time_val (UTC si nouveau app.js)
                 await fetch('/api/schedule', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ time, duration: parseInt(duration), valves })
+                    body:    JSON.stringify({
+                        time:     utcTime,   // UTC pour nouveau app.js (getUTCHours)
+                        duration: parseInt(duration),
+                        valves
+                    })
                 });
+                console.log(`📅 Planning: local=${localTime} → UTC=${utcTime}`);
             } catch(e) {}
         }
 
@@ -599,9 +615,10 @@
 
             const mode = document.querySelector('input[name="m"]:checked').value;
             if (mode === 'i') {
-                const t = document.getElementById('sched-time').value;
+                // Affiche l'heure locale saisie par l'utilisateur (pas UTC)
+                const localTime = document.getElementById('sched-time').value;
                 document.getElementById('status-msg').innerHTML =
-                    "NEXT CYCLE AT: <b style='color:var(--accent)'>" + t + "</b>";
+                    "NEXT CYCLE AT: <b style='color:var(--accent)'>" + localTime + "</b> <span style='color:#666;font-size:0.75rem'>(local time)</span>";
             } else if (!forcedWatering) {
                 document.getElementById('status-msg').innerText = 'MANUAL OVERRIDE ENABLED';
             }
