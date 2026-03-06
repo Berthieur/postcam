@@ -100,7 +100,7 @@
 
         /* --- MAIN INTERFACE --- */
         #main-interface {
-            display: none; width: 95vw; height: 95vh;
+            display: none; width: 100vw; height: 100vh;
             max-width: 1000px; max-height: 620px;
             border-radius: 15px; overflow: hidden;
             flex-direction: column; border: 1px solid rgba(255,255,255,0.1);
@@ -119,7 +119,7 @@
             grid-template-rows: auto auto 1fr auto; 
             gap: 12px; 
             background: rgba(8, 20, 8, 0.96);
-            overflow: hidden; 
+            overflow: auto; 
         }
 
         .glass-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; color: white; justify-content: center; }
@@ -129,6 +129,120 @@
 
         .stat-val { font-size: 1.6rem; font-weight: bold; }
         .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
+
+        /* ══════════════════════════════════════════
+           RESPONSIVE — TABLETTE (max 768px)
+        ══════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            body, html { overflow: auto; align-items: center; }
+
+            #main-interface {
+                width: 100vw; height: auto; min-height: 100vh;
+                max-width: 100%; max-height: none;
+                border-radius: 0;
+            }
+
+            .content {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: auto;
+                overflow: visible;
+                padding: 10px;
+                gap: 10px;
+            }
+
+            /* Header card : colonne au lieu de ligne */
+            .header-card {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 12px;
+                padding: 12px;
+            }
+
+            #current-date  { font-size: 0.85rem; }
+            #current-time  { font-size: 1.6rem; }
+            .stat-val      { font-size: 1.2rem; }
+            .icon-dashboard { width: 22px; height: 22px; }
+
+            .faucet-icon { width: 36px; height: 36px; }
+
+            .input-pro { width: 80px; padding: 6px; font-size: 0.85rem; }
+        }
+
+        /* ══════════════════════════════════════════
+           RESPONSIVE — TÉLÉPHONE (max 480px)
+        ══════════════════════════════════════════ */
+        @media (max-width: 480px) {
+            body, html { overflow: auto; align-items: center; min-height: 100vh; }
+
+            #login-screen { width: 88%; padding: 55px 20px 40px; margin-top: 60px; }
+
+            #main-interface {
+                width: 100vw; height: auto; min-height: 100vh;
+                max-width: 100%; max-height: none;
+                border-radius: 0;
+            }
+
+            #status-indicator { font-size: 0.65rem; top: 10px; left: 10px; }
+            #logout-btn { top: 8px; right: 8px; padding: 6px; }
+            #logout-btn svg { width: 18px !important; }
+
+            .content {
+                /* Une seule colonne sur téléphone */
+                grid-template-columns: 1fr !important;
+                grid-template-rows: auto;
+                padding: 8px;
+                gap: 8px;
+                overflow: visible;
+            }
+
+            /* Header card full width */
+            .header-card,
+            .mode-row,
+            .span2 {
+                grid-column: span 1 !important;
+            }
+
+            /* Header : tout en colonne, compact */
+            .header-card {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 10px;
+                min-height: unset !important;
+                padding: 12px 10px;
+            }
+
+            #current-date  { font-size: 0.75rem; }
+            #current-time  { font-size: 1.4rem; }
+            .stat-val      { font-size: 1.1rem; }
+            .icon-dashboard { width: 20px; height: 20px; }
+
+            /* Icônes vannes plus petites */
+            .faucet-icon   { width: 32px; height: 32px; }
+            .faucet-label  { font-size: 0.6rem; }
+
+            /* Mode row */
+            .mode-row { width: 90% !important; }
+            .mode-row label { font-size: 0.75rem; padding: 7px 14px; }
+
+            /* Cards planning / manuel full width */
+            #p-int, #p-man { grid-column: span 1; }
+
+            .section-header { font-size: 0.75rem; }
+
+            /* Inputs planning */
+            .input-pro { width: 90px; padding: 6px; font-size: 0.8rem; }
+
+            /* Chips vannes */
+            .vanne-chip { padding: 5px 10px; font-size: 0.7rem; }
+
+            /* Switch plus grand pour le doigt */
+            .switch { width: 48px; height: 26px; }
+            .slider:before { height: 18px; width: 18px; }
+            input:checked + .slider:before { transform: translateX(22px); }
+
+            /* Status message */
+            #status-msg { font-size: 0.75rem; padding: 8px; }
+        }
 
         /* ── ICÔNE ROBINET ── */
         .faucet-wrap {
@@ -236,7 +350,7 @@
         </div>
 
         <div class="content">
-            <div class="glass-card" style="grid-column: span 2; flex-direction: row; justify-content: space-around; align-items: center; min-height: 120px;">
+            <div class="glass-card header-card" style="grid-column: span 2; flex-direction: row; justify-content: space-around; align-items: center; min-height: 120px;">
                 <div>
                     <div id="current-date">-- --, ----</div>
                     <div id="current-time">00:00:00</div>
@@ -323,7 +437,7 @@
                 </div>
             </div>
 
-            <div id="status-msg" style="grid-column: span 2; text-align: center; font-size: 0.85rem; padding: 12px; color: #fff;">System Ready...</div>
+            <div id="status-msg" class="span2" style="grid-column: span 2; text-align: center; font-size: 0.85rem; padding: 12px; color: #fff;">System Ready...</div>
         </div>
     </div>
 
