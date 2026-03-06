@@ -131,20 +131,47 @@
         .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
 
         /* ── ICÔNE ROBINET ── */
-        .faucet-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .faucet-label { font-size: 0.65rem; color: #888; font-weight: bold; letter-spacing: 1px; }
+        .faucet-wrap {
+            display: flex; flex-direction: column; align-items: center; gap: 0px;
+            position: relative;
+        }
+        .faucet-label {
+            font-size: 0.65rem; color: #888; font-weight: bold;
+            letter-spacing: 1px; margin-top: 2px;
+        }
+        .faucet-icon {
+            width: 44px; height: 44px;
+            fill: var(--gray-icon);
+            transition: fill 0.3s, filter 0.3s;
+        }
 
-        .faucet-icon { width: 40px; height: 40px; fill: var(--gray-icon); transition: fill 0.3s; }
+        /* Gouttes sous le robinet */
+        .drops {
+            display: flex; gap: 6px; height: 16px;
+            align-items: flex-start; justify-content: center;
+        }
+        .drop {
+            width: 5px; height: 8px;
+            background: #4fc3f7;
+            border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+            opacity: 0;
+        }
 
-        /* État actif : icône verte + animation goutte */
-        .active-water .faucet-icon { fill: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
-        .water-drop { opacity: 0; fill: #4fc3f7; }
-        .active-water .water-drop { animation: dropAnim 0.9s ease-in-out infinite; opacity: 1; }
+        /* ACTIF : icône verte + gouttes animées */
+        .active-water .faucet-icon {
+            fill: var(--accent);
+            filter: drop-shadow(0 0 8px var(--accent));
+        }
+        .active-water .faucet-label { color: var(--accent); }
+        .active-water .drop:nth-child(1) { animation: fall 1.1s ease-in infinite 0s; }
+        .active-water .drop:nth-child(2) { animation: fall 1.1s ease-in infinite 0.37s; }
+        .active-water .drop:nth-child(3) { animation: fall 1.1s ease-in infinite 0.74s; }
 
-        @keyframes dropAnim {
-            0%   { transform: translateY(-4px); opacity: 0; }
-            40%  { opacity: 1; }
-            100% { transform: translateY(10px); opacity: 0; }
+        @keyframes fall {
+            0%   { transform: translateY(0px);  opacity: 0; }
+            15%  { opacity: 1; }
+            85%  { opacity: 1; }
+            100% { transform: translateY(14px); opacity: 0; }
         }
 
         .mode-row { grid-column: span 2; display: flex; justify-content: center; gap: 15px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 50px; width: fit-content; margin: 0 auto; }
@@ -244,20 +271,28 @@
                     </div>
                 </div>
 
-                <!-- ══ ICÔNES VANNES — corrigées ══ -->
-                <div style="display: flex; gap: 20px; align-items: center;">
+                <!-- ══ ICÔNES VANNES ══ -->
+                <div style="display: flex; gap: 24px; align-items: center;">
                     <div class="faucet-wrap" id="v1-status">
                         <svg class="faucet-icon" viewBox="0 0 24 24">
-                            <path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/>
                             <path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/>
                         </svg>
+                        <div class="drops">
+                            <div class="drop"></div>
+                            <div class="drop"></div>
+                            <div class="drop"></div>
+                        </div>
                         <span class="faucet-label">V1</span>
                     </div>
                     <div class="faucet-wrap" id="v2-status">
                         <svg class="faucet-icon" viewBox="0 0 24 24">
-                            <path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/>
                             <path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/>
                         </svg>
+                        <div class="drops">
+                            <div class="drop"></div>
+                            <div class="drop"></div>
+                            <div class="drop"></div>
+                        </div>
                         <span class="faucet-label">V2</span>
                     </div>
                 </div>
@@ -407,11 +442,15 @@
                     break;
 
                 case 'command_sent':
-                    // ══ CORRECTION ══
-                    // Met à jour IMMÉDIATEMENT l'icône robinet ET le toggle
-                    // sans attendre le feedback valve_status de l'ESP32
-                    if (msg.valve === 1) setValves(msg.state, document.getElementById('sw2').checked);
-                    if (msg.valve === 2) setValves(document.getElementById('sw1').checked, msg.state);
+                    // Met à jour icône ET toggle immédiatement
+                    if (msg.valve === 1) {
+                        document.getElementById('sw1').checked = msg.state;
+                        document.getElementById('v1-status').classList.toggle('active-water', msg.state);
+                    }
+                    if (msg.valve === 2) {
+                        document.getElementById('sw2').checked = msg.state;
+                        document.getElementById('v2-status').classList.toggle('active-water', msg.state);
+                    }
                     break;
 
                 case 'esp32_offline':
