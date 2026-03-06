@@ -372,7 +372,7 @@ setInterval(async () => {
 // ── Start ────────────────────────────────────────
 initDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🌿 HydroSmart — https://hydrosmart-groupe5.onrender.com`);
+    console.log(`\n🌿 HydroSmart — https://hydrosmart-groupe-iot.fly.dev`);
     console.log(`   WebSocket ESP32 + Navigateurs temps réel\n`);
   });
 }).catch(err => { console.error('Start error:', err); process.exit(1); });
