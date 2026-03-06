@@ -271,8 +271,8 @@ app.get('/api/commands', authESP, async (req, res) => {
 // POST /api/login
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
-  const ok_e = process.env.ADMIN_EMAIL    || 'admin@hydrosmart.io';
-  const ok_p = process.env.ADMIN_PASSWORD || 'hydro2024';
+  const ok_e = process.env.ADMIN_EMAIL    || 'hydrosmart@gmail.com';
+  const ok_p = process.env.ADMIN_PASSWORD || 'groupe5';
   if (email === ok_e && password === ok_p) return res.json({ success: true });
   res.status(401).json({ success: false, message: 'Identifiants invalides' });
 });
