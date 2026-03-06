@@ -426,7 +426,8 @@
                 case 'full_state':
                     if (msg.sensors && msg.sensors.temp !== null)
                         setSensors(msg.sensors.temp, msg.sensors.hum, msg.sensors.soil);
-                    setValves(msg.valves?.v1, msg.valves?.v2);
+                    // Utilise l'état réel des vannes (feedback ESP32), pas les commandes DB
+                    setValves(msg.valves?.v1 || false, msg.valves?.v2 || false);
                     setOnline(msg.lastSeen, msg.esp32Online);
                     break;
 
@@ -442,15 +443,8 @@
                     break;
 
                 case 'command_sent':
-                    // Met à jour icône ET toggle immédiatement
-                    if (msg.valve === 1) {
-                        document.getElementById('sw1').checked = msg.state;
-                        document.getElementById('v1-status').classList.toggle('active-water', msg.state);
-                    }
-                    if (msg.valve === 2) {
-                        document.getElementById('sw2').checked = msg.state;
-                        document.getElementById('v2-status').classList.toggle('active-water', msg.state);
-                    }
+                    // Icône déjà mise à jour au clic du toggle — on ignore l'écho serveur
+                    // pour éviter le conflit avec l'état DB pas encore synchronisé
                     break;
 
                 case 'esp32_offline':
@@ -553,8 +547,15 @@
             } catch(e) { console.error('cmdValve:', e); }
         }
 
-        document.getElementById('sw1').addEventListener('change', function() { cmdValve(1, this.checked); });
-        document.getElementById('sw2').addEventListener('change', function() { cmdValve(2, this.checked); });
+        document.getElementById('sw1').addEventListener('change', function() {
+            // Mise à jour icône IMMÉDIATE au clic, sans attendre le serveur
+            document.getElementById('v1-status').classList.toggle('active-water', this.checked);
+            cmdValve(1, this.checked);
+        });
+        document.getElementById('sw2').addEventListener('change', function() {
+            document.getElementById('v2-status').classList.toggle('active-water', this.checked);
+            cmdValve(2, this.checked);
+        });
 
         // ── Planning ─────────────────────────────────────
         async function syncSchedule() {
