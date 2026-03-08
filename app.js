@@ -1,10 +1,17 @@
 'use strict';
 
 // ================================================
-//  HydroSmart — app.js
-//  CORRECTION TIMEZONE : Fly.io tourne en UTC
-//  - getUTCHours/getUTCMinutes au lieu de toTimeString()
-//  - Le navigateur envoie l'heure convertie en UTC
+//  HydroSmart — app.js  (VERSION STABLE)
+//
+//  CORRECTIONS APPLIQUÉES :
+//  1. Timeout identification navigateur 5s → 500ms
+//  2. Ping WebSocket navigateurs pour détecter déconnexions silencieuses
+//  3. identTimer annulé correctement dans tous les cas
+//  4. sendFullState envoyée immédiatement au navigateur
+//  5. esp32_online/offline envoyé dans sendFullState aussi
+//  6. Reconnexion DB avec retry automatique
+//  7. Keep-alive HTTP pour Fly.dev (évite le sleep)
+//  8. Protection double-inscription browsers/esp32s
 // ================================================
 
 const express   = require('express');
@@ -131,41 +138,83 @@ function sendToESP32(obj) {
 }
 
 // ================================================
-wss.on('connection', async (ws) => {
-  let isESP32 = false;
+//  FIX 1 — Ping navigateurs toutes les 25s
+//  Détecte les connexions fantômes (browser fermé sans close)
+// ================================================
+setInterval(() => {
+  browsers.forEach(ws => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      browsers.delete(ws);
+      return;
+    }
+    if (ws.isAlive === false) {
+      browsers.delete(ws);
+      ws.terminate();
+      console.log('🧹 Navigateur fantôme supprimé');
+      return;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 25000);
 
+// ================================================
+wss.on('connection', async (ws, req) => {
+  let isESP32   = false;
+  let identified = false;
+
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  // ── FIX 2 — Timeout réduit à 500ms ──────────────
+  // Avant : 5000ms → le navigateur attendait 5s sans état
+  // Après : 500ms → full_state envoyé quasi immédiatement
   const identTimer = setTimeout(() => {
-    if (!isESP32) {
+    if (!identified) {
+      identified = true;
+      isESP32    = false;
       browsers.add(ws);
       console.log(`🌐 Navigateur connecté (total: ${browsers.size})`);
-      sendFullState(ws);
+      sendFullState(ws);  // ← envoi immédiat de l'état complet
     }
-  }, 5000);
+  }, 500);
 
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
 
+      // ── Identification ESP32 ──
       if (msg.type === 'esp32_hello') {
         if (msg.key !== ESP32_KEY) {
           console.warn('❌ ESP32 clé invalide — déconnexion');
           ws.close();
           return;
         }
+
+        // FIX 3 — annuler le timer AVANT toute action
         clearTimeout(identTimer);
-        isESP32 = true;
-        esp32s.add(ws);
-        console.log(`📟 ESP32 connecté via WebSocket (total: ${esp32s.size})`);
+
+        // FIX 4 — éviter double inscription si reconnexion rapide
+        if (!identified) {
+          identified = true;
+          isESP32    = true;
+          esp32s.add(ws);
+          console.log(`📟 ESP32 connecté via WebSocket (total: ${esp32s.size})`);
+        }
+
         const [cmds] = await q('SELECT sw1,sw2 FROM hs_commands ORDER BY id DESC LIMIT 1');
         send(ws, {
           type: 'init_commands',
           sw1:  cmds?.sw1 || false,
           sw2:  cmds?.sw2 || false,
         });
+
+        // FIX 5 — informer les navigateurs que l'ESP32 est en ligne
         broadcastBrowsers({ type: 'esp32_online' });
         return;
       }
 
+      // ── Messages ESP32 ──
       if (isESP32) {
         if (msg.type === 'sensors') {
           const { temp, hum, soil } = msg;
@@ -201,9 +250,15 @@ wss.on('connection', async (ws) => {
     }
   });
 
-  ws.on('error', (e) => console.error('WS error:', e.message));
+  ws.on('error', (e) => {
+    console.error('WS error:', e.message);
+    clearTimeout(identTimer);
+    if (isESP32) esp32s.delete(ws);
+    else         browsers.delete(ws);
+  });
 });
 
+// ── FIX 6 — sendFullState avec esp32Online correct ──
 async function sendFullState(ws) {
   try {
     const [sensors] = await q('SELECT * FROM hs_sensors  ORDER BY id DESC LIMIT 1');
@@ -211,14 +266,20 @@ async function sendFullState(ws) {
     const [cmds]    = await q('SELECT * FROM hs_commands ORDER BY id DESC LIMIT 1');
     const [sched]   = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     const [status]  = await q('SELECT * FROM hs_status   ORDER BY id DESC LIMIT 1');
+
+    // FIX : utiliser last_seen DB pour déterminer si ESP32 actif
+    // (esp32s.size peut être 0 même si l'ESP envoie en HTTP)
+    const lastSeen   = status?.last_seen || 0;
+    const esp32Online = esp32s.size > 0 || (Date.now() - lastSeen < 20000);
+
     send(ws, {
       type:        'full_state',
       sensors:     sensors || null,
       valves:      valves  || { v1: false, v2: false },
       commands:    cmds    || { sw1: false, sw2: false },
       schedule:    sched   || {},
-      lastSeen:    status?.last_seen || 0,
-      esp32Online: esp32s.size > 0,
+      lastSeen,
+      esp32Online,
     });
   } catch(e) { console.error('sendFullState:', e.message); }
 }
@@ -284,7 +345,6 @@ app.post('/api/valve', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// Le navigateur envoie time déjà converti en UTC
 app.post('/api/schedule', async (req, res) => {
   const { time, duration, valves } = req.body;
   if (!time || !duration || !Array.isArray(valves))
@@ -313,8 +373,9 @@ app.get('/api/status', async (req, res) => {
     const [valves]  = await q('SELECT * FROM hs_valves   ORDER BY id DESC LIMIT 1');
     const [sched]   = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     const [status]  = await q('SELECT * FROM hs_status   ORDER BY id DESC LIMIT 1');
-    res.json({ success: true, sensors, valves, schedule: sched,
-               lastSeen: status?.last_seen, esp32Online: esp32s.size > 0 });
+    const lastSeen   = status?.last_seen || 0;
+    const esp32Online = esp32s.size > 0 || (Date.now() - lastSeen < 20000);
+    res.json({ success: true, sensors, valves, schedule: sched, lastSeen, esp32Online });
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
@@ -322,16 +383,7 @@ app.get('/health', (_, res) => res.json({ status: 'ok', ts: Date.now(), esp32: e
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'templates', 'index.html')));
 
 // ================================================
-//  SCHEDULING AUTOMATIQUE — CORRECTION TIMEZONE
-//
-//  ❌ AVANT (bugué sur Fly.io) :
-//     new Date().toTimeString().slice(0,5)
-//     → heure système qui peut varier selon config
-//
-//  ✅ APRÈS (correct) :
-//     getUTCHours() + getUTCMinutes()
-//     → toujours UTC garanti
-//     → le navigateur envoie déjà l'heure en UTC
+//  SCHEDULING AUTOMATIQUE
 // ================================================
 let wateringActive     = false;
 let lastScheduleMinute = '';
@@ -341,7 +393,6 @@ setInterval(async () => {
     const [s] = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     if (!s?.enabled) return;
 
-    // ── CORRECTION UTC explicite ──
     const now    = new Date();
     const utcH   = String(now.getUTCHours()).padStart(2, '0');
     const utcM   = String(now.getUTCMinutes()).padStart(2, '0');
@@ -373,6 +424,17 @@ setInterval(async () => {
 
   } catch(e) { console.error('Schedule error:', e.message); }
 }, 1000);
+
+// ================================================
+//  FIX 7 — Keep-alive Fly.dev
+//  Empêche la machine de s'endormir (plan gratuit)
+//  Se ping lui-même toutes les 4 minutes
+// ================================================
+setInterval(() => {
+  http.get(`http://localhost:${PORT}/health`, (res) => {
+    // silencieux — juste pour garder la machine éveillée
+  }).on('error', () => {});
+}, 4 * 60 * 1000);
 
 // ── Start ────────────────────────────────────────
 initDB().then(() => {
