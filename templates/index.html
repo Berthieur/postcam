@@ -396,6 +396,7 @@
         let forcedWatering = false;
         let sessionActive  = false;
         let pollInterval   = null;
+        let pollBlocked    = false; // bloque le poll apres un clic vanne
 
         const loginBtn  = document.getElementById('login-btn');
         const spinner   = document.getElementById('btn-spinner');
@@ -494,8 +495,11 @@
                     checkSoil(data.sensors.soil);
                 }
 
-                // Vannes — état réel depuis hs_valves (feedback ESP32)
-                setValves(data.valves?.v1 || false, data.valves?.v2 || false);
+                // Vannes — utilise commands (ce qu'on a demandé)
+                // et ne pas écraser si on vient de cliquer (pollBlocked)
+                if (!pollBlocked) {
+                    setValves(data.commands?.sw1 || false, data.commands?.sw2 || false);
+                }
 
                 // Planning — restaure si actif
                 if (data.schedule?.enabled && data.schedule?.time_val) {
@@ -572,14 +576,16 @@
 
         // ── Commande vanne ───────────────────────────────
         async function cmdValve(valve, state) {
+            // Bloquer le poll 3s pour éviter que setValves() écrase le toggle
+            pollBlocked = true;
+            clearTimeout(window._pollBlockTimer);
+            window._pollBlockTimer = setTimeout(() => { pollBlocked = false; }, 3000);
             try {
                 await fetch('/api/valve', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body:    JSON.stringify({ valve, state })
                 });
-                // Poll immédiat pour synchroniser l'affichage
-                doPoll();
             } catch(e) {}
         }
 
