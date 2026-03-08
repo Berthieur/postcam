@@ -389,13 +389,13 @@
 
         <script>
         // ================================================
-        //  HydroSmart — Client WebSocket (NeonDB/app.js)
-        //  Firebase SUPPRIMÉ → WebSocket + /api/login
+        //  HydroSmart — Client HTTP PURE (polling)
+        //  Pas de WebSocket — poll /api/poll toutes les 2s
         // ================================================
 
-        let ws            = null;
         let forcedWatering = false;
         let sessionActive  = false;
+        let pollInterval   = null;
 
         const loginBtn  = document.getElementById('login-btn');
         const spinner   = document.getElementById('btn-spinner');
@@ -447,7 +447,7 @@
             sessionActive = false;
             localStorage.removeItem('hs_session');
             localStorage.removeItem('hs_mode');
-            if (ws) ws.close();
+            if (pollInterval) clearInterval(pollInterval);
             document.getElementById('main-interface').style.display = 'none';
             document.getElementById('login-screen').style.display   = 'block';
         });
@@ -463,6 +463,7 @@
         function showMain() {
             document.getElementById('login-screen').style.display   = 'none';
             document.getElementById('main-interface').style.display = 'flex';
+
             // Restaure le dernier mode
             const savedMode = localStorage.getItem('hs_mode') || 'i';
             const radio = document.querySelector('input[name="m"][value="' + savedMode + '"]');
@@ -471,75 +472,50 @@
                 document.getElementById('p-int').classList.toggle('disabled', savedMode !== 'i');
                 document.getElementById('p-man').classList.toggle('disabled', savedMode === 'i');
             }
+
             setInterval(updateClock, 1000);
             updateClock();
-            connectWS();
+
+            // Démarrer le polling HTTP toutes les 2s
+            doPoll(); // premier appel immédiat
+            pollInterval = setInterval(doPoll, 2000);
         }
 
-        // ── WebSocket ────────────────────────────────────
-        function connectWS() {
-            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-            ws = new WebSocket(proto + '://' + location.host);
-            ws.onopen  = () => console.log('✅ WS connecté');
-            ws.onmessage = (e) => { try { handleMsg(JSON.parse(e.data)); } catch(err) {} };
-            ws.onclose = () => {
-                if (!sessionActive) return;
-                setTimeout(connectWS, 3000);
-            };
-        }
+        // ── POLLING PRINCIPAL — /api/poll ────────────────
+        async function doPoll() {
+            try {
+                const r   = await fetch('/api/poll');
+                const data = await r.json();
+                if (!data.success) return;
 
-        // ── Messages serveur ─────────────────────────────
-        function handleMsg(msg) {
-            switch (msg.type) {
+                // Capteurs
+                if (data.sensors) {
+                    setSensors(data.sensors.temp, data.sensors.hum, data.sensors.soil);
+                    checkSoil(data.sensors.soil);
+                }
 
-                case 'full_state':
-                    if (msg.sensors?.temp != null)
-                        setSensors(msg.sensors.temp, msg.sensors.hum, msg.sensors.soil);
-                    setValves(msg.commands?.sw1 || false, msg.commands?.sw2 || false);
-                    // Restaure planning
-                    if (msg.schedule?.enabled && msg.schedule?.time_val) {
-                        const [uh, um] = msg.schedule.time_val.split(':').map(Number);
-                        const d = new Date(); d.setUTCHours(uh, um, 0, 0);
-                        document.getElementById('sched-time').value     = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
-                        document.getElementById('sched-duration').value = msg.schedule.duration || 10;
-                        const valves = (msg.schedule.valves || '1').split(',').map(Number);
-                        document.getElementById('sched-v1').checked = valves.includes(1);
-                        document.getElementById('sched-v2').checked = valves.includes(2);
-                    }
-                    setOnline(msg.lastSeen, msg.esp32Online);
-                    break;
+                // Vannes — état réel depuis hs_valves (feedback ESP32)
+                setValves(data.valves?.v1 || false, data.valves?.v2 || false);
 
-                case 'sensors':
-                    setSensors(msg.temp, msg.hum, msg.soil);
-                    setOnline(msg.lastSeen, true);
-                    checkSoil(msg.soil);
-                    break;
+                // Planning — restaure si actif
+                if (data.schedule?.enabled && data.schedule?.time_val) {
+                    const [uh, um] = data.schedule.time_val.split(':').map(Number);
+                    const d = new Date();
+                    d.setUTCHours(uh, um, 0, 0);
+                    const localH = String(d.getHours()).padStart(2, '0');
+                    const localM = String(d.getMinutes()).padStart(2, '0');
+                    document.getElementById('sched-time').value     = localH + ':' + localM;
+                    document.getElementById('sched-duration').value = data.schedule.duration || 10;
+                    const valves = (data.schedule.valves || '1').split(',').map(Number);
+                    document.getElementById('sched-v1').checked = valves.includes(1);
+                    document.getElementById('sched-v2').checked = valves.includes(2);
+                }
 
-                case 'valve_status':
-                    setValves(msg.v1, msg.v2);
-                    break;
+                // Statut ESP32
+                setOnline(data.lastSeen, data.esp32Online);
 
-                case 'command_sent':
-                    break; // icône déjà mise à jour au clic
-
-                case 'esp32_online':
-                    setOnline(Date.now(), true);
-                    break;
-
-                case 'esp32_offline':
-                    setOnline(null, false);
-                    document.getElementById('status-msg').innerText = '⚠️ ESP32 déconnecté';
-                    break;
-
-                case 'auto_watering_start':
-                    document.getElementById('status-msg').innerText = '⏰ ARROSAGE AUTOMATIQUE EN COURS...';
-                    if (msg.valves) setValves(msg.valves.includes(1), msg.valves.includes(2));
-                    break;
-
-                case 'auto_watering_stop':
-                    document.getElementById('status-msg').innerText = '✅ ARROSAGE AUTOMATIQUE TERMINÉ';
-                    setValves(false, false);
-                    break;
+            } catch(e) {
+                // Silencieux — on réessaie dans 2s
             }
         }
 
@@ -578,11 +554,6 @@
             }
         }
 
-        // Vérif offline périodique
-        setInterval(() => {
-            fetch('/api/status').then(r => r.json()).then(d => setOnline(d.lastSeen, d.esp32Online)).catch(() => {});
-        }, 8000);
-
         // ── Alerte sol bas ───────────────────────────────
         function checkSoil(soil) {
             if (soil < 20 && !forcedWatering) {
@@ -603,9 +574,12 @@
         async function cmdValve(valve, state) {
             try {
                 await fetch('/api/valve', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ valve, state })
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ valve, state })
                 });
+                // Poll immédiat pour synchroniser l'affichage
+                doPoll();
             } catch(e) {}
         }
 
@@ -632,8 +606,9 @@
             const utcTime = String(local.getUTCHours()).padStart(2,'0') + ':' + String(local.getUTCMinutes()).padStart(2,'0');
             try {
                 await fetch('/api/schedule', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ time: utcTime, duration: parseInt(duration), valves })
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ time: utcTime, duration: parseInt(duration), valves })
                 });
             } catch(e) {}
         }
@@ -657,12 +632,15 @@
         // ── Horloge ──────────────────────────────────────
         function updateClock() {
             const now = new Date();
-            document.getElementById('current-time').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-            document.getElementById('current-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            document.getElementById('current-time').innerText =
+                now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('current-date').innerText =
+                now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
             const mode = document.querySelector('input[name="m"]:checked').value;
             if (mode === 'i') {
                 const t = document.getElementById('sched-time').value;
-                document.getElementById('status-msg').innerHTML = "NEXT CYCLE AT: <b style='color:var(--accent)'>" + t + "</b> <span style='color:#666;font-size:0.75rem'>(local time)</span>";
+                document.getElementById('status-msg').innerHTML =
+                    "NEXT CYCLE AT: <b style='color:var(--accent)'>" + t + "</b> <span style='color:#666;font-size:0.75rem'>(local time)</span>";
             } else if (!forcedWatering) {
                 document.getElementById('status-msg').innerText = 'MANUAL OVERRIDE ENABLED';
             }
