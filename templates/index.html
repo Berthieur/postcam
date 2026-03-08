@@ -40,7 +40,6 @@
         .online { color: #a2ff00 !important; }
         .online .dot { background: #a2ff00; box-shadow: 0 0 10px #a2ff00; }
 
-        /* VERROUILLAGE QUAND INACTIF */
         .system-offline-lock {
             filter: grayscale(1) !important;
             opacity: 0.5 !important;
@@ -48,7 +47,7 @@
             cursor: not-allowed;
         }
 
-        /* --- LOGIN DESIGN --- */
+        /* --- LOGIN --- */
         #login-screen {
             width: 90%; max-width: 360px;
             padding: 60px 35px 40px 35px;
@@ -68,7 +67,6 @@
             border: 2px solid rgba(255, 255, 255, 0.1);
             overflow: hidden;
         }
-        
         .profile-logo img { width: 90%; height: 90%; object-fit: contain; }
 
         .input-group { background: var(--input-bg); border-radius: 6px; display: flex; align-items: center; margin-bottom: 20px; position: relative; }
@@ -159,123 +157,45 @@
 
         .disabled { opacity: 0.25; pointer-events: none; filter: grayscale(1); }
 
-        /* ════════════════════════════════════════════
-           RESPONSIVE — TABLETTE (≤ 768px)
-        ════════════════════════════════════════════ */
+        /* RESPONSIVE */
         @media (max-width: 768px) {
             body, html { overflow: auto; }
-
-            #main-interface {
-                width: 100vw; height: 100vh;
-                max-width: 100%; max-height: 100%;
-                border-radius: 0;
-            }
-            .content {
-                grid-template-columns: 1fr 1fr;
-                overflow: auto;
-                padding: 10px; gap: 10px;
-            }
-            /* Header en colonne */
-            .glass-card[style*="span 2"] {
-                flex-direction: column !important;
-                align-items: center !important;
-                min-height: unset !important;
-                gap: 10px; padding: 12px;
-            }
-            #current-date  { font-size: 0.9rem; }
-            #current-time  { font-size: 1.7rem; }
-            .stat-val      { font-size: 1.3rem; }
+            #main-interface { width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; border-radius: 0; }
+            .content { grid-template-columns: 1fr 1fr; overflow: auto; padding: 10px; gap: 10px; }
+            .glass-card[style*="span 2"] { flex-direction: column !important; align-items: center !important; min-height: unset !important; gap: 10px; padding: 12px; }
+            #current-date { font-size: 0.9rem; }
+            #current-time { font-size: 1.7rem; }
+            .stat-val { font-size: 1.3rem; }
             .icon-dashboard { width: 24px; height: 24px; }
-            .faucet-icon   { width: 36px; height: 36px; }
+            .faucet-icon { width: 36px; height: 36px; }
         }
 
-        /* ════════════════════════════════════════════
-           RESPONSIVE — TÉLÉPHONE (≤ 480px)
-        ════════════════════════════════════════════ */
         @media (max-width: 480px) {
             body, html { overflow: auto; }
-
-            /* Login centré */
-            #login-screen {
-                width: 88%;
-                padding: 55px 20px 40px;
-                margin-top: 60px;
-            }
-
-            /* Interface plein écran scrollable */
-            #main-interface {
-                width: 100vw; height: auto; min-height: 100vh;
-                max-width: 100%; max-height: none;
-                border-radius: 0;
-            }
-
+            #login-screen { width: 88%; padding: 55px 20px 40px; margin-top: 60px; }
+            #main-interface { width: 100vw; height: auto; min-height: 100vh; max-width: 100%; max-height: none; border-radius: 0; }
             #status-indicator { font-size: 0.65rem; top: 10px; left: 10px; }
             #logout-btn { top: 8px; right: 8px; padding: 6px; }
             #logout-btn svg { width: 18px !important; }
-
-            /* ── UNE SEULE COLONNE ── */
-            .content {
-                grid-template-columns: 1fr !important;
-                overflow: visible;
-                padding: 8px; gap: 10px;
-            }
-
-            /* Header full width + colonne */
-            .glass-card[style*="span 2"] {
-                grid-column: 1 / -1 !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                min-height: unset !important;
-                gap: 10px; padding: 12px;
-            }
-
-            /* Mode row full width */
-            .mode-row {
-                grid-column: 1 / -1 !important;
-                width: 100% !important;
-                justify-content: center;
-            }
+            .content { grid-template-columns: 1fr !important; overflow: visible; padding: 8px; gap: 10px; }
+            .glass-card[style*="span 2"] { grid-column: 1 / -1 !important; flex-direction: column !important; align-items: center !important; min-height: unset !important; gap: 10px; padding: 12px; }
+            .mode-row { grid-column: 1 / -1 !important; width: 100% !important; justify-content: center; }
             .mode-row label { font-size: 0.78rem; padding: 8px 18px; }
-
-            /* ── INTELLIGENT + MANUEL full width chacun ── */
-            #p-int {
-                grid-column: 1 / -1 !important;
-                width: 100%;
-            }
-            #p-man {
-                grid-column: 1 / -1 !important;
-                width: 100%;
-            }
-
-            /* Status msg full width */
-            #status-msg {
-                grid-column: 1 / -1 !important;
-            }
-
-            /* Stats */
-            #current-date  { font-size: 0.75rem; }
-            #current-time  { font-size: 1.4rem; }
-            .stat-val      { font-size: 1.1rem; }
+            #p-int { grid-column: 1 / -1 !important; width: 100%; }
+            #p-man { grid-column: 1 / -1 !important; width: 100%; }
+            #status-msg { grid-column: 1 / -1 !important; }
+            #current-date { font-size: 0.75rem; }
+            #current-time { font-size: 1.4rem; }
+            .stat-val { font-size: 1.1rem; }
             .icon-dashboard { width: 20px; height: 20px; margin-bottom: 2px; }
-            .faucet-icon   { width: 32px; height: 32px; }
-            .faucet-label  { font-size: 0.6rem; }
-
-            /* Planning : label + input en colonne */
-            .plan-row {
-                flex-direction: column !important;
-                align-items: flex-start !important;
-                gap: 5px !important;
-            }
+            .faucet-icon { width: 32px; height: 32px; }
+            .faucet-label { font-size: 0.6rem; }
+            .plan-row { flex-direction: column !important; align-items: flex-start !important; gap: 5px !important; }
             .input-pro { width: 100% !important; padding: 9px; font-size: 0.9rem; }
-
-            /* Chips */
             .vanne-chip { padding: 7px 14px; font-size: 0.75rem; }
-
-            /* Switch plus grand */
             .switch { width: 50px; height: 28px; }
             .slider:before { height: 20px; width: 20px; }
             input:checked + .slider:before { transform: translateX(22px); }
-
             .section-header { font-size: 0.8rem; }
             #status-msg { font-size: 0.8rem; padding: 8px; }
         }
@@ -353,8 +273,8 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 15px;">
-                    <div id="v1-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
-                    <div id="v2-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
+                    <div id="v1-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg><div class="faucet-label" style="text-align:center;font-size:0.65rem;color:#aaa;margin-top:2px;">VALVE 1</div></div>
+                    <div id="v2-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg><div class="faucet-label" style="text-align:center;font-size:0.65rem;color:#aaa;margin-top:2px;">VALVE 2</div></div>
                 </div>
             </div>
 
@@ -372,6 +292,10 @@
                         <label class="vanne-chip"><input type="checkbox" id="sched-v1" checked> VALVE 1</label>
                         <label class="vanne-chip"><input type="checkbox" id="sched-v2"> VALVE 2</label>
                     </div>
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <button id="sched-save-btn" style="flex:1; background:var(--accent); color:var(--dark-blue); border:none; padding:8px; border-radius:8px; font-weight:bold; cursor:pointer;">SAVE</button>
+                        <button id="sched-cancel-btn" style="flex:1; background:#333; color:#eee; border:none; padding:8px; border-radius:8px; font-weight:bold; cursor:pointer;">CANCEL</button>
+                    </div>
                 </div>
             </div>
 
@@ -387,159 +311,297 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-database.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+    <script>
+        // ================================================
+        //  HydroSmart — index.html
+        //  VERSION HTTP ONLY — polling /api/status toutes les 2s
+        //  Aucune dépendance Firebase / WebSocket
+        // ================================================
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3p-sFubEGNazkLiVyZFiXiTnO-9hEphY",
-            authDomain: "hydrosmart-fc6a4.firebaseapp.com",
-            databaseURL: "https://hydrosmart-fc6a4-default-rtdb.firebaseio.com",
-            projectId: "hydrosmart-fc6a4",
-            storageBucket: "hydrosmart-fc6a4.firebasestorage.app",
-            messagingSenderId: "410048225901",
-            appId: "1:410048225901:web:477dda53a3cf78b58bd564"
-        };
+        const API = '';  // même origine, pas besoin d'URL absolue
+        let loggedIn       = false;
+        let pollTimer      = null;
+        let forcedWatering = false;
+        let scheduleActive = false;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
+        // ── Éléments DOM ─────────────────────────────
+        const loginScreen   = document.getElementById('login-screen');
+        const mainInterface = document.getElementById('main-interface');
+        const statusText    = document.getElementById('status-text');
+        const statusInd     = document.getElementById('status-indicator');
+        const mainContent   = document.querySelector('.content');
+        const statusMsg     = document.getElementById('status-msg');
 
-        let forcedWatering = false; // Suivi arrosage secours
-
-        const loginBtn = document.getElementById('login-btn');
-        const spinner = document.getElementById('btn-spinner');
-        const btnText = document.getElementById('btn-text');
-        const errorDiv = document.getElementById('login-error');
+        // ── Login ─────────────────────────────────────
+        const loginBtn  = document.getElementById('login-btn');
+        const spinner   = document.getElementById('btn-spinner');
+        const btnText   = document.getElementById('btn-text');
+        const errorDiv  = document.getElementById('login-error');
 
         loginBtn.addEventListener('click', async () => {
-            const email = document.getElementById('user').value;
-            const pass = document.getElementById('pass').value;
-            errorDiv.style.visibility = "hidden";
-            spinner.style.display = "block";
-            btnText.innerText = "VERIFYING...";
-            loginBtn.style.pointerEvents = "none";
+            const email = document.getElementById('user').value.trim();
+            const pass  = document.getElementById('pass').value;
+            if (!email || !pass) return;
+
+            errorDiv.style.visibility = 'hidden';
+            spinner.style.display     = 'block';
+            btnText.innerText         = 'VERIFYING...';
+            loginBtn.style.pointerEvents = 'none';
 
             try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) {
-                spinner.style.display = "none";
-                btnText.innerText = "ACCESS SYSTEM";
-                loginBtn.style.pointerEvents = "auto";
-                errorDiv.style.visibility = "visible";
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            signOut(auth).then(() => location.reload());
-        });
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-interface').style.display = 'flex';
-                // Restaure le dernier mode (intelligent/manuel)
-                const savedMode = localStorage.getItem('hs_mode') || 'i';
-                const radio = document.querySelector('input[name="m"][value="' + savedMode + '"]');
-                if (radio) {
-                    radio.checked = true;
-                    document.getElementById('p-int').classList.toggle('disabled', savedMode !== 'i');
-                    document.getElementById('p-man').classList.toggle('disabled', savedMode === 'i');
-                }
-                initSystem();
-            }
-        });
-
-        function initSystem() {
-            setInterval(updateClock, 1000);
-            
-            const statusText = document.getElementById('status-text');
-            const statusIndicator = document.getElementById('status-indicator');
-            const mainContent = document.querySelector('.content');
-
-            onValue(ref(db, 'system/status/lastSeen'), (snap) => {
-                const lastSeen = snap.val();
-                const now = Date.now();
-                const isOnline = lastSeen && (now - lastSeen < 10000);
-
-                if(isOnline) {
-                    statusText.innerText = "ESP32 ACTIVE";
-                    statusIndicator.classList.add('online');
-                    mainContent.classList.remove('system-offline-lock');
+                const r = await fetch('/api/login', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ email, password: pass }),
+                });
+                const data = await r.json();
+                if (data.success) {
+                    showMain();
                 } else {
-                    statusText.innerText = "ESP32 INACTIVE";
-                    statusIndicator.classList.remove('online');
-                    mainContent.classList.add('system-offline-lock');
-                    
-                    // Reset valeurs quand inactif
-                    document.getElementById('temp-val').innerText = "--°C";
-                    document.getElementById('hum-val').innerText = "--%";
-                    document.getElementById('soil-val').innerText = "--%";
+                    throw new Error('invalid');
                 }
-            });
+            } catch {
+                spinner.style.display        = 'none';
+                btnText.innerText            = 'ACCESS SYSTEM';
+                loginBtn.style.pointerEvents = 'auto';
+                errorDiv.style.visibility    = 'visible';
+            }
+        });
 
-            // LECTURE CAPTEURS ET LOGIQUE ARROSAGE
-            onValue(ref(db, 'system/live'), (snap) => {
-                const val = snap.val();
-                const statusStr = statusText.innerText;
-                if(val && statusStr === "ESP32 ACTIVE") {
-                    const soilMoisture = Math.round(val.soil);
-                    document.getElementById('soil-val').innerText = soilMoisture + "%";
-                    document.getElementById('temp-val').innerText = Math.round(val.temp) + "°C";
-                    document.getElementById('hum-val').innerText = Math.round(val.hum) + "%";
+        // Login sur Entrée
+        document.getElementById('pass').addEventListener('keydown', e => {
+            if (e.key === 'Enter') loginBtn.click();
+        });
 
-                    // Notification si humidité sol < 20%
-                    if (soilMoisture < 20 && !forcedWatering) {
-                        if (confirm("L'humidité du sol est basse (" + soilMoisture + "%). Voulez-vous arroser maintenant ?")) {
-                            forcedWatering = true;
-                            set(ref(db, 'system/manual/sw1'), true);
-                            set(ref(db, 'system/manual/sw2'), true);
-                            document.getElementById('status-msg').innerText = "ARROSAGE DE SECOURS EN COURS...";
+        // ── Logout ────────────────────────────────────
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            loggedIn = false;
+            clearInterval(pollTimer);
+            mainInterface.style.display = 'none';
+            loginScreen.style.display   = '';
+        });
+
+        // ── Afficher l'interface principale ───────────
+        function showMain() {
+            loggedIn = true;
+            loginScreen.style.display   = 'none';
+            mainInterface.style.display = 'flex';
+
+            // Restaure le dernier mode
+            const savedMode = localStorage.getItem('hs_mode') || 'i';
+            const radio = document.querySelector(`input[name="m"][value="${savedMode}"]`);
+            if (radio) { radio.checked = true; applyMode(savedMode); }
+
+            setInterval(updateClock, 1000);
+            updateClock();
+            pollStatus();                          // premier appel immédiat
+            pollTimer = setInterval(pollStatus, 2000);
+        }
+
+        // ── Polling HTTP /api/status ──────────────────
+        async function pollStatus() {
+            try {
+                const r    = await fetch('/api/status');
+                const data = await r.json();
+                if (!data.success) return;
+
+                updateESP32Status(data.esp32Online);
+
+                if (data.esp32Online) {
+                    const s = data.sensors;
+                    if (s) {
+                        document.getElementById('temp-val').innerText = Math.round(s.temp) + '°C';
+                        document.getElementById('hum-val').innerText  = Math.round(s.hum)  + '%';
+                        const soil = Math.round(s.soil);
+                        document.getElementById('soil-val').innerText = soil + '%';
+
+                        // Alerte humidité basse
+                        if (soil < 20 && !forcedWatering) {
+                            if (confirm(`Soil humidity is low (${soil}%). Start emergency watering?`)) {
+                                forcedWatering = true;
+                                await sendValve(1, true);
+                                await sendValve(2, true);
+                                statusMsg.innerText = 'EMERGENCY WATERING IN PROGRESS...';
+                            }
+                        }
+                        // Arrêt automatique sol saturé
+                        if (forcedWatering && soil >= 100) {
+                            forcedWatering = false;
+                            await sendValve(1, false);
+                            await sendValve(2, false);
+                            statusMsg.innerText = 'SOIL SATURATED — WATERING STOPPED';
                         }
                     }
 
-                    // Arrêt automatique quand sol saturé (100%)
-                    if (forcedWatering && soilMoisture >= 100) {
-                        forcedWatering = false;
-                        set(ref(db, 'system/manual/sw1'), false);
-                        set(ref(db, 'system/manual/sw2'), false);
-                        document.getElementById('status-msg').innerText = "SOL SATURÉ : ARROSAGE TERMINÉ";
+                    // État vannes (feedback ESP32)
+                    const v = data.valves;
+                    if (v) {
+                        document.getElementById('v1-status').classList.toggle('active-water', !!v.v1);
+                        document.getElementById('v2-status').classList.toggle('active-water', !!v.v2);
+                        // Sync switches en mode manuel
+                        if (getMode() === 'm') {
+                            setSwitchSilent('sw1', !!v.v1);
+                            setSwitchSilent('sw2', !!v.v2);
+                        }
+                    }
+
+                    // Sync planning
+                    const sch = data.schedule;
+                    if (sch && sch.enabled) {
+                        scheduleActive = true;
+                        // Convertit l'heure UTC stockée en heure locale pour l'affichage
+                        document.getElementById('sched-time').value     = utcToLocal(sch.time_val);
+                        document.getElementById('sched-duration').value  = sch.duration;
+                        const valArr = (sch.valves || '').split(',').map(Number);
+                        document.getElementById('sched-v1').checked = valArr.includes(1);
+                        document.getElementById('sched-v2').checked = valArr.includes(2);
                     }
                 }
-            });
+            } catch(e) {
+                console.warn('Poll error:', e.message);
+            }
         }
 
+        // ── Mise à jour voyant ESP32 ──────────────────
+        function updateESP32Status(online) {
+            if (online) {
+                statusText.innerText = 'ESP32 ACTIVE';
+                statusInd.classList.add('online');
+                mainContent.classList.remove('system-offline-lock');
+            } else {
+                statusText.innerText = 'ESP32 INACTIVE';
+                statusInd.classList.remove('online');
+                mainContent.classList.add('system-offline-lock');
+                document.getElementById('temp-val').innerText = '--°C';
+                document.getElementById('hum-val').innerText  = '--%';
+                document.getElementById('soil-val').innerText = '--%';
+            }
+        }
+
+        // ── Commande vanne ────────────────────────────
+        async function sendValve(valve, state) {
+            try {
+                await fetch('/api/valve', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ valve, state }),
+                });
+            } catch(e) { console.error('sendValve error:', e.message); }
+        }
+
+        // ── Switches manuels ──────────────────────────
+        document.getElementById('sw1').addEventListener('change', function() {
+            sendValve(1, this.checked);
+        });
+        document.getElementById('sw2').addEventListener('change', function() {
+            sendValve(2, this.checked);
+        });
+
+        function setSwitchSilent(id, val) {
+            const el = document.getElementById(id);
+            if (el.checked !== val) el.checked = val;
+        }
+
+        // ── Planning — SAVE ───────────────────────────
+        document.getElementById('sched-save-btn').addEventListener('click', async () => {
+            const localTime = document.getElementById('sched-time').value;
+            const duration  = parseInt(document.getElementById('sched-duration').value);
+            const valves    = [];
+            if (document.getElementById('sched-v1').checked) valves.push(1);
+            if (document.getElementById('sched-v2').checked) valves.push(2);
+
+            if (!localTime || !duration || valves.length === 0) {
+                statusMsg.innerText = 'Please fill all fields and select at least one valve.';
+                return;
+            }
+
+            // Convertit l'heure locale en UTC avant envoi
+            const utcTime = localToUtc(localTime);
+
+            try {
+                const r    = await fetch('/api/schedule', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ time: utcTime, duration, valves }),
+                });
+                const data = await r.json();
+                if (data.success) {
+                    scheduleActive = true;
+                    statusMsg.innerHTML = `NEXT CYCLE AT: <b style="color:var(--accent)">${localTime}</b>`;
+                } else {
+                    statusMsg.innerText = 'Error saving schedule.';
+                }
+            } catch(e) { statusMsg.innerText = 'Network error.'; }
+        });
+
+        // ── Planning — CANCEL ─────────────────────────
+        document.getElementById('sched-cancel-btn').addEventListener('click', async () => {
+            try {
+                await fetch('/api/schedule', { method: 'DELETE' });
+                scheduleActive = false;
+                statusMsg.innerText = 'Schedule cancelled.';
+            } catch(e) { statusMsg.innerText = 'Network error.'; }
+        });
+
+        // ── Conversion UTC ↔ Local ────────────────────
+        function localToUtc(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            const d = new Date();
+            d.setHours(h, m, 0, 0);
+            return String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
+        }
+
+        function utcToLocal(timeStr) {
+            const [h, m] = timeStr.split(':').map(Number);
+            const d = new Date();
+            d.setUTCHours(h, m, 0, 0);
+            return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+
+        // ── Horloge ───────────────────────────────────
         function updateClock() {
             const now = new Date();
             document.getElementById('current-time').innerText = now.toLocaleTimeString('en-US', { hour12: false });
             document.getElementById('current-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            
-            const mode = document.querySelector('input[name="m"]:checked').value;
-            if (mode === 'i') {
-                const startTime = document.getElementById('sched-time').value;
-                document.getElementById('status-msg').innerHTML = "NEXT CYCLE AT: <b style='color:var(--accent)'>" + startTime + "</b>";
-            } else if (!forcedWatering) {
-                document.getElementById('status-msg').innerText = "MANUAL OVERRIDE ENABLED";
+
+            const mode = getMode();
+            if (mode === 'i' && !forcedWatering) {
+                const localTime = document.getElementById('sched-time').value;
+                statusMsg.innerHTML = scheduleActive
+                    ? `NEXT CYCLE AT: <b style="color:var(--accent)">${localTime}</b>`
+                    : 'System Ready...';
+            } else if (mode === 'm' && !forcedWatering) {
+                statusMsg.innerText = 'MANUAL OVERRIDE ENABLED';
             }
         }
 
-        const passInput = document.getElementById('pass');
-        const eyeBtn = document.getElementById('toggle-eye');
-        passInput.addEventListener('input', () => eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none');
-        eyeBtn.addEventListener('click', () => {
-            const isPass = passInput.type === 'password';
-            passInput.type = isPass ? 'text' : 'password';
-            eyeBtn.style.opacity = isPass ? '1' : '0.4';
-        });
+        // ── Mode (Intelligent / Manuel) ───────────────
+        function getMode() {
+            return document.querySelector('input[name="m"]:checked')?.value || 'i';
+        }
+
+        function applyMode(mode) {
+            document.getElementById('p-int').classList.toggle('disabled', mode !== 'i');
+            document.getElementById('p-man').classList.toggle('disabled', mode === 'i');
+        }
 
         document.querySelectorAll('input[name="m"]').forEach(r => {
             r.addEventListener('change', () => {
-                const isInt = r.value === 'i';
                 localStorage.setItem('hs_mode', r.value);
-                document.getElementById('p-int').classList.toggle('disabled', !isInt);
-                document.getElementById('p-man').classList.toggle('disabled', isInt);
+                applyMode(r.value);
             });
+        });
+
+        // ── Mot de passe — œil ────────────────────────
+        const passInput = document.getElementById('pass');
+        const eyeBtn    = document.getElementById('toggle-eye');
+        passInput.addEventListener('input', () => {
+            eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none';
+        });
+        eyeBtn.addEventListener('click', () => {
+            const isPass = passInput.type === 'password';
+            passInput.type    = isPass ? 'text' : 'password';
+            eyeBtn.style.opacity = isPass ? '1' : '0.4';
         });
     </script>
 </body>
