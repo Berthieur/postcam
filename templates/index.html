@@ -129,11 +129,43 @@
 
         .stat-val { font-size: 1.6rem; font-weight: bold; }
         .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
-        .faucet-icon { width: 40px; height: 40px; fill: var(--gray-icon); }
-        .active-water .faucet-icon { fill: var(--accent); }
-        .active-water .water-drop { animation: dropAnim 0.8s infinite; opacity: 1; fill: #4fc3f7; }
-        
-        @keyframes dropAnim { 0% { transform: translateY(-5px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+        /* ── Vanne container ── */
+        .faucet-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            position: relative; gap: 2px;
+        }
+        .faucet-icon { width: 44px; height: 44px; fill: var(--gray-icon); transition: fill 0.3s; }
+        .active-water .faucet-icon { fill: var(--accent); filter: drop-shadow(0 0 6px #00e676aa); }
+
+        /* ── Flux d'eau ── */
+        .water-stream {
+            display: flex; gap: 5px; height: 28px;
+            align-items: flex-start; justify-content: center;
+            overflow: hidden;
+        }
+        .wdrop {
+            width: 5px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            background: #4fc3f7; opacity: 0;
+        }
+        .wdrop-sm { height: 7px; }
+        .wdrop-md { height: 10px; }
+        .wdrop-lg { height: 13px; }
+
+        .active-water .wdrop-1 { animation: fall 0.7s ease-in infinite 0.00s; }
+        .active-water .wdrop-2 { animation: fall 0.7s ease-in infinite 0.18s; }
+        .active-water .wdrop-3 { animation: fall 0.7s ease-in infinite 0.36s; }
+        .active-water .wdrop-4 { animation: fall 0.7s ease-in infinite 0.10s; }
+        .active-water .wdrop-5 { animation: fall 0.7s ease-in infinite 0.28s; }
+        .active-water .wdrop-6 { animation: fall 0.7s ease-in infinite 0.46s; }
+
+        @keyframes fall {
+            0%   { transform: translateY(-4px); opacity: 0; }
+            20%  { opacity: 0.9; }
+            80%  { opacity: 0.7; }
+            100% { transform: translateY(26px); opacity: 0; }
+        }
+        .faucet-label { font-size: 0.65rem; color: var(--gray-icon); letter-spacing: 1px; font-weight: 600; }
+        .active-water .faucet-label { color: var(--accent); }
 
         .mode-row { grid-column: span 2; display: flex; justify-content: center; gap: 15px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 50px; width: fit-content; margin: 0 auto; }
         .mode-row label { font-size: 0.8rem; font-weight: bold; cursor: pointer; padding: 8px 20px; border-radius: 30px; color: #aaa; }
@@ -352,9 +384,45 @@
                         <div id="soil-val" class="stat-val">--%</div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 15px;">
-                    <div id="v1-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
-                    <div id="v2-status"><svg class="faucet-icon" viewBox="0 0 24 24"><path class="water-drop" d="M12,18A2,2 0 0,1 10,20A2,2 0 0,1 8,18A2,2 0 0,1 10,16A2,2 0 0,1 12,18Z"/><path d="M16 13h-3V5h2V3H9v2h2v8H8c-1.1 0-2 .9-2 2v3H2v2h20v-2h-4v-3c0-1.1-.9-2-2-2z"/></svg></div>
+                <div style="display: flex; gap: 20px;">
+                    <div id="v1-status" class="faucet-wrap">
+                        <svg class="faucet-icon" viewBox="0 0 64 64">
+                          <rect x="20" y="30" width="24" height="14" rx="3"/>
+                          <rect x="26" y="44" width="8" height="10" rx="2"/>
+                          <rect x="28" y="10" width="8" height="20" rx="2"/>
+                          <rect x="12" y="14" width="40" height="6" rx="3"/>
+                          <rect x="14" y="8"  width="6"  height="12" rx="2"/>
+                          <rect x="44" y="8"  width="6"  height="12" rx="2"/>
+                        </svg>
+                        <div class="water-stream">
+                          <div class="wdrop wdrop-sm wdrop-1"></div>
+                          <div class="wdrop wdrop-lg wdrop-2"></div>
+                          <div class="wdrop wdrop-md wdrop-3"></div>
+                          <div class="wdrop wdrop-sm wdrop-4"></div>
+                          <div class="wdrop wdrop-lg wdrop-5"></div>
+                          <div class="wdrop wdrop-md wdrop-6"></div>
+                        </div>
+                        <span class="faucet-label">V1</span>
+                    </div>
+                    <div id="v2-status" class="faucet-wrap">
+                        <svg class="faucet-icon" viewBox="0 0 64 64">
+                          <rect x="20" y="30" width="24" height="14" rx="3"/>
+                          <rect x="26" y="44" width="8" height="10" rx="2"/>
+                          <rect x="28" y="10" width="8" height="20" rx="2"/>
+                          <rect x="12" y="14" width="40" height="6" rx="3"/>
+                          <rect x="14" y="8"  width="6"  height="12" rx="2"/>
+                          <rect x="44" y="8"  width="6"  height="12" rx="2"/>
+                        </svg>
+                        <div class="water-stream">
+                          <div class="wdrop wdrop-md wdrop-1"></div>
+                          <div class="wdrop wdrop-sm wdrop-2"></div>
+                          <div class="wdrop wdrop-lg wdrop-3"></div>
+                          <div class="wdrop wdrop-md wdrop-4"></div>
+                          <div class="wdrop wdrop-sm wdrop-5"></div>
+                          <div class="wdrop wdrop-lg wdrop-6"></div>
+                        </div>
+                        <span class="faucet-label">V2</span>
+                    </div>
                 </div>
             </div>
 
@@ -387,160 +455,252 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-database.js";
-        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.1.1/firebase-auth.js";
+    <script>
+        // ================================================
+        //  HydroSmart — HTTP PURE (polling /api/poll)
+        //  Firebase supprimé — NeonDB via app.js
+        // ================================================
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyD3p-sFubEGNazkLiVyZFiXiTnO-9hEphY",
-            authDomain: "hydrosmart-fc6a4.firebaseapp.com",
-            databaseURL: "https://hydrosmart-fc6a4-default-rtdb.firebaseio.com",
-            projectId: "hydrosmart-fc6a4",
-            storageBucket: "hydrosmart-fc6a4.firebasestorage.app",
-            messagingSenderId: "410048225901",
-            appId: "1:410048225901:web:477dda53a3cf78b58bd564"
-        };
+        let forcedWatering = false;
+        let sessionActive  = false;
+        let pollInterval   = null;
+        let pollBlocked    = false;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        let forcedWatering = false; // Suivi arrosage secours
-
-        const loginBtn = document.getElementById('login-btn');
-        const spinner = document.getElementById('btn-spinner');
-        const btnText = document.getElementById('btn-text');
-        const errorDiv = document.getElementById('login-error');
-
-        loginBtn.addEventListener('click', async () => {
-            const email = document.getElementById('user').value;
-            const pass = document.getElementById('pass').value;
-            errorDiv.style.visibility = "hidden";
-            spinner.style.display = "block";
-            btnText.innerText = "VERIFYING...";
-            loginBtn.style.pointerEvents = "none";
-
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-            } catch (e) {
-                spinner.style.display = "none";
-                btnText.innerText = "ACCESS SYSTEM";
-                loginBtn.style.pointerEvents = "auto";
-                errorDiv.style.visibility = "visible";
-            }
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            signOut(auth).then(() => location.reload());
-        });
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-interface').style.display = 'flex';
-                // Restaure le dernier mode (intelligent/manuel)
-                const savedMode = localStorage.getItem('hs_mode') || 'i';
-                const radio = document.querySelector('input[name="m"][value="' + savedMode + '"]');
-                if (radio) {
-                    radio.checked = true;
-                    document.getElementById('p-int').classList.toggle('disabled', savedMode !== 'i');
-                    document.getElementById('p-man').classList.toggle('disabled', savedMode === 'i');
-                }
-                initSystem();
-            }
-        });
-
-        function initSystem() {
-            setInterval(updateClock, 1000);
-            
-            const statusText = document.getElementById('status-text');
-            const statusIndicator = document.getElementById('status-indicator');
-            const mainContent = document.querySelector('.content');
-
-            onValue(ref(db, 'system/status/lastSeen'), (snap) => {
-                const lastSeen = snap.val();
-                const now = Date.now();
-                const isOnline = lastSeen && (now - lastSeen < 10000);
-
-                if(isOnline) {
-                    statusText.innerText = "ESP32 ACTIVE";
-                    statusIndicator.classList.add('online');
-                    mainContent.classList.remove('system-offline-lock');
-                } else {
-                    statusText.innerText = "ESP32 INACTIVE";
-                    statusIndicator.classList.remove('online');
-                    mainContent.classList.add('system-offline-lock');
-                    
-                    // Reset valeurs quand inactif
-                    document.getElementById('temp-val').innerText = "--°C";
-                    document.getElementById('hum-val').innerText = "--%";
-                    document.getElementById('soil-val').innerText = "--%";
-                }
-            });
-
-            // LECTURE CAPTEURS ET LOGIQUE ARROSAGE
-            onValue(ref(db, 'system/live'), (snap) => {
-                const val = snap.val();
-                const statusStr = statusText.innerText;
-                if(val && statusStr === "ESP32 ACTIVE") {
-                    const soilMoisture = Math.round(val.soil);
-                    document.getElementById('soil-val').innerText = soilMoisture + "%";
-                    document.getElementById('temp-val').innerText = Math.round(val.temp) + "°C";
-                    document.getElementById('hum-val').innerText = Math.round(val.hum) + "%";
-
-                    // Notification si humidité sol < 20%
-                    if (soilMoisture < 20 && !forcedWatering) {
-                        if (confirm("L'humidité du sol est basse (" + soilMoisture + "%). Voulez-vous arroser maintenant ?")) {
-                            forcedWatering = true;
-                            set(ref(db, 'system/manual/sw1'), true);
-                            set(ref(db, 'system/manual/sw2'), true);
-                            document.getElementById('status-msg').innerText = "ARROSAGE DE SECOURS EN COURS...";
-                        }
-                    }
-
-                    // Arrêt automatique quand sol saturé (100%)
-                    if (forcedWatering && soilMoisture >= 100) {
-                        forcedWatering = false;
-                        set(ref(db, 'system/manual/sw1'), false);
-                        set(ref(db, 'system/manual/sw2'), false);
-                        document.getElementById('status-msg').innerText = "SOL SATURÉ : ARROSAGE TERMINÉ";
-                    }
-                }
-            });
-        }
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('current-time').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-            document.getElementById('current-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            
-            const mode = document.querySelector('input[name="m"]:checked').value;
-            if (mode === 'i') {
-                const startTime = document.getElementById('sched-time').value;
-                document.getElementById('status-msg').innerHTML = "NEXT CYCLE AT: <b style='color:var(--accent)'>" + startTime + "</b>";
-            } else if (!forcedWatering) {
-                document.getElementById('status-msg').innerText = "MANUAL OVERRIDE ENABLED";
-            }
-        }
-
+        const loginBtn  = document.getElementById('login-btn');
+        const spinner   = document.getElementById('btn-spinner');
+        const btnText   = document.getElementById('btn-text');
+        const errorDiv  = document.getElementById('login-error');
         const passInput = document.getElementById('pass');
-        const eyeBtn = document.getElementById('toggle-eye');
-        passInput.addEventListener('input', () => eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none');
+        const eyeBtn    = document.getElementById('toggle-eye');
+
+        // ── Password toggle ──
+        passInput.addEventListener('input', () => {
+            eyeBtn.style.display = passInput.value.length > 0 ? 'flex' : 'none';
+        });
         eyeBtn.addEventListener('click', () => {
             const isPass = passInput.type === 'password';
-            passInput.type = isPass ? 'text' : 'password';
+            passInput.type       = isPass ? 'text' : 'password';
             eyeBtn.style.opacity = isPass ? '1' : '0.4';
         });
 
+        // ── Login ──
+        loginBtn.addEventListener('click', async () => {
+            const email = document.getElementById('user').value.trim();
+            const pass  = passInput.value;
+            if (!email || !pass) return;
+            errorDiv.style.visibility    = 'hidden';
+            spinner.style.display        = 'block';
+            btnText.innerText            = 'VERIFYING...';
+            loginBtn.style.pointerEvents = 'none';
+            try {
+                const r    = await fetch('/api/login', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password: pass })
+                });
+                const data = await r.json();
+                if (!data.success) throw new Error();
+                sessionActive = true;
+                localStorage.setItem('hs_session', 'active');
+                showMain();
+            } catch {
+                spinner.style.display        = 'none';
+                btnText.innerText            = 'ACCESS SYSTEM';
+                loginBtn.style.pointerEvents = 'auto';
+                errorDiv.style.visibility    = 'visible';
+            }
+        });
+
+        // ── Logout ──
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            sessionActive = false;
+            localStorage.removeItem('hs_session');
+            localStorage.removeItem('hs_mode');
+            if (pollInterval) clearInterval(pollInterval);
+            document.getElementById('main-interface').style.display = 'none';
+            document.getElementById('login-screen').style.display   = 'block';
+        });
+
+        // ── Restauration session ──
+        window.addEventListener('load', () => {
+            if (localStorage.getItem('hs_session') === 'active') {
+                sessionActive = true;
+                showMain();
+            }
+        });
+
+        function showMain() {
+            document.getElementById('login-screen').style.display   = 'none';
+            document.getElementById('main-interface').style.display = 'flex';
+            const savedMode = localStorage.getItem('hs_mode') || 'i';
+            const radio = document.querySelector('input[name="m"][value="' + savedMode + '"]');
+            if (radio) {
+                radio.checked = true;
+                document.getElementById('p-int').classList.toggle('disabled', savedMode !== 'i');
+                document.getElementById('p-man').classList.toggle('disabled', savedMode === 'i');
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+            doPoll();
+            pollInterval = setInterval(doPoll, 2000);
+        }
+
+        // ── POLL /api/poll toutes les 2s ──
+        async function doPoll() {
+            try {
+                const r    = await fetch('/api/poll');
+                const data = await r.json();
+                if (!data.success) return;
+
+                if (data.sensors) {
+                    setSensors(data.sensors.temp, data.sensors.hum, data.sensors.soil);
+                    checkSoil(data.sensors.soil);
+                }
+
+                // Ne pas écraser les toggles si on vient de cliquer
+                if (!pollBlocked) {
+                    setValves(data.commands?.sw1 || false, data.commands?.sw2 || false);
+                }
+
+                if (data.schedule?.enabled && data.schedule?.time_val) {
+                    const [uh, um] = data.schedule.time_val.split(':').map(Number);
+                    const d = new Date();
+                    d.setUTCHours(uh, um, 0, 0);
+                    document.getElementById('sched-time').value     = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+                    document.getElementById('sched-duration').value = data.schedule.duration || 10;
+                    const valves = (data.schedule.valves || '1').split(',').map(Number);
+                    document.getElementById('sched-v1').checked = valves.includes(1);
+                    document.getElementById('sched-v2').checked = valves.includes(2);
+                }
+
+                setOnline(data.lastSeen, data.esp32Online);
+            } catch(e) {}
+        }
+
+        // ── Capteurs ──
+        function setSensors(temp, hum, soil) {
+            if (temp != null) document.getElementById('temp-val').innerText = Math.round(temp) + '°C';
+            if (hum  != null) document.getElementById('hum-val').innerText  = Math.round(hum)  + '%';
+            if (soil != null) document.getElementById('soil-val').innerText = Math.round(soil) + '%';
+        }
+
+        // ── Vannes ──
+        function setValves(v1, v2) {
+            document.getElementById('v1-status').classList.toggle('active-water', !!v1);
+            document.getElementById('v2-status').classList.toggle('active-water', !!v2);
+            document.getElementById('sw1').checked = !!v1;
+            document.getElementById('sw2').checked = !!v2;
+        }
+
+        // ── Statut ESP32 ──
+        function setOnline(lastSeen, esp32Online) {
+            const online  = esp32Online || (lastSeen && Date.now() - lastSeen < 12000);
+            const ind     = document.getElementById('status-indicator');
+            const txt     = document.getElementById('status-text');
+            const content = document.querySelector('.content');
+            if (online) {
+                txt.innerText = 'ESP32 ACTIVE';
+                ind.classList.add('online');
+                content.classList.remove('system-offline-lock');
+            } else {
+                txt.innerText = 'ESP32 INACTIVE';
+                ind.classList.remove('online');
+                content.classList.add('system-offline-lock');
+                document.getElementById('temp-val').innerText = '--°C';
+                document.getElementById('hum-val').innerText  = '--%';
+                document.getElementById('soil-val').innerText = '--%';
+            }
+        }
+
+        // ── Alerte sol bas ──
+        function checkSoil(soil) {
+            if (soil < 20 && !forcedWatering) {
+                if (confirm("L'humidité du sol est basse (" + soil + "%). Arroser maintenant ?")) {
+                    forcedWatering = true;
+                    cmdValve(1, true); cmdValve(2, true);
+                    document.getElementById('status-msg').innerText = 'ARROSAGE DE SECOURS EN COURS...';
+                }
+            }
+            if (forcedWatering && soil >= 100) {
+                forcedWatering = false;
+                cmdValve(1, false); cmdValve(2, false);
+                document.getElementById('status-msg').innerText = 'SOL SATURÉ : ARROSAGE TERMINÉ';
+            }
+        }
+
+        // ── Commande vanne ──
+        async function cmdValve(valve, state) {
+            pollBlocked = true;
+            clearTimeout(window._pollBlockTimer);
+            window._pollBlockTimer = setTimeout(() => { pollBlocked = false; }, 3000);
+            try {
+                await fetch('/api/valve', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ valve, state })
+                });
+            } catch(e) {}
+        }
+
+        document.getElementById('sw1').addEventListener('change', function() {
+            document.getElementById('v1-status').classList.toggle('active-water', this.checked);
+            cmdValve(1, this.checked);
+        });
+        document.getElementById('sw2').addEventListener('change', function() {
+            document.getElementById('v2-status').classList.toggle('active-water', this.checked);
+            cmdValve(2, this.checked);
+        });
+
+        // ── Planning ──
+        async function syncSchedule() {
+            const localTime = document.getElementById('sched-time').value;
+            const duration  = document.getElementById('sched-duration').value;
+            const valves    = [];
+            if (document.getElementById('sched-v1').checked) valves.push(1);
+            if (document.getElementById('sched-v2').checked) valves.push(2);
+            if (!valves.length) return;
+            const [h, m] = localTime.split(':').map(Number);
+            const now    = new Date();
+            const local  = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+            const utcTime = String(local.getUTCHours()).padStart(2,'0') + ':' + String(local.getUTCMinutes()).padStart(2,'0');
+            try {
+                await fetch('/api/schedule', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time: utcTime, duration: parseInt(duration), valves })
+                });
+            } catch(e) {}
+        }
+
+        ['sched-time','sched-duration','sched-v1','sched-v2'].forEach(id => {
+            document.getElementById(id).addEventListener('change', syncSchedule);
+        });
+
+        // ── Mode ──
         document.querySelectorAll('input[name="m"]').forEach(r => {
             r.addEventListener('change', () => {
                 const isInt = r.value === 'i';
                 localStorage.setItem('hs_mode', r.value);
                 document.getElementById('p-int').classList.toggle('disabled', !isInt);
-                document.getElementById('p-man').classList.toggle('disabled', isInt);
+                document.getElementById('p-man').classList.toggle('disabled',  isInt);
+                if (isInt) syncSchedule();
+                else fetch('/api/schedule', { method: 'DELETE' }).catch(() => {});
             });
         });
+
+        // ── Horloge ──
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').innerText =
+                now.toLocaleTimeString('en-US', { hour12: false });
+            document.getElementById('current-date').innerText =
+                now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const mode = document.querySelector('input[name="m"]:checked').value;
+            if (mode === 'i') {
+                const t = document.getElementById('sched-time').value;
+                document.getElementById('status-msg').innerHTML =
+                    "NEXT CYCLE AT: <b style='color:var(--accent)'>" + t + "</b> <span style='color:#666;font-size:0.75rem'>(local)</span>";
+            } else if (!forcedWatering) {
+                document.getElementById('status-msg').innerText = 'MANUAL OVERRIDE ENABLED';
+            }
+        }
     </script>
 </body>
 </html>
