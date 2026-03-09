@@ -1,7 +1,7 @@
 'use strict';
 
 // ================================================
-//  HydroSmart — app.js  [VERSION CORRIGÉE]
+//  HydroSmart — app.js  [VERSION CORRIGÉE] IZY IO AN
 //
 //  FIXES :
 //  [FIX1] ESP32_TIMEOUT_MS = 12000 (12s)
