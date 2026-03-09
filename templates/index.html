@@ -29,7 +29,6 @@
             background-color: #050a05;
         }
 
-        /* --- VOYANT D'ÉTAT --- */
         #status-indicator {
             display: flex; align-items: center; gap: 8px;
             position: absolute; top: 15px; left: 15px;
@@ -40,7 +39,6 @@
         .online { color: #a2ff00 !important; }
         .online .dot { background: #a2ff00; box-shadow: 0 0 10px #a2ff00; }
 
-        /* VERROUILLAGE QUAND INACTIF */
         .system-offline-lock {
             filter: grayscale(1) !important;
             opacity: 0.5 !important;
@@ -48,7 +46,6 @@
             cursor: not-allowed;
         }
 
-        /* --- LOGIN DESIGN --- */
         #login-screen {
             width: 90%; max-width: 360px;
             padding: 60px 35px 40px 35px;
@@ -68,7 +65,6 @@
             border: 2px solid rgba(255, 255, 255, 0.1);
             overflow: hidden;
         }
-        
         .profile-logo img { width: 90%; height: 90%; object-fit: contain; }
 
         .input-group { background: var(--input-bg); border-radius: 6px; display: flex; align-items: center; margin-bottom: 20px; position: relative; }
@@ -98,7 +94,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* --- MAIN INTERFACE --- */
         #main-interface {
             display: none; width: 95vw; height: 95vh;
             max-width: 1000px; max-height: 620px;
@@ -129,7 +124,7 @@
 
         .stat-val { font-size: 1.6rem; font-weight: bold; }
         .icon-dashboard { width: 30px; height: 30px; fill: var(--accent); margin-bottom: 5px; }
-        /* ── Vanne container ── */
+
         .faucet-wrap {
             display: flex; flex-direction: column; align-items: center;
             position: relative; gap: 2px;
@@ -137,7 +132,6 @@
         .faucet-icon { width: 44px; height: 44px; fill: var(--gray-icon); transition: fill 0.3s; }
         .active-water .faucet-icon { fill: var(--accent); filter: drop-shadow(0 0 6px #00e676aa); }
 
-        /* ── Flux d'eau ── */
         .water-stream {
             display: flex; gap: 5px; height: 28px;
             align-items: flex-start; justify-content: center;
@@ -191,29 +185,11 @@
 
         .disabled { opacity: 0.25; pointer-events: none; filter: grayscale(1); }
 
-        /* ════════════════════════════════════════════
-           RESPONSIVE — TABLETTE (≤ 768px)
-        ════════════════════════════════════════════ */
         @media (max-width: 768px) {
             body, html { overflow: auto; }
-
-            #main-interface {
-                width: 100vw; height: 100vh;
-                max-width: 100%; max-height: 100%;
-                border-radius: 0;
-            }
-            .content {
-                grid-template-columns: 1fr 1fr;
-                overflow: auto;
-                padding: 10px; gap: 10px;
-            }
-            /* Header en colonne */
-            .glass-card[style*="span 2"] {
-                flex-direction: column !important;
-                align-items: center !important;
-                min-height: unset !important;
-                gap: 10px; padding: 12px;
-            }
+            #main-interface { width: 100vw; height: 100vh; max-width: 100%; max-height: 100%; border-radius: 0; }
+            .content { grid-template-columns: 1fr 1fr; overflow: auto; padding: 10px; gap: 10px; }
+            .glass-card[style*="span 2"] { flex-direction: column !important; align-items: center !important; min-height: unset !important; gap: 10px; padding: 12px; }
             #current-date  { font-size: 0.9rem; }
             #current-time  { font-size: 1.7rem; }
             .stat-val      { font-size: 1.3rem; }
@@ -221,93 +197,32 @@
             .faucet-icon   { width: 36px; height: 36px; }
         }
 
-        /* ════════════════════════════════════════════
-           RESPONSIVE — TÉLÉPHONE (≤ 480px)
-        ════════════════════════════════════════════ */
         @media (max-width: 480px) {
             body, html { overflow: auto; }
-
-            /* Login centré */
-            #login-screen {
-                width: 88%;
-                padding: 55px 20px 40px;
-                margin-top: 60px;
-            }
-
-            /* Interface plein écran scrollable */
-            #main-interface {
-                width: 100vw; height: auto; min-height: 100vh;
-                max-width: 100%; max-height: none;
-                border-radius: 0;
-            }
-
+            #login-screen { width: 88%; padding: 55px 20px 40px; margin-top: 60px; }
+            #main-interface { width: 100vw; height: auto; min-height: 100vh; max-width: 100%; max-height: none; border-radius: 0; }
             #status-indicator { font-size: 0.65rem; top: 10px; left: 10px; }
             #logout-btn { top: 8px; right: 8px; padding: 6px; }
             #logout-btn svg { width: 18px !important; }
-
-            /* ── UNE SEULE COLONNE ── */
-            .content {
-                grid-template-columns: 1fr !important;
-                overflow: visible;
-                padding: 8px; gap: 10px;
-            }
-
-            /* Header full width + colonne */
-            .glass-card[style*="span 2"] {
-                grid-column: 1 / -1 !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                min-height: unset !important;
-                gap: 10px; padding: 12px;
-            }
-
-            /* Mode row full width */
-            .mode-row {
-                grid-column: 1 / -1 !important;
-                width: 100% !important;
-                justify-content: center;
-            }
+            .content { grid-template-columns: 1fr !important; overflow: visible; padding: 8px; gap: 10px; }
+            .glass-card[style*="span 2"] { grid-column: 1 / -1 !important; flex-direction: column !important; align-items: center !important; min-height: unset !important; gap: 10px; padding: 12px; }
+            .mode-row { grid-column: 1 / -1 !important; width: 100% !important; justify-content: center; }
             .mode-row label { font-size: 0.78rem; padding: 8px 18px; }
-
-            /* ── INTELLIGENT + MANUEL full width chacun ── */
-            #p-int {
-                grid-column: 1 / -1 !important;
-                width: 100%;
-            }
-            #p-man {
-                grid-column: 1 / -1 !important;
-                width: 100%;
-            }
-
-            /* Status msg full width */
-            #status-msg {
-                grid-column: 1 / -1 !important;
-            }
-
-            /* Stats */
+            #p-int { grid-column: 1 / -1 !important; width: 100%; }
+            #p-man { grid-column: 1 / -1 !important; width: 100%; }
+            #status-msg { grid-column: 1 / -1 !important; }
             #current-date  { font-size: 0.75rem; }
             #current-time  { font-size: 1.4rem; }
             .stat-val      { font-size: 1.1rem; }
             .icon-dashboard { width: 20px; height: 20px; margin-bottom: 2px; }
             .faucet-icon   { width: 32px; height: 32px; }
             .faucet-label  { font-size: 0.6rem; }
-
-            /* Planning : label + input en colonne */
-            .plan-row {
-                flex-direction: column !important;
-                align-items: flex-start !important;
-                gap: 5px !important;
-            }
+            .plan-row { flex-direction: column !important; align-items: flex-start !important; gap: 5px !important; }
             .input-pro { width: 100% !important; padding: 9px; font-size: 0.9rem; }
-
-            /* Chips */
             .vanne-chip { padding: 7px 14px; font-size: 0.75rem; }
-
-            /* Switch plus grand */
             .switch { width: 50px; height: 28px; }
             .slider:before { height: 20px; width: 20px; }
             input:checked + .slider:before { transform: translateX(22px); }
-
             .section-header { font-size: 0.8rem; }
             #status-msg { font-size: 0.8rem; padding: 8px; }
         }
@@ -457,14 +372,21 @@
 
     <script>
         // ================================================
-        //  HydroSmart — HTTP PURE (polling /api/poll)
-        //  Firebase supprimé — NeonDB via app.js
+        //  HydroSmart — HTTP PURE
+        //  FIXES :
+        //  [1] setOnline : seuil 25s + normalisation lastSeen (ms vs s)
+        //  [2] doPoll   : timeout AbortController 5s + compteur échecs
+        //  [3] checkSoil: soilAlertShown + zone tampon 60%
+        //  [4] Intervalle poll 2500ms (moins de pression SSL)
         // ================================================
 
-        let forcedWatering = false;
-        let sessionActive  = false;
-        let pollInterval   = null;
-        let pollBlocked    = false;
+        let forcedWatering   = false;
+        let sessionActive    = false;
+        let pollInterval     = null;
+        let pollBlocked      = false;
+        let soilAlertShown   = false;   // [3] évite confirm() en boucle
+        let consecutiveFails = 0;       // [2] compteur d'échecs réseau
+        let lastOnlineState  = null;    // [1] évite redessiner inutilement
 
         const loginBtn  = document.getElementById('login-btn');
         const spinner   = document.getElementById('btn-spinner');
@@ -512,7 +434,9 @@
 
         // ── Logout ──
         document.getElementById('logout-btn').addEventListener('click', () => {
-            sessionActive = false;
+            sessionActive    = false;
+            consecutiveFails = 0;
+            lastOnlineState  = null;
             localStorage.removeItem('hs_session');
             localStorage.removeItem('hs_mode');
             if (pollInterval) clearInterval(pollInterval);
@@ -541,14 +465,23 @@
             setInterval(updateClock, 1000);
             updateClock();
             doPoll();
-            pollInterval = setInterval(doPoll, 2000);
+            // [4] 2500ms — moins agressif, évite chevauchement requêtes SSL
+            pollInterval = setInterval(doPoll, 2500);
         }
 
-        // ── POLL /api/poll toutes les 2s ──
+        // ── POLL /api/poll ──
         async function doPoll() {
             try {
-                const r    = await fetch('/api/poll');
+                // [2] Timeout explicite 5s via AbortController
+                const controller = new AbortController();
+                const tid = setTimeout(() => controller.abort(), 5000);
+
+                const r    = await fetch('/api/poll', { signal: controller.signal });
+                clearTimeout(tid);
+
                 const data = await r.json();
+                consecutiveFails = 0; // [2] reset sur succès
+
                 if (!data.success) return;
 
                 if (data.sensors) {
@@ -556,7 +489,6 @@
                     checkSoil(data.sensors.soil);
                 }
 
-                // Ne pas écraser les toggles si on vient de cliquer
                 if (!pollBlocked) {
                     setValves(data.commands?.sw1 || false, data.commands?.sw2 || false);
                 }
@@ -573,7 +505,14 @@
                 }
 
                 setOnline(data.lastSeen, data.esp32Online);
-            } catch(e) {}
+
+            } catch(e) {
+                // [2] Après 3 échecs consécutifs → hors-ligne
+                consecutiveFails++;
+                if (consecutiveFails >= 3) {
+                    setOnline(null, false);
+                }
+            }
         }
 
         // ── Capteurs ──
@@ -591,16 +530,36 @@
             document.getElementById('sw2').checked = !!v2;
         }
 
-        // ── Statut ESP32 ──
+        // ── Statut ESP32 — CORRIGÉ [1] ──
         function setOnline(lastSeen, esp32Online) {
-            const online  = esp32Online || (lastSeen && Date.now() - lastSeen < 12000);
+            let online = false;
+
+            if (esp32Online === true) {
+                // Le serveur confirme explicitement que l'ESP32 est actif
+                online = true;
+            } else if (lastSeen != null) {
+                // [1] Normalisation : si lastSeen < 1e12 → c'est en secondes Unix
+                //     (ex: 1741480000) → convertir en ms JS (ex: 1741480000000)
+                //     Si lastSeen > 1e12 → déjà en ms JS, utiliser tel quel
+                const ts = (lastSeen < 1e12) ? lastSeen * 1000 : lastSeen;
+
+                // [1] Seuil 25s (était 12s) : 12 envois de marge sur 2s/envoi
+                online = (Date.now() - ts) < 25000;
+            }
+
+            // Éviter de redessiner si l'état n'a pas changé
+            if (online === lastOnlineState) return;
+            lastOnlineState = online;
+
             const ind     = document.getElementById('status-indicator');
             const txt     = document.getElementById('status-text');
             const content = document.querySelector('.content');
+
             if (online) {
                 txt.innerText = 'ESP32 ACTIVE';
                 ind.classList.add('online');
                 content.classList.remove('system-offline-lock');
+                soilAlertShown = false; // réinitialiser l'alerte sol au retour en ligne
             } else {
                 txt.innerText = 'ESP32 INACTIVE';
                 ind.classList.remove('online');
@@ -611,19 +570,34 @@
             }
         }
 
-        // ── Alerte sol bas ──
+        // ── Alerte sol bas — CORRIGÉE [3] ──
         function checkSoil(soil) {
-            if (soil < 20 && !forcedWatering) {
-                if (confirm("L'humidité du sol est basse (" + soil + "%). Arroser maintenant ?")) {
-                    forcedWatering = true;
-                    cmdValve(1, true); cmdValve(2, true);
-                    document.getElementById('status-msg').innerText = 'ARROSAGE DE SECOURS EN COURS...';
-                }
+            if (soil == null) return;
+
+            // [3] soilAlertShown empêche le confirm() de s'ouvrir toutes les 2.5s
+            if (soil < 20 && !forcedWatering && !soilAlertShown) {
+                soilAlertShown = true;
+                // setTimeout évite de bloquer la boucle de polling
+                setTimeout(() => {
+                    if (confirm('Soil moisture is low (' + soil + '%). Start emergency watering now?')) {
+                        forcedWatering = true;
+                        cmdValve(1, true);
+                        cmdValve(2, true);
+                        document.getElementById('status-msg').innerText = 'EMERGENCY WATERING IN PROGRESS...';
+                    } else {
+                        // Utilisateur refuse : ré-activer l'alerte quand sol > 30%
+                        soilAlertShown = false;
+                    }
+                }, 100);
             }
-            if (forcedWatering && soil >= 100) {
+
+            // [3] Zone tampon 60% (était 100% → jamais atteint en conditions réelles)
+            if (forcedWatering && soil >= 60) {
                 forcedWatering = false;
-                cmdValve(1, false); cmdValve(2, false);
-                document.getElementById('status-msg').innerText = 'SOL SATURÉ : ARROSAGE TERMINÉ';
+                soilAlertShown = false;
+                cmdValve(1, false);
+                cmdValve(2, false);
+                document.getElementById('status-msg').innerText = 'SOIL SATURATED — WATERING STOPPED';
             }
         }
 
