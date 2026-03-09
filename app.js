@@ -2,15 +2,23 @@
 
 // ================================================
 //  HydroSmart — app.js
-//  VERSION HTTP PURE — CORRIGEE
+//  FIX CRITIQUE : vannes s'allument au démarrage web
 //
-//  FIXES :
-//  ✅ Seuil esp32Online 12s → 20s (cohérent frontend)
-//  ✅ Endpoint POST /api/heartbeat ajouté
-//  ✅ /api/poll retourne lastSeen en ms (pas en s)
-//  ✅ /api/status même seuil 20s
-//  ✅ Pool DB : max connexions réduit + retry connect
-//  ✅ Logs plus clairs pour le debug
+//  CAUSE RACINE :
+//  hs_commands garde sw1/sw2=true en DB depuis la
+//  session précédente ou un arrosage non terminé.
+//  Au premier /api/poll du navigateur, setValves()
+//  reçoit sw1=true → vanne s'ouvre immédiatement.
+//
+//  TRIPLE PROTECTION :
+//  [A] initDB()      → reset OFF au boot serveur
+//  [B] /api/login    → reset OFF à chaque connexion
+//  [C] /api/valve-reset → endpoint reset d'urgence
+//
+//  AUTRES FIXES :
+//  ✅ Seuil esp32Online 20s (cohérent frontend)
+//  ✅ POST /api/heartbeat
+//  ✅ lastSeen toujours en millisecondes
 // ================================================
 
 const express   = require('express');
@@ -22,8 +30,6 @@ const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3000;
 
-// ── Seuil de présence ESP32 ──────────────────────
-// FIX : 20 000 ms (cohérent avec index.html et ESP32)
 const ESP32_TIMEOUT_MS = 20000;
 
 // ── NeonDB ──────────────────────────────────────
@@ -43,8 +49,6 @@ async function q(sql, p = []) {
   finally { c.release(); }
 }
 
-// ── Helper : est-ce que l'ESP32 est en ligne ? ──
-// FIX : fonction centralisée pour éviter les incohérences
 function isEsp32Online(lastSeenMs) {
   if (!lastSeenMs || lastSeenMs === 0) return false;
   return (Date.now() - lastSeenMs) < ESP32_TIMEOUT_MS;
@@ -97,7 +101,13 @@ async function initDB() {
       INSERT INTO hs_status (last_seen)
         SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM hs_status);
     `);
-    console.log('✅ NeonDB initialisée');
+
+    // [A] FIX BOOT : reset vannes à chaque démarrage du serveur
+    // Protège contre un crash qui laisserait sw1/sw2=true bloqué
+    await c.query(`UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1`, [Date.now()]);
+    await c.query(`UPDATE hs_valves   SET v1=false,  v2=false,  updated_at=$1`, [Date.now()]);
+    console.log('🔒 [BOOT] Vannes remises à OFF');
+    console.log('✅ NeonDB OK');
   } finally { c.release(); }
 }
 
@@ -125,22 +135,17 @@ function authESP(req, res, next) {
 //  ROUTES ESP32
 // ================================================
 
-// ESP32 → envoi capteurs (met à jour last_seen)
 app.post('/api/sensors', authESP, async (req, res) => {
   const { temp, hum, soil } = req.body;
   if (temp == null || hum == null || soil == null)
     return res.status(400).json({ success: false, message: 'temp hum soil requis' });
   try {
     const now = Date.now();
-    await q(
-      'INSERT INTO hs_sensors (temp,hum,soil,recorded_at) VALUES ($1,$2,$3,$4)',
-      [+temp, +hum, Math.round(+soil), now]
-    );
-    // FIX : last_seen toujours en millisecondes
+    await q('INSERT INTO hs_sensors (temp,hum,soil,recorded_at) VALUES ($1,$2,$3,$4)',
+            [+temp, +hum, Math.round(+soil), now]);
     await q('UPDATE hs_status SET last_seen=$1', [now]);
-    // Nettoyage données > 24h
     await q('DELETE FROM hs_sensors WHERE recorded_at < $1', [now - 86400000]);
-    console.log(`📡 Capteurs  T=${temp}°C  H=${hum}%  Sol=${soil}%`);
+    console.log(`📡 T=${temp}°C  H=${hum}%  Sol=${soil}%`);
     res.json({ success: true });
   } catch(e) {
     console.error('POST /api/sensors:', e.message);
@@ -148,7 +153,6 @@ app.post('/api/sensors', authESP, async (req, res) => {
   }
 });
 
-// ESP32 → lecture commandes (polling 1.5s)
 app.get('/api/commands', authESP, async (req, res) => {
   try {
     const [cmds] = await q('SELECT sw1,sw2 FROM hs_commands ORDER BY id DESC LIMIT 1');
@@ -159,12 +163,10 @@ app.get('/api/commands', authESP, async (req, res) => {
   }
 });
 
-// ESP32 → feedback état vannes
 app.post('/api/valve-feedback', authESP, async (req, res) => {
   const { v1, v2 } = req.body;
   try {
     await q('UPDATE hs_valves SET v1=$1, v2=$2, updated_at=$3', [!!v1, !!v2, Date.now()]);
-    console.log(`📤 Feedback vannes  V1=${v1}  V2=${v2}`);
     res.json({ success: true });
   } catch(e) {
     console.error('POST /api/valve-feedback:', e.message);
@@ -172,17 +174,11 @@ app.post('/api/valve-feedback', authESP, async (req, res) => {
   }
 });
 
-// ================================================
-//  FIX : Endpoint heartbeat dédié
-//  L'ESP32 envoie un ping toutes les 5s
-//  Met à jour last_seen même si les autres routes
-//  échouent (DHT22 erreur, capteur sol déconnecté…)
-// ================================================
 app.post('/api/heartbeat', authESP, async (req, res) => {
   try {
     const now = Date.now();
     await q('UPDATE hs_status SET last_seen=$1', [now]);
-    console.log(`💓 Heartbeat ESP32 reçu — last_seen=${now}`);
+    console.log(`💓 Heartbeat ESP32`);
     res.json({ success: true, ts: now });
   } catch(e) {
     console.error('POST /api/heartbeat:', e.message);
@@ -194,19 +190,29 @@ app.post('/api/heartbeat', authESP, async (req, res) => {
 //  ROUTES NAVIGATEUR
 // ================================================
 
-// Login
-app.post('/api/login', (req, res) => {
+// [B] FIX LOGIN : reset vannes à chaque connexion
+// → le premier poll du navigateur verra sw1=false, sw2=false
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const ok_e = process.env.ADMIN_EMAIL    || 'hydrosmart@gmail.com';
   const ok_p = process.env.ADMIN_PASSWORD || 'groupe5';
-  if (email === ok_e && password === ok_p)
-    return res.json({ success: true });
-  res.status(401).json({ success: false, message: 'Identifiants invalides' });
+  if (email !== ok_e || password !== ok_p)
+    return res.status(401).json({ success: false, message: 'Identifiants invalides' });
+
+  try {
+    // Ne pas couper un arrosage planifié en cours
+    if (!wateringActive) {
+      await q('UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1', [Date.now()]);
+      console.log('🔒 [LOGIN] Vannes remises à OFF');
+    }
+  } catch(e) {
+    console.error('Login reset error (non-bloquant):', e.message);
+  }
+
+  res.json({ success: true });
 });
 
-// ── POLL principal navigateur ────────────────────
-// FIX : esp32Online calculé avec ESP32_TIMEOUT_MS (20s)
-// FIX : lastSeen toujours en millisecondes
+// ── POLL navigateur ──────────────────────────────
 app.get('/api/poll', async (req, res) => {
   try {
     const [sensors] = await q('SELECT * FROM hs_sensors  ORDER BY id DESC LIMIT 1');
@@ -215,7 +221,6 @@ app.get('/api/poll', async (req, res) => {
     const [sched]   = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     const [status]  = await q('SELECT * FROM hs_status   ORDER BY id DESC LIMIT 1');
 
-    // FIX : last_seen est déjà en ms (pas de conversion)
     const lastSeen    = status?.last_seen || 0;
     const esp32Online = isEsp32Online(lastSeen);
 
@@ -225,7 +230,7 @@ app.get('/api/poll', async (req, res) => {
       valves:      valves  || { v1: false, v2: false },
       commands:    cmds    || { sw1: false, sw2: false },
       schedule:    sched   || {},
-      lastSeen,                    // en ms — le frontend attend des ms
+      lastSeen,
       esp32Online: !!esp32Online,
     });
   } catch(e) {
@@ -234,7 +239,7 @@ app.get('/api/poll', async (req, res) => {
   }
 });
 
-// Commande vanne depuis navigateur
+// Commande vanne navigateur
 app.post('/api/valve', async (req, res) => {
   const { valve, state } = req.body;
   if (valve !== 1 && valve !== 2)
@@ -251,16 +256,28 @@ app.post('/api/valve', async (req, res) => {
   }
 });
 
+// [C] Reset d'urgence — appel manuel si vanne bloquée ON
+// Exemple : fetch('/api/valve-reset', {method:'POST'}) depuis la console
+app.post('/api/valve-reset', async (req, res) => {
+  try {
+    await q('UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1', [Date.now()]);
+    await q('UPDATE hs_valves   SET v1=false,  v2=false,  updated_at=$1', [Date.now()]);
+    console.log('🚨 [RESET URGENCE] Toutes les vannes → OFF');
+    res.json({ success: true, message: 'Toutes les vannes remises à OFF' });
+  } catch(e) {
+    console.error('POST /api/valve-reset:', e.message);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // Planning
 app.post('/api/schedule', async (req, res) => {
   const { time, duration, valves } = req.body;
   if (!time || !duration || !Array.isArray(valves))
     return res.status(400).json({ success: false, message: 'time duration valves[] requis' });
   try {
-    await q(
-      'UPDATE hs_schedule SET enabled=true,time_val=$1,duration=$2,valves=$3,updated_at=$4',
-      [time, +duration, valves.join(','), Date.now()]
-    );
+    await q('UPDATE hs_schedule SET enabled=true,time_val=$1,duration=$2,valves=$3,updated_at=$4',
+            [time, +duration, valves.join(','), Date.now()]);
     console.log(`📅 Planning UTC: ${time}  ${duration}min  [${valves}]`);
     res.json({ success: true });
   } catch(e) {
@@ -280,18 +297,12 @@ app.delete('/api/schedule', async (req, res) => {
   }
 });
 
-// FIX : /api/status utilise aussi ESP32_TIMEOUT_MS
 app.get('/api/status', async (req, res) => {
   try {
     const [status] = await q('SELECT * FROM hs_status ORDER BY id DESC LIMIT 1');
     const lastSeen = status?.last_seen || 0;
-    res.json({
-      success:     true,
-      lastSeen,
-      esp32Online: isEsp32Online(lastSeen),
-    });
+    res.json({ success: true, lastSeen, esp32Online: isEsp32Online(lastSeen) });
   } catch(e) {
-    console.error('GET /api/status:', e.message);
     res.status(500).json({ success: false, message: e.message });
   }
 });
@@ -343,8 +354,8 @@ setInterval(async () => {
 initDB().then(() => {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🌿 HydroSmart — HTTP PURE`);
-    console.log(`   Port        : ${PORT}`);
-    console.log(`   Timezone    : UTC (Fly.io)`);
+    console.log(`   Port         : ${PORT}`);
+    console.log(`   Timezone     : UTC (Fly.io)`);
     console.log(`   ESP32 timeout: ${ESP32_TIMEOUT_MS}ms\n`);
   });
 }).catch(err => {
