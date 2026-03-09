@@ -1,24 +1,21 @@
 'use strict';
 
 // ================================================
-//  HydroSmart — app.js
-//  FIX CRITIQUE : vannes s'allument au démarrage web
+//  HydroSmart — app.js  [VERSION CORRIGÉE]
 //
-//  CAUSE RACINE :
-//  hs_commands garde sw1/sw2=true en DB depuis la
-//  session précédente ou un arrosage non terminé.
-//  Au premier /api/poll du navigateur, setValves()
-//  reçoit sw1=true → vanne s'ouvre immédiatement.
+//  FIXES :
+//  [FIX1] ESP32_TIMEOUT_MS = 12000 (12s)
+//         L'ESP32 envoie heartbeat toutes les 5s
+//         → marge confortable, pas de faux "offline"
 //
-//  TRIPLE PROTECTION :
-//  [A] initDB()      → reset OFF au boot serveur
-//  [B] /api/login    → reset OFF à chaque connexion
-//  [C] /api/valve-reset → endpoint reset d'urgence
+//  [FIX2] /api/heartbeat robuste : upsert sécurisé
+//         → ne plante pas si last_seen manquant en DB
 //
-//  AUTRES FIXES :
-//  ✅ Seuil esp32Online 20s (cohérent frontend)
-//  ✅ POST /api/heartbeat
-//  ✅ lastSeen toujours en millisecondes
+//  [FIX3] /api/poll renvoie toujours lastSeen en ms JS
+//         → plus de confusion ms vs secondes Unix côté frontend
+//
+//  [FIX4] isEsp32Online centralisé en une seule fonction
+//         utilisée partout de manière cohérente
 // ================================================
 
 const express   = require('express');
@@ -30,7 +27,9 @@ const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3000;
 
-const ESP32_TIMEOUT_MS = 20000;
+// [FIX1] 12s : l'ESP32 envoie heartbeat toutes les 5s
+// → marge de 2+ heartbeats manqués avant d'être "offline"
+const ESP32_TIMEOUT_MS = 12000;
 
 // ── NeonDB ──────────────────────────────────────
 const pool = new Pool({
@@ -49,9 +48,11 @@ async function q(sql, p = []) {
   finally { c.release(); }
 }
 
+// [FIX4] Fonction centralisée — utilisée partout
+// lastSeenMs doit TOUJOURS être en millisecondes JS (Date.now())
 function isEsp32Online(lastSeenMs) {
   if (!lastSeenMs || lastSeenMs === 0) return false;
-  return (Date.now() - lastSeenMs) < ESP32_TIMEOUT_MS;
+  return (Date.now() - Number(lastSeenMs)) < ESP32_TIMEOUT_MS;
 }
 
 // ── Init tables ──────────────────────────────────
@@ -102,8 +103,7 @@ async function initDB() {
         SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM hs_status);
     `);
 
-    // [A] FIX BOOT : reset vannes à chaque démarrage du serveur
-    // Protège contre un crash qui laisserait sw1/sw2=true bloqué
+    // [A] FIX BOOT : reset vannes à chaque démarrage serveur
     await c.query(`UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1`, [Date.now()]);
     await c.query(`UPDATE hs_valves   SET v1=false,  v2=false,  updated_at=$1`, [Date.now()]);
     console.log('🔒 [BOOT] Vannes remises à OFF');
@@ -140,7 +140,7 @@ app.post('/api/sensors', authESP, async (req, res) => {
   if (temp == null || hum == null || soil == null)
     return res.status(400).json({ success: false, message: 'temp hum soil requis' });
   try {
-    const now = Date.now();
+    const now = Date.now(); // TOUJOURS en ms JS [FIX3]
     await q('INSERT INTO hs_sensors (temp,hum,soil,recorded_at) VALUES ($1,$2,$3,$4)',
             [+temp, +hum, Math.round(+soil), now]);
     await q('UPDATE hs_status SET last_seen=$1', [now]);
@@ -174,11 +174,19 @@ app.post('/api/valve-feedback', authESP, async (req, res) => {
   }
 });
 
+// [FIX2] Heartbeat robuste — met à jour last_seen en ms JS
+// Fonctionne même si la ligne hs_status n'existe pas encore
 app.post('/api/heartbeat', authESP, async (req, res) => {
   try {
-    const now = Date.now();
+    const now = Date.now(); // ms JS [FIX3]
+    // Upsert sécurisé : insère si pas de ligne, update sinon
+    await q(`
+      INSERT INTO hs_status (last_seen)
+      VALUES ($1)
+      ON CONFLICT DO NOTHING
+    `, [now]);
     await q('UPDATE hs_status SET last_seen=$1', [now]);
-    console.log(`💓 Heartbeat ESP32`);
+    console.log(`💓 Heartbeat ESP32 — ${new Date(now).toISOString()}`);
     res.json({ success: true, ts: now });
   } catch(e) {
     console.error('POST /api/heartbeat:', e.message);
@@ -191,7 +199,6 @@ app.post('/api/heartbeat', authESP, async (req, res) => {
 // ================================================
 
 // [B] FIX LOGIN : reset vannes à chaque connexion
-// → le premier poll du navigateur verra sw1=false, sw2=false
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   const ok_e = process.env.ADMIN_EMAIL    || 'hydrosmart@gmail.com';
@@ -200,7 +207,6 @@ app.post('/api/login', async (req, res) => {
     return res.status(401).json({ success: false, message: 'Identifiants invalides' });
 
   try {
-    // Ne pas couper un arrosage planifié en cours
     if (!wateringActive) {
       await q('UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1', [Date.now()]);
       console.log('🔒 [LOGIN] Vannes remises à OFF');
@@ -212,7 +218,8 @@ app.post('/api/login', async (req, res) => {
   res.json({ success: true });
 });
 
-// ── POLL navigateur ──────────────────────────────
+// ── POLL navigateur [FIX3] ──────────────────────
+// lastSeen toujours en ms JS → pas de confusion côté frontend
 app.get('/api/poll', async (req, res) => {
   try {
     const [sensors] = await q('SELECT * FROM hs_sensors  ORDER BY id DESC LIMIT 1');
@@ -221,7 +228,8 @@ app.get('/api/poll', async (req, res) => {
     const [sched]   = await q('SELECT * FROM hs_schedule ORDER BY id DESC LIMIT 1');
     const [status]  = await q('SELECT * FROM hs_status   ORDER BY id DESC LIMIT 1');
 
-    const lastSeen    = status?.last_seen || 0;
+    // [FIX3] last_seen est BIGINT en ms JS — pas de conversion nécessaire
+    const lastSeen    = Number(status?.last_seen || 0);
     const esp32Online = isEsp32Online(lastSeen);
 
     res.json({
@@ -230,7 +238,7 @@ app.get('/api/poll', async (req, res) => {
       valves:      valves  || { v1: false, v2: false },
       commands:    cmds    || { sw1: false, sw2: false },
       schedule:    sched   || {},
-      lastSeen,
+      lastSeen,          // toujours en ms JS
       esp32Online: !!esp32Online,
     });
   } catch(e) {
@@ -256,8 +264,7 @@ app.post('/api/valve', async (req, res) => {
   }
 });
 
-// [C] Reset d'urgence — appel manuel si vanne bloquée ON
-// Exemple : fetch('/api/valve-reset', {method:'POST'}) depuis la console
+// [C] Reset d'urgence
 app.post('/api/valve-reset', async (req, res) => {
   try {
     await q('UPDATE hs_commands SET sw1=false, sw2=false, updated_at=$1', [Date.now()]);
@@ -300,7 +307,7 @@ app.delete('/api/schedule', async (req, res) => {
 app.get('/api/status', async (req, res) => {
   try {
     const [status] = await q('SELECT * FROM hs_status ORDER BY id DESC LIMIT 1');
-    const lastSeen = status?.last_seen || 0;
+    const lastSeen = Number(status?.last_seen || 0);
     res.json({ success: true, lastSeen, esp32Online: isEsp32Online(lastSeen) });
   } catch(e) {
     res.status(500).json({ success: false, message: e.message });
