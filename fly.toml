@@ -1,4 +1,4 @@
-app = "hydrosmart-groupe-iot"
+app = "hydrosmart"
 primary_region = "cdg"
 
 [build]
@@ -9,9 +9,9 @@ primary_region = "cdg"
   NODE_ENV = "production"
 
 [http_service]
-  internal_port = 3000
-  force_https   = true
-  auto_stop_machines  = false
+  internal_port = 3000        # ← DOIT ÊTRE 3000
+  force_https = true
+  auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
 
