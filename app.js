@@ -34,7 +34,7 @@ const ESP32_TIMEOUT_MS = 12000;
 // ── NeonDB ──────────────────────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL ||
-    'postgresql://neondb_owner:npg_jiCSoE8M7kxy@ep-quiet-field-aigwxbil-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+    'postgresql://neondb_owner:npg_ciw3zt7eDlux@ep-soft-term-an7v1dq6-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
   ssl: { rejectUnauthorized: false },
   max: 5,
   idleTimeoutMillis: 30000,
